@@ -8,37 +8,36 @@
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #140d22; color: #fff3df; font: 15px/1.5 Georgia, serif; }
   canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  .ui { position: fixed; left: 26px; pointer-events: none; text-shadow: 0 2px 14px rgba(20, 5, 20, .85); }
-  #top { top: 20px; } #top a { pointer-events: auto; color: #ffd9a0; text-decoration: none; letter-spacing: .1em; font-size: 13px; }
-  #cap { bottom: 28px; max-width: 430px; }
-  #cap .dev { font-family: 'Tiro Devanagari Sanskrit', serif; color: #ffc78a; font-size: 18px; }
-  #cap h1 { font: 400 clamp(28px, 5vw, 48px)/1.05 Marcellus, serif; letter-spacing: .1em; margin: 2px 0 8px; }
-  #cap p { margin: 0; opacity: .88; }
-  #tabs { position: fixed; right: 22px; bottom: 28px; display: flex; gap: 8px; }
-  #who { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
-  #who button { font-size: 17px !important; padding: 10px 22px !important; }
-  #tabs button, #who button { font: 15px Marcellus, serif; padding: 9px 16px; color: #fff3df; background: rgba(40, 18, 40, .55); border: 1px solid rgba(255, 210, 150, .4); border-radius: 3px; cursor: pointer; backdrop-filter: blur(4px); }
-  #tabs button.on, #who button.on { background: #ffd08a; color: #2a1220; border-color: #ffd08a; }
-  #arrows { position: fixed; right: 22px; bottom: 78px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 70vw; }
-  #arrows button { font: 13px Marcellus, serif; padding: 6px 11px; color: #fff3df; background: rgba(40, 18, 40, .55); border: 1px solid rgba(255, 210, 150, .3); border-radius: 3px; cursor: pointer; }
+  button { font: 14px Marcellus, serif; padding: 7px 13px; color: #fff3df; background: rgba(40, 18, 40, .55); border: 1px solid rgba(255, 210, 150, .35); border-radius: 3px; cursor: pointer; }
+  button.on { background: #ffd08a; color: #2a1220; border-color: #ffd08a; }
+  #back { position: fixed; left: 20px; top: 16px; color: #ffd9a0; text-decoration: none; letter-spacing: .1em; font-size: 13px; text-shadow: 0 2px 10px rgba(20, 5, 20, .8); }
+  #fps { position: fixed; left: 20px; top: 40px; font: 11px ui-monospace, monospace; color: #ffe9c0; opacity: .6; pointer-events: none; }
+  /* everything you press lives in two places: enemies top right, the characters in one bar along the bottom */
+  #summon, #hud { position: fixed; display: flex; gap: 6px; padding: 8px 10px; background: rgba(24, 12, 28, .5); border-radius: 6px; backdrop-filter: blur(5px); }
+  #summon { right: 16px; top: 12px; align-items: center; }
+  #summon span { font: 12px Marcellus, serif; letter-spacing: .14em; text-transform: uppercase; opacity: .7; margin-right: 4px; }
+  #summon button { border-color: rgba(200, 150, 255, .5); }
+  #summon button:active { background: #b98aff; color: #1a0f24; }
+  #hud { left: 0; right: 0; bottom: 14px; margin: 0 auto; width: fit-content; flex-direction: column; align-items: center; max-width: calc(100vw - 24px); box-sizing: border-box; }
+  #hud .row, #arrows, #who, #tabs { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+  #hud .row { gap: 14px; }
+  #arrows button { font-size: 13px; padding: 5px 10px; }
   #arrows button.on { color: #1c0d16; border-color: transparent; }
   #flash { position: fixed; inset: 0; background: #fff6dc; opacity: 0; pointer-events: none; }
-  #summon { position: fixed; right: 24px; top: 50px; font: 15px Marcellus, serif; padding: 9px 16px; color: #fff3df; background: rgba(60, 20, 70, .6); border: 1px solid rgba(200, 150, 255, .5); border-radius: 3px; cursor: pointer; backdrop-filter: blur(4px); }
-  #summon:active { background: #b98aff; color: #1a0f24; }
-  #hits { position: fixed; right: 26px; top: 20px; font: 14px Marcellus, serif; letter-spacing: .1em; opacity: .85; }
   #load { position: fixed; inset: 0; display: grid; place-items: center; background: #140d22; font: 20px Marcellus, serif; letter-spacing: .2em; color: #ffd08a; transition: opacity .6s; }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="top" class="ui"><a href="index.html">← RAMAYANA</a></div>
-<div id="hits"></div>
-<div id="cap" class="ui"><div class="dev" id="dev">राम</div><h1 id="name"></h1><p id="desc"></p></div>
+<a id="back" href="index.html">← RAMAYANA</a>
+<div id="fps"></div>
 <div id="flash"></div>
-<div id="arrows"></div>
-<button id="summon">Summon</button>
-<div id="who"><button data-w="rama">Rama</button><button data-w="sage">Vishwamitra</button></div>
-<div id="tabs"><button data-m="idle">Stand</button><button data-m="walk">Walk</button><button data-m="run">Run</button><button data-m="sit">Sit</button><button data-n="1">Namaste</button><button data-f="1">Rapid fire</button></div>
+<div id="summon"><span>Summon</span><button data-k="grunt">Rakshasa</button><button data-k="pish">Pishacha</button></div>
+<div id="hud">
+  <div id="arrows"></div>
+  <div class="row"><div id="who"><button data-w="rama">Rama</button><button data-w="sage">Vishwamitra</button></div>
+  <div id="tabs"><button data-m="idle">Stand</button><button data-m="walk">Walk</button><button data-m="run">Run</button><button data-m="sit">Sit</button><button data-n="1">Namaste</button><button data-f="1">Rapid fire</button></div></div>
+</div>
 <div id="load">SHAPING RAMA…</div>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
 <script type="module">
@@ -172,13 +171,17 @@ skinned(sculpt(bodyF, [-0.74, -0.01, -0.22], [0.74, 1.64, 0.26], 0.0095), SKIN);
 const clothF = (x, y, z) => { const ax = x < 0 ? -0.1 : 0.1, fold = Math.sin(Math.atan2(z, x - ax) * 9 + y * 14) * 0.006 * Math.min(1, (1.03 - y) * 4); return Math.max(lowerF(x, y, z) - 0.024 - fold, y - 1.035, 0.37 - y, GAP(x, y)); };
 const dhotiGeo = unlap(skinned(sculpt(clothF, [-0.3, 0.35, -0.22], [0.3, 1.05, 0.22], 0.0085, (x, y) => y < 0.395 ? [1.35, 0.95, 0.3] : y > 0.408 && y < 0.424 ? [0.8, 0.14, 0.16] : [1, 1, 1]), toon(0xb5601a, { vertexColors: true })).geometry);
 // sash and sacred thread, skinned so they bend with the torso
-function strip(pts, w, ref) { const cv = new THREE.CatmullRomCurve3(pts.map(q => V3(...q))), n = 40, pos = [], idx = [], t = V3(), s = V3(), rf = V3(...ref); for (let i = 0; i <= n; i++) { const p = cv.getPoint(i / n); cv.getTangent(i / n, t); s.crossVectors(t, rf).normalize().multiplyScalar(w / 2); pos.push(p.x - s.x, p.y - s.y, p.z - s.z, p.x + s.x, p.y + s.y, p.z + s.z); if (i < n) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } } const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g; }
 const chestPath = (pts, lift) => pts.map(([x, y]) => [x, y, surfZ(bodyF, x, y) + lift]);
-skinned(strip(chestPath([[0.15, 1.46], [0.09, 1.37], [-0.01, 1.24], [-0.09, 1.11], [-0.13, 1.03]], 0.014), 0.1, [0.3, 0.2, 1]), toon(0xead6a4));
-skinned(strip(chestPath([[0.18, 1.475], [0.12, 1.39], [0.02, 1.26], [-0.06, 1.13], [-0.1, 1.05]], 0.02), 0.02, [0.3, 0.2, 1]), GOLD);
-skinned(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(chestPath([[-0.15, 1.45], [-0.06, 1.33], [0.04, 1.18], [0.12, 1.06]], 0.006).map(q => V3(...q))), 40, 0.004, 6), toon(0xfff1d8));
+const chestPathN = (pts, lift) => pts.map(([x, y]) => { const e = 0.004, z = surfZ(bodyF, x, y), nx = -(surfZ(bodyF, x + e, y) - surfZ(bodyF, x - e, y)) / (2 * e), ny = -(surfZ(bodyF, x, y + e) - surfZ(bodyF, x, y - e)) / (2 * e), l = Math.hypot(nx, ny, 1); return [x + nx / l * lift, y + ny / l * lift, z + lift / l]; });
+// things worn across the chest are laid on the body point by point: the line is sampled densely and every vertex of a ribbon is set on the surface under it and lifted along the surface normal, so nothing cuts across a curve of the chest
+const dense = (pts, n = 28) => { const cv = new THREE.CatmullRomCurve3(pts.map(([x, y]) => V3(x, y, 0))); return Array.from({ length: n + 1 }, (_, i) => { const q = cv.getPoint(i / n); return [q.x, q.y]; }); };
+function strip(pts, w, lift, cols = 4) { const n = pts.length - 1, at = [], idx = []; for (let i = 0; i <= n; i++) { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n, i + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]), sx = (b[1] - a[1]) / l * w / 2, sy = -(b[0] - a[0]) / l * w / 2; for (let j = 0; j <= cols; j++) { const u = j / cols * 2 - 1; at.push([pts[i][0] + sx * u, pts[i][1] + sy * u]); if (i < n && j < cols) { const q = i * (cols + 1) + j; idx.push(q, q + 1, q + cols + 1, q + 1, q + cols + 2, q + cols + 1); } } }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(chestPathN(at, lift).flat(), 3)); g.setIndex(idx); g.computeVertexNormals(); return g; }
+skinned(strip(dense([[0.15, 1.46], [0.09, 1.37], [-0.01, 1.24], [-0.09, 1.11], [-0.13, 1.03]]), 0.1, 0.011, 5), toon(0xead6a4));
+skinned(strip(dense([[0.18, 1.475], [0.12, 1.39], [0.02, 1.26], [-0.06, 1.13], [-0.1, 1.05]]), 0.02, 0.016, 2), GOLD);
+skinned(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(chestPathN(dense([[-0.15, 1.45], [-0.06, 1.33], [0.04, 1.18], [0.12, 1.06]]), 0.0075).map(q => V3(...q))), 64, 0.004, 6), toon(0xfff1d8));
 // rigid ornaments ride on single bones
-{ const pts = []; for (let i = 0; i <= 16; i++) { const t = -1.35 + i / 16 * 2.7; pts.push([Math.sin(t) * 0.098, 1.475 - Math.cos(t) * 0.085]); } skinned(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(chestPath(pts, 0.009).map(q => V3(...q))), 48, 0.0095, 8), GOLD); } // collar laid on the chest surface
+{ const pts = []; for (let i = 0; i <= 16; i++) { const t = -1.35 + i / 16 * 2.7; pts.push([Math.sin(t) * 0.098, 1.475 - Math.cos(t) * 0.085]); } skinned(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(chestPathN(pts, 0.015).map(q => V3(...q))), 64, 0.0095, 8), GOLD); } // collar resting on the chest surface, clear of the skin
 { const b = onBone('hips', new THREE.Mesh(new THREE.TorusGeometry(0.154, 0.02, 10, 36), GOLD), [0, 1.025, 0.004]); b.rotation.x = Math.PI / 2; b.scale.set(1, 0.74, 1); onBone('hips', new THREE.Mesh(new THREE.SphereGeometry(0.028, 16, 12), gem(0xff3a4a)), [0, 1.025, 0.12]); }
 { const pl = onBone('hips', new THREE.Group(), [0, 1.0, 0.12]); lathe(pl, [[0.03, 0], [0.05, -0.2], [0.085, -0.5], [0.07, -0.52]], toon(0x8a1c2a), [0, 0, 0], [-0.1, 0, 0], [1, 1, 0.3]); }
 for (const s of ['L', 'R']) { const sh = R3('arm' + s), el = R3('fore' + s), wr = R3('hand' + s), kn = R3('shin' + s), an = R3('foot' + s); ringOn('arm' + s, sh, el, 0.45, 0.06, 0.012, GOLD); ringOn('fore' + s, el, wr, 0.84, 0.04, 0.008, GOLD); ringOn('fore' + s, el, wr, 0.93, 0.037, 0.008, GOLD); ringOn('shin' + s, kn, an, 0.86, 0.048, 0.009, GOLD); ringOn('shin' + s, kn, an, 0.78, 0.052, 0.007, GOLD); }
@@ -495,7 +498,7 @@ const fist = new THREE.Mesh(new THREE.SphereGeometry(0.04, 14, 10), toon(0xb8733
   V.body = V.skin(rama.children.find(o => o.isSkinnedMesh).geometry, skinV);
   const robeF = (x, y, z) => { const ax = x < 0 ? -0.1 : 0.1, fold = Math.sin(Math.atan2(z, x - ax) * 8 + y * 10) * 0.007; return Math.max(lowerF(x, y, z) - 0.03 - fold, y - 1.05, 0.13 - y, GAP(x, y)); };
   V.skin(unlap(weigh(sculpt(robeF, [-0.32, 0.1, -0.24], [0.32, 1.07, 0.24], 0.0095, (x, y) => y < 0.17 ? [1.3, 0.95, 0.35] : y > 0.19 && y < 0.21 ? [0.6, 0.14, 0.12] : [1, 1, 1]), saffron)), saffron);
-  V.skin(weigh(strip(chestPath([[0.17, 1.47], [0.1, 1.38], [0, 1.25], [-0.09, 1.12], [-0.14, 1.04]], 0.016), 0.17, [0.3, 0.2, 1]), maroon), maroon);
+  V.skin(weigh(strip(dense([[0.17, 1.47], [0.1, 1.38], [0, 1.25], [-0.09, 1.12], [-0.14, 1.04]]), 0.17, 0.014, 7), maroon), maroon);
   for (const ry of [0.16, 0.3]) { const pts = []; for (let i = 0; i <= 16; i++) { const t = -1.3 + i / 16 * 2.6; pts.push([Math.sin(t) * 0.1, 1.475 - Math.cos(t) * ry]); } V.skin(weigh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(chestPath(pts, 0.014).map(q => V3(...q))), 48, 0.012, 6), bead), bead); }
   { const b = V.on('hips', new THREE.Mesh(new THREE.TorusGeometry(0.158, 0.022, 10, 36), maroon), [0, 1.03, 0.004]); b.rotation.x = Math.PI / 2; b.scale.set(1, 0.76, 1); }
   for (const s of ['L', 'R']) { const m = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 8, 24), bead), a = R3('arm' + s), e = R3('fore' + s); m.quaternion.setFromUnitVectors(V3(0, 0, 1), V3(e[0] - a[0], e[1] - a[1], 0).normalize()); V.on('arm' + s, m, L3(a, e, 0.45)); }
@@ -579,29 +582,48 @@ const E = new THREE.Euler(), eq = (x, y, z) => new THREE.Quaternion().setFromEul
 const foldR = (() => { const rp = eq(0, 0, -0.78); return rp.clone().invert().multiply(new THREE.Quaternion().setFromAxisAngle(V3(0, 1, 0), 1.75)).multiply(rp); })();
 // ---------- Rakshasa foot soldier: the same body made heavy and hunched, horned and tusked, with a studded club ----------
 const grunts = [], EG = new THREE.Euler();
+const cordPts = Array.from({ length: 17 }, (_, i) => { const t = -1.3 + i / 16 * 2.6; return [Math.sin(t) * 0.12, 1.47 - Math.cos(t) * 0.1]; }), cordGeo = weigh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(chestPathN(cordPts, 0.01).map(q => V3(...q))), 48, 0.006, 6), SKIN), toothAt = chestPathN(cordPts.filter((_, i) => i > 1 && i < 15 && i % 2 === 0), 0.014);
+// a tusk built from tapering segments along an arc: thick at the root, ending in a point
+function tusk(head, s, x0, y0, z, Rt, a0, a1, r0, mat) { const n = 6, cx = x0 - Rt * Math.cos(a0), cy = y0 - Rt * Math.sin(a0); for (let i = 0; i < n; i++) { const a = a0 + (a1 - a0) * (i + 0.5) / n; cyl(head, r0 * (1 - (i + 1) / n), r0 * (1 - i / n), Rt * (a1 - a0) / n * 1.2, mat, [s * (cx + Rt * Math.cos(a)), cy + Rt * Math.sin(a), z], [0, 0, s * a]); } }
+
 function makeGrunt(d, seed) { const g = d.g; while (g.children.length) g.remove(g.children[0]);
   const R = makeRig(), skin = toon(0x4b3f5c, { vertexColors: true, rim: 0.45 }), sk = toon(0x4b3f5c, { rim: 0.45 }), cloth = toon(0x5a1410, { vertexColors: true }), iron = toon(0x2c2a30, { rim: 0.5 }), boneC = toon(0xd8cdb0, { rim: 0.4 }), hairC = toon(0x16101c, { rim: 0.25 }), eyeC = new THREE.MeshBasicMaterial({ color: 0xffa020 }), WOOD = toon(0x7a4a22), DARK = toon(0x15101a);
   { const k = d.k || 1; R.group.scale.set(1.0 * k, 0.9 * k, 1.04 * k); } R.group.position.y = -0.04; g.add(R.group);
   R.skin(V.body.geometry, skin); R.skin(dhotiGeo, cloth);
   { const b = R.on('hips', new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.024, 10, 36), iron), [0, 1.03, 0.004]); b.rotation.x = Math.PI / 2; b.scale.set(1, 0.76, 1); }
-  { const n = R.on('chest', new THREE.Group(), [0, 1.44, 0.02]); n.rotation.x = 0.5; for (let i = 0; i < 9; i++) { const a = -1.4 + i / 8 * 2.8; cyl(n, 0.002, 0.012, 0.05, boneC, [Math.sin(a) * 0.12, -0.02, Math.cos(a) * 0.1], [Math.PI, 0, 0]); } tor(n, 0.12, 0.006, hairC, [0, 0, 0], [Math.PI / 2, 0, 0], [1, 0.84, 1]); }
+  { R.skin(cordGeo, hairC); const n = R.on('chest', new THREE.Group(), [0, 0, 0]); for (const q of toothAt) cyl(n, 0.002, 0.012, 0.05, boneC, [q[0], q[1] - 0.026, q[2]], [Math.PI, 0, 0]); }
   for (const s of [-1, 1]) { const S = s > 0 ? 'L' : 'R'; R.on('chest', sph(new THREE.Group(), 0.085, sk, [0, 0, 0], [1.1, 0.9, 1]).parent, [s * 0.2, 1.455, -0.02]);
     const m = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.014, 8, 24), iron), a = R3('fore' + S), e = R3('hand' + S); m.quaternion.setFromUnitVectors(V3(0, 0, 1), V3(e[0] - a[0], e[1] - a[1], 0).normalize()); R.on('fore' + S, m, L3(a, e, 0.75)); }
   const head = R.on('head', new THREE.Group(), [0, 1.715, 0.012]);
   sph(head, 0.125, sk, [0, 0, 0], [1.05, 1, 1.05]); sph(head, 0.105, sk, [0, -0.085, 0.03], [1.12, 0.8, 1.05]); add(head, new THREE.BoxGeometry(0.19, 0.04, 0.06), sk, [0, 0.032, 0.098], [0.25, 0, 0]); sph(head, 0.024, sk, [0, -0.028, 0.122], [1.4, 0.8, 0.8]); add(head, new THREE.BoxGeometry(0.11, 0.022, 0.02), DARK, [0, -0.095, 0.118]);
   sph(head, 0.132, hairC, [0, 0.03, -0.045], [1.06, 1.05, 1]); sph(head, 0.11, hairC, [0, -0.09, -0.1], [1.25, 1.35, 0.8]);
-  for (const s of [-1, 1]) { sph(head, 0.026, DARK, [s * 0.05, 0, 0.104], [1.3, 0.75, 0.55], [0, 0, s * 0.3]); sph(head, 0.013, eyeC, [s * 0.05, -0.002, 0.116], [1.35, 0.55, 0.5], [0, 0, s * 0.3]); sph(head, 0.005, DARK, [s * 0.05, -0.002, 0.1225], [0.55, 1.1, 0.4]); cyl(head, 0.002, 0.014, 0.075, boneC, [s * 0.048, -0.068, 0.125], [0.2, 0, s * -0.18]); cyl(head, 0.003, 0.03, 0.17, boneC, [s * 0.1, 0.14, 0], [0, 0, s * -0.55]); cyl(head, 0.002, 0.03, 0.1, sk, [s * 0.145, 0.005, -0.01], [0, 0, s * -1.25], [1, 1, 0.5]); }
+  for (const s of [-1, 1]) { sph(head, 0.026, DARK, [s * 0.05, 0, 0.104], [1.3, 0.75, 0.55], [0, 0, s * 0.3]); sph(head, 0.013, eyeC, [s * 0.05, -0.002, 0.116], [1.35, 0.55, 0.5], [0, 0, s * 0.3]); sph(head, 0.005, DARK, [s * 0.05, -0.002, 0.1225], [0.55, 1.1, 0.4]); tusk(head, s, 0.05, -0.088, 0.118, 0.03, 1.25 * Math.PI, 2.35 * Math.PI, 0.016, boneC); cyl(head, 0.003, 0.03, 0.17, boneC, [s * 0.1, 0.14, 0], [0, 0, s * -0.55]); cyl(head, 0.002, 0.03, 0.1, sk, [s * 0.145, 0.005, -0.01], [0, 0, s * -1.25], [1, 1, 0.5]); }
   { const dir = V3(-0.7071, -0.7071, 0), grip = new THREE.Group(), club = new THREE.Group(); R.bone.handR.add(grip); grip.add(club); sph(grip, 0.046, sk, [dir.x * 0.048, dir.y * 0.048, 0], [1.15, 1.4, 1.1], [0, 0, -Math.PI / 4]);
     cyl(club, 0.018, 0.015, 0.22, WOOD, [0, 0.03, 0]); cyl(club, 0.058, 0.026, 0.36, WOOD, [0, 0.32, 0]); sph(club, 0.058, WOOD, [0, 0.5, 0], [1, 0.6, 1]); for (let i = 0; i < 8; i++) { const a = i * 2.4, y = 0.24 + i * 0.03; cyl(club, 0.002, 0.014, 0.04, iron, [Math.cos(a) * 0.055, y, Math.sin(a) * 0.055], [0, -a, -Math.PI / 2]); } for (const y of [0.16, 0.47]) tor(club, y < 0.3 ? 0.03 : 0.055, 0.007, iron, [0, y, 0], [Math.PI / 2, 0, 0]);
     club.quaternion.setFromUnitVectors(V3(0, 1, 0), V3(0, 0.25, 1).normalize()); club.position.copy(dir).multiplyScalar(0.055); d.club = club; d.grip = grip; d.clubP = club.position.clone(); d.clubQ = club.quaternion.clone(); }
   d.mats = new Set(); g.traverse(o => { if (o.isMesh) { o.castShadow = true; d.mats.add(o.material); } });
   d.mat = skin; d.mat2 = sk; d.base = skin.color.clone(); d.rig = R; d.seed = seed; grunts.push(d); }
-for (const [k, i] of [1, 4, 7].entries()) makeGrunt(dummies[i], k);
-// summoning: one to three rakshasas step out of the dark at random points round the clearing and walk in. Summoned ones are gone for good when they die
-function summon() { const n = 1 + ((Math.random() * 3) | 0); for (let i = 0; i < n && grunts.length < 14; i++) { const a = Math.random() * 6.283, r = 11 + Math.random() * 2.5, g = new THREE.Group(); g.position.set(Math.cos(a) * r, 0, Math.sin(a) * r); g.rotation.y = Math.atan2(-g.position.x, -g.position.z); scene.add(g);
-    const d = { g, mat: null, home: g.position.clone(), vel: V3(), wob: 0, rest: 0, char: 0, flung: false, ft: 0, summoned: true, k: 0.88 + Math.random() * 0.3 }; dummies.push(d); makeGrunt(d, Math.random() * 9);
-    tmpA.copy(g.position).setY(1); puff(tmpA, 0x9a5ad0, 30, 3, 0.7, -1); ring(tmpA.setY(0.06), 1.3, 0xb070ff, 0.6); flash(tmpA.setY(1), 0x9a5ad0, 14); } }
-function banish(d) { scene.remove(d.g); scene.remove(d.club); for (const o of [d.g, d.club]) o.traverse(m => { if (m.isMesh && !m.isSkinnedMesh) m.geometry.dispose(); }); d.mats.forEach(m => m.dispose()); grunts.splice(grunts.indexOf(d), 1); dummies.splice(dummies.indexOf(d), 1); }
+// ---------- Pishacha: the rakshasa's starved cousin. Same build of head and the same dark palette, but gaunt, hornless and long-eared, with lank hair, a rag for cloth and claws for weapons. It goes on all fours ----------
+function makePish(d, seed) { const g = d.g, R = makeRig(), skin = toon(0x3f5c52, { vertexColors: true, rim: 0.45 }), sk = toon(0x3f5c52, { rim: 0.45 }), cloth = toon(0x4a1612), boneC = toon(0xd8cdb0, { rim: 0.4 }), hairC = toon(0x16101c, { rim: 0.25 }), eyeC = new THREE.MeshBasicMaterial({ color: 0xc4c0b4 }), DARK = toon(0x15101a);
+  const k = d.k || 1; R.group.scale.set(1.0 * k, 0.8 * k, 1.06 * k); d.by = -0.43 * 0.8 * k; R.group.position.y = d.by; g.add(R.group); R.skin(V.body.geometry, skin);
+  { const b = R.on('hips', new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.014, 8, 28), hairC), [0, 1.02, 0.004]); b.rotation.x = Math.PI / 2; b.scale.set(1, 0.76, 1); for (const z of [0.105, -0.105]) R.on('hips', new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.22, 0.012), cloth), [0, 0.91, z]); }
+  for (let i = 0; i < 6; i++) { const y = 1.08 + i * 0.07; R.on(y < 1.26 ? 'spine' : 'chest', sph(new THREE.Group(), 0.017, sk, [0, 0, 0], [1, 1.1, 1]).parent, [0, y, -0.098]); } // knobs of the backbone
+  const head = R.on('head', new THREE.Group(), [0, 1.715, 0.012]);
+  sph(head, 0.116, sk, [0, 0, 0], [0.98, 1.04, 1.05]); sph(head, 0.086, sk, [0, -0.082, 0.03], [1.05, 0.82, 1.05]); add(head, new THREE.BoxGeometry(0.175, 0.032, 0.05), sk, [0, 0.066, 0.084], [0.28, 0, 0]); sph(head, 0.02, sk, [0, -0.026, 0.116], [1.3, 0.8, 0.8]); add(head, new THREE.BoxGeometry(0.115, 0.024, 0.02), DARK, [0, -0.09, 0.106]);
+  sph(head, 0.122, hairC, [0, 0.028, -0.042], [1.02, 1.03, 1]);
+  for (const x of [-0.014, 0.014]) cyl(head, 0.001, 0.007, 0.026, boneC, [x, -0.074, 0.11]);
+  for (const s of [-1, 1]) { sph(head, 0.04, DARK, [s * 0.053, 0.024, 0.086], [1, 1, 0.6]); sph(head, 0.031, eyeC, [s * 0.053, 0.024, 0.099], [1, 1, 0.6]); sph(head, 0.016, DARK, [s * 0.053, 0.024, 0.1135], [1, 1, 0.4]); // big white staring eyes
+    tusk(head, s, 0.045, -0.085, 0.094, 0.042, 1.15 * Math.PI, 2.3 * Math.PI, 0.019, boneC); // a tusk from each corner of the mouth, sweeping down and out to the side, then up to a sharp point
+    cyl(head, 0.002, 0.03, 0.17, sk, [s * 0.165, 0.03, -0.02], [0, 0, s * -1.15], [1, 1, 0.45]);
+    const dir = V3(s * 0.7071, -0.7071, 0), c = new THREE.Group(); c.quaternion.setFromUnitVectors(V3(0, 1, 0), dir); c.position.copy(dir).multiplyScalar(0.085); R.bone[s > 0 ? 'handL' : 'handR'].add(c); for (const z of [-0.02, 0, 0.02]) cyl(c, 0.001, 0.007, 0.055, boneC, [0, 0.02, z], [z * 8, 0, 0]); }
+  d.mats = new Set(); g.traverse(o => { if (o.isMesh) { o.castShadow = true; d.mats.add(o.material); } });
+  d.pi = true; d.cr = Math.random() < 0.5; d.club = null; d.mat = skin; d.mat2 = sk; d.base = skin.color.clone(); d.rig = R; d.seed = seed; grunts.push(d); }
+// summoning, one button per kind: each press brings one, from a random point round the clearing. All of them are gone for good when they die
+function spawn(a, pi) { if (grunts.length >= 16) return; const r = 11 + Math.random() * 2.5, g = new THREE.Group(); g.position.set(Math.cos(a) * r, 0, Math.sin(a) * r); g.rotation.y = Math.atan2(-g.position.x, -g.position.z); scene.add(g);
+  const d = { g, mat: null, home: g.position.clone(), vel: V3(), wob: 0, rest: 0, char: 0, flung: false, ft: 0, summoned: true, k: pi ? 0.9 + Math.random() * 0.2 : 0.88 + Math.random() * 0.3 }; dummies.push(d); (pi ? makePish : makeGrunt)(d, Math.random() * 9);
+  const c = pi ? 0x6fd09a : 0x9a5ad0; tmpA.copy(g.position).setY(1); puff(tmpA, c, pi ? 14 : 30, 3, 0.7, -1); ring(tmpA.setY(0.06), pi ? 0.8 : 1.3, c, 0.6); flash(tmpA.setY(1), c, pi ? 6 : 14); }
+function summon(kind) { spawn(Math.random() * 6.283, kind === 'pish'); }
+function banish(d) { scene.remove(d.g); if (d.club) scene.remove(d.club); for (const o of d.club ? [d.g, d.club] : [d.g]) o.traverse(m => { if (m.isMesh && !m.isSkinnedMesh) m.geometry.dispose(); }); d.mats.forEach(m => m.dispose()); grunts.splice(grunts.indexOf(d), 1); dummies.splice(dummies.indexOf(d), 1); }
 const GS = [1.2, 1.1, 1.28], kf = (u, K) => { for (let i = 0; i < K.length - 1; i++) if (u <= K[i + 1][0]) { let t = (u - K[i][0]) / (K[i + 1][0] - K[i][0]); t = t * t * (3 - 2 * t); return K[i][1] + (K[i + 1][1] - K[i][1]) * t; } return K[K.length - 1][1]; };
 // three strikes, picked at random each swing. Each gives the club arm, forearm and wrist angles, the torso twist and the forward lean at a moment u of the swing (0..1); in all of them the wrist lets go last
 const pulseS = u => u > 0.4 && u < 0.62 ? Math.sin((u - 0.4) / 0.22 * Math.PI) : 0, STRIKES = [
@@ -611,40 +633,60 @@ const pulseS = u => u > 0.4 && u < 0.62 ? Math.sin((u - 0.4) / 0.22 * Math.PI) :
     w: [0, kf(u, [[0, -1.2], [0.35, -0.2], [0.43, -0.3], [0.5, -1.5], [0.68, -2.1], [1, -1.2]])], tw: kf(u, [[0, 0], [0.35, 0.5], [0.5, -0.4], [0.7, -0.5], [1, 0]]), lean: pulseS(u) * 0.2 }),
   u => ({ a: [kf(u, [[0, -0.6], [0.35, -2.7], [0.42, -2.6], [0.5, -0.95], [0.68, -0.7], [1, -0.6]]), 0, 0.3], f: [kf(u, [[0, -0.7], [0.35, -1.5], [0.44, -1.4], [0.5, -0.15], [0.7, -0.3], [1, -0.7]]), 0, 0], // chop: club dropped behind his head, then brought down in front
     w: [kf(u, [[0, 0.4], [0.35, -0.4], [0.44, -0.3], [0.5, 1.2], [0.68, 1.5], [1, 0.4]]), 0], tw: kf(u, [[0, 0], [0.35, -0.2], [0.5, 0.15], [1, 0]]), lean: kf(u, [[0, 0], [0.35, -0.3], [0.5, 0.45], [0.75, 0.2], [1, 0]]) })];
+// pishacha attacks, picked at random each time and thrown with either hand. Each gives the striking arm (as the right one; mirrored for the left), its forearm, how far the body rears off its hands, the torso twist, a lunge forward, a hop, and how far the legs kick out
+const PB = [0.06, 0.14, -0.3]; // bound: mean lift, swing and phase of the body's height
+const PA = o => Object.assign({ lean: 0, w: [0, 0], hop: 0, leg: 0, lunge: 0, tw: 0, both: 0 }, o), PATK = [
+  u => PA({ a: [kf(u, [[0, -1.55], [0.3, -2.9], [0.42, -0.7], [0.62, -1.2], [1, -1.55]]), 0, 0.45], f: kf(u, [[0, -0.3], [0.3, -1.3], [0.42, -0.05], [0.62, -0.3], [1, -0.3]]), // overhead rake: rears up, claw high, tears down
+    rear: kf(u, [[0, 0], [0.3, 1], [0.42, 0.2], [0.7, 0], [1, 0]]), tw: kf(u, [[0, 0], [0.3, -0.4], [0.42, 0.4], [0.7, 0], [1, 0]]), lunge: kf(u, [[0, 0], [0.3, -0.06], [0.42, 0.14], [0.75, 0], [1, 0]]), hit: 0.42 }),
+  u => PA({ a: [kf(u, [[0, -1.55], [0.3, -1.0], [0.44, -2.6], [0.62, -1.9], [1, -1.55]]), 0, 0.3], f: kf(u, [[0, -0.3], [0.3, -1.5], [0.44, -0.05], [0.62, -0.3], [1, -0.3]]), // pounce: sinks back, springs forward with both claws out, drops back
+    rear: kf(u, [[0, 0], [0.3, 0.35], [0.44, 0.55], [0.62, 0.15], [1, 0]]), lunge: kf(u, [[0, 0], [0.3, -0.2], [0.44, 0.6], [0.6, 0.55], [1, 0]]), hop: kf(u, [[0, 0], [0.3, -0.03], [0.4, 0.2], [0.5, 0.06], [0.62, 0], [1, 0]]), leg: kf(u, [[0, 0], [0.3, -0.3], [0.44, 0.9], [0.62, 0.3], [1, 0]]), both: 1, hit: 0.44 }),
+  u => PA({ a: [kf(u, [[0, -1.55], [0.3, -0.2], [0.5, -0.2], [0.8, -1.55], [1, -1.55]]), kf(u, [[0, 0], [0.3, -0.5], [0.44, 1.7], [0.58, 1.8], [0.8, 0], [1, 0]]), kf(u, [[0, 0.45], [0.3, -0.7], [0.55, -0.6], [0.8, 0.45], [1, 0.45]])], f: kf(u, [[0, -0.3], [0.3, -0.9], [0.44, -0.05], [0.8, -0.3], [1, -0.3]]), // side slash: arm flung wide, swept flat across the front
+    rear: kf(u, [[0, 0], [0.3, 0.8], [0.58, 0.7], [0.85, 0], [1, 0]]), tw: kf(u, [[0, 0], [0.3, -0.5], [0.44, 0.5], [0.58, 0.6], [0.85, 0], [1, 0]]), hit: 0.44 })];
 function gruntUpdate(dt) { for (const d of grunts) { const B = d.rig.bone, g = d.g, R = d.rig.group;
-  if (d.hp === undefined) { d.hp = 2; d.pw = 0; d.wW = 0; d.wA = 0; d.ph = d.seed * 2; d.at = 0; d.dead = 0; d.lu = 0; }
+  if (d.hp === undefined) { d.hp0 = d.hp = d.pi ? 1 : 2; d.rng = d.pi ? 4.8 + (d.seed % 1) * 0.8 : 5.4; d.pw = 0; d.wW = 0; d.wA = 0; d.ph = d.seed * 2; d.at = 0; d.dead = 0; d.lu = 0; }
   // health: every fresh blow costs one, a heavy one costs all three, and so does burning through; being flung away sends him back to the start
   const r0 = Math.hypot(g.position.x, g.position.z) || 1;
-  if (d.flung) d.wasFlung = true; else if (d.wasFlung) { d.wasFlung = false; d.hp = 2; d.char = 0; }
-  if (!d.dead && !d.flung) { if (d.wob > d.pw + 0.25) d.hp -= d.vel.length() > 6 ? 3 : 1; if (d.char > 0.7) d.hp = 0; if (d.hp <= 0) { d.dead = 0.0001; d.vel.multiplyScalar(0.4); d.rg = Array.from({ length: 6 }, () => Math.random()); if (d.vel.length() > 0.8) g.rotation.y = Math.atan2(-d.vel.x, -d.vel.z); scene.attach(d.club); d.club.scale.setScalar(1.0 * (d.k || 1)); d.cv = V3(-g.position.x / r0 * 0.8, 1.6, -g.position.z / r0 * 0.8); d.mats.forEach(m => { m.transparent = true; m.needsUpdate = true; }); } }
+  if (d.flung) d.wasFlung = true; else if (d.wasFlung) { d.wasFlung = false; d.hp = d.hp0; d.char = 0; }
+  if (!d.dead && !d.flung) { if (d.wob > d.pw + 0.25) d.hp -= d.vel.length() > 6 ? 3 : 1; if (d.char > 0.7) d.hp = 0; if (d.hp <= 0) { d.dead = 0.0001; d.vel.multiplyScalar(0.4); d.rg = Array.from({ length: 6 }, () => Math.random()); if (d.vel.length() > 0.8) g.rotation.y = Math.atan2(-d.vel.x, -d.vel.z); if (d.club) { scene.attach(d.club); d.club.scale.setScalar(1.0 * (d.k || 1)); } d.cv = V3(-g.position.x / r0 * 0.8, 1.6, -g.position.z / r0 * 0.8); d.mats.forEach(m => { m.transparent = true; m.needsUpdate = true; });
+      d.dk = d.pi ? (Math.random() * 4) | 0 : 0; d.dD = [0.45, 0.45, 0.5, 0.55][d.dk]; d.ds = Math.random() < 0.5 ? -1 : 1; if (d.dk === 3) d.vel.set(-Math.sin(g.rotation.y) * 2.6, 0, -Math.cos(g.rotation.y) * 2.6); } }
   d.pw = d.wob; d.rest = 0;
-  const r = Math.hypot(g.position.x, g.position.z) || 1, stag = d.wob > 0.3 || d.hold > 0 || d.flung || d.dead > 0, walking = !stag && r > 5.4, attacking = !stag && !walking;
+  const r = Math.hypot(g.position.x, g.position.z) || 1, stag = d.wob > 0.3 || d.hold > 0 || d.flung || d.dead > 0, walking = !stag && r > d.rng, attacking = !stag && !walking;
   // he comes in at a run, weaving from side to side, and turns to face wherever he is heading; once in range he squares up to the fire, bouncing on his feet
-  { const nx = -g.position.x / r, nz = -g.position.z / r, lat = walking ? Math.sin(T * 1.9 + d.seed * 3) * 1.4 : 0, vx = nx * 2.6 - nz * lat, vz = nz * 2.6 + nx * lat;
-    if (walking) { g.position.x += vx * dt; g.position.z += vz * dt; d.ph += dt * 10; }
-    if (!d.flung && !d.dead) { const want = walking ? Math.atan2(vx, vz) : Math.atan2(nx, nz); g.rotation.y += Math.atan2(Math.sin(want - g.rotation.y), Math.cos(want - g.rotation.y)) * Math.min(1, dt * 9); R.position.y = -0.04 + 0.035 * Math.abs(Math.sin(T * 5 + d.seed)) * d.wA; } }
+  { const nx = -g.position.x / r, nz = -g.position.z / r, sp = d.pi && !d.cr ? 3.0 : 2.6, bm = d.pi && !d.cr ? 1 + 0.4 * Math.sin(d.ph - 0.3) : 1, lat = !walking ? 0 : d.pi ? Math.sin(T * 1.6 + d.seed * 3) * 1.2 : Math.sin(T * 1.9 + d.seed * 3) * 1.4, vx = nx * sp - nz * lat, vz = nz * sp + nx * lat;
+    if (walking) { g.position.x += vx * bm * dt; g.position.z += vz * bm * dt; d.ph += dt * (d.pi ? (d.cr ? 8.5 : 11.5) : 10); }
+    if (!d.flung && !d.dead) { const want = walking ? Math.atan2(vx, vz) : Math.atan2(nx, nz); g.rotation.y += Math.atan2(Math.sin(want - g.rotation.y), Math.cos(want - g.rotation.y)) * Math.min(1, dt * 9); R.position.y = d.pi ? R.position.y : -0.04 + 0.035 * Math.abs(Math.sin(T * 5 + d.seed)) * d.wA; } }
   d.wW += ((walking ? 1 : 0) - d.wW) * Math.min(1, dt * 6); d.wA += ((attacking ? 1 : 0) - d.wA) * Math.min(1, dt * 6);
   // attack: a sidearm swing. He coils to his right with the club cocked back, whips his torso round, and the forearm and wrist snap through last so the club head flicks across in front of him
-  { const was = Math.floor(d.at); d.at = attacking ? d.at + dt / 1.05 : 0; if (Math.floor(d.at) !== was || d.sk === undefined) d.sk = (Math.random() * STRIKES.length) | 0; }
-  const u = d.at % 1, wind = 0, S = STRIKES[d.sk](u), smash = S.lean * d.wA, aw = kf(u, [[0, 0], [0.12, 1], [0.75, 1], [1, 0]]) * d.wA, tw = S.tw * d.wA, Ap = { armR: S.a, foreR: S.f }, wrist = S.w;
-  if (attacking && d.lu < 0.48 && u >= 0.48) { d.club.localToWorld(tmpA.set(0, 0.42, 0)); puff(tmpA, 0xffe2b0, 16, 3.2, 0.3, 2); flash(tmpA, 0xffc890, 10); shake = Math.max(shake, 0.05); if (d.sk === 2) { tmpA.y = 0.08; puff(tmpA, 0xffd9a0, 14, 2.4, 0.4, 3); ring(tmpA, 0.8, 0xffc890, 0.3); } }
-  d.lu = u;
+  { const was = Math.floor(d.at); d.at = attacking ? d.at + dt / (d.pi ? 1.4 : 1.05) : 0; if (Math.floor(d.at) !== was || d.sk === undefined) { d.sk = (Math.random() * STRIKES.length) | 0; d.sd = Math.random() < 0.5 ? -1 : 1; } }
+  const u = d.at % 1, wind = 0, S = d.pi ? PATK[d.sk](u) : STRIKES[d.sk](u), smash = S.lean * d.wA, aw = kf(u, [[0, 0], [0.12, 1], [0.75, 1], [1, 0]]) * d.wA, tw = S.tw * d.wA * (d.pi ? d.sd : 1), Ap = d.pi ? {} : { armR: S.a, foreR: S.f }, wrist = S.w;
+  if (d.pi) { if (attacking && d.lu < S.hit && u >= S.hit) for (const h of S.both ? [B.handR, B.handL] : [d.sd > 0 ? B.handR : B.handL]) { h.getWorldPosition(tmpA); puff(tmpA, 0xffd0c0, 7, 2.2, 0.25, 2); } }
+  else if (attacking && d.lu < 0.48 && u >= 0.48) { d.club.localToWorld(tmpA.set(0, 0.42, 0)); puff(tmpA, 0xffe2b0, 16, 3.2, 0.3, 2); flash(tmpA, 0xffc890, 10); shake = Math.max(shake, 0.05); if (d.sk === 2) { tmpA.y = 0.08; puff(tmpA, 0xffd9a0, 14, 2.4, 0.4, 3); } }
+  d.lu = u; if (d.pi && !d.dead) { R.position.y = d.by + (d.cr ? 0.03 + 0.03 * Math.sin(d.ph * 2) : PB[0] + PB[1] * Math.sin(d.ph + PB[2])) * d.wW + S.hop * d.wA; R.position.z = S.lunge * 0.9 * d.wA; } else if (d.pi) R.position.z *= 0.9;
   // death: he topples onto his back, lies a moment, then withers away in dark wisps and a fresh one sets out from the start
-  let f = 0; if (d.dead > 0) { d.dead += dt; const k = Math.min(1, d.dead / 0.45); f = k * k; const sc = Math.max(0, 1 - Math.max(0, d.dead - 1.3) / 0.8); { const tb = Math.max(0, d.dead - 0.45), bn = k >= 1 ? 0.07 * Math.exp(-7 * tb) * Math.abs(Math.sin(14 * tb)) : 0; R.rotation.x = -1.5708 * (f - bn); R.position.y = -0.04 + 0.15 * f; } d.mats.forEach(m => { m.opacity = sc; });
-    { const c = d.club; if (c.position.y > 0.075) { d.cv.y -= 9 * dt; c.position.addScaledVector(d.cv, dt); c.rotation.x += dt * 5; if (c.position.y <= 0.075) { c.position.y = 0.075; c.rotation.set(Math.PI / 2, 0, d.seed * 2.3 + 0.6); puff(c.position, 0xffd9a0, 5, 1.2, 0.3, 2); } } }
+  let f = 0; if (d.dead > 0) { d.dead += dt; const DD = d.dD || 0.45, k = Math.min(1, d.dead / DD); f = k * k; const sc = Math.max(0, 1 - Math.max(0, d.dead - 1.3) / 0.8); { const tb = Math.max(0, d.dead - DD), bn = k >= 1 ? 0.07 * Math.exp(-7 * tb) * Math.abs(Math.sin(14 * tb)) : 0, dk = d.dk || 0, air = Math.sin(k * Math.PI);
+      // four ways down for a pishacha, none of them a spin: flipped onto its back · flat on its face · toppled onto its side · knocked off its feet backwards
+      if (dk === 1) R.rotation.x = 1.5708 * (f - bn); else if (dk === 2) R.rotation.z = d.ds * 1.5708 * (f - bn); else R.rotation.x = -1.5708 * (f - bn);
+      R.position.y = (d.pi ? d.by * (1 - f) - 0.04 * f : -0.04) + 0.15 * f + (dk === 3 ? 0.3 : 0) * air; } d.mats.forEach(m => { m.opacity = sc; });
+    if (d.club) { const c = d.club; if (c.position.y > 0.075) { d.cv.y -= 9 * dt; c.position.addScaledVector(d.cv, dt); c.rotation.x += dt * 5; if (c.position.y <= 0.075) { c.position.y = 0.075; c.rotation.set(Math.PI / 2, 0, d.seed * 2.3 + 0.6); puff(c.position, 0xffd9a0, 5, 1.2, 0.3, 2); } } }
     if (d.dead > 1.3) puff(tmpA.set(g.position.x + (Math.random() - 0.5) * 0.6, 0.2, g.position.z + (Math.random() - 0.5) * 0.9), 0x9a5ad0, 2, 0.5, 0.6, -2.5);
-    if (d.dead > 2.3 && d.summoned) { banish(d); continue; }
-    if (d.dead > 2.3) { d.dead = 0; d.hp = 2; d.char = 0; d.wob = 0; d.pw = 0; d.vel.set(0, 0, 0); g.position.copy(d.home); R.rotation.x = 0; R.position.y = -0.04; d.grip.add(d.club); d.club.position.copy(d.clubP); d.club.quaternion.copy(d.clubQ); d.club.scale.setScalar(1); d.mats.forEach(m => { m.opacity = 1; m.transparent = false; m.needsUpdate = true; }); puff(tmpA.copy(d.home).setY(1), 0x9a5ad0, 16, 2, 0.5, 0); f = 0; } }
+    if (d.dead > 2.3) { banish(d); continue; } }
   const t = T * 1.15 + d.seed * 2.1, P = idle(t), Wk = run(d.ph), w = d.dead ? 0 : d.wob, fl = d.flung ? 1 : 0, br = Math.sin(t * 2.1), st = 1 - d.wW;
-  const O = { spine: [0.3 - w * 0.45 + br * 0.015 - wind * 0.2 + smash * 0.32 - 0 * 0.3, 0, 0], chest: [0.16 + br * 0.03 - w * 0.2 + smash * 0.2 - 0 * 0.16, wind * -0.25, 0], neck: [-0.1, 0, 0], head: [-0.3 - w * 0.45 + smash * 0.15, 0, 0],
+  // pishacha: at rest it is on hands and knees with a level back. Half of them crawl in, opposite hand and knee together with the spine snaking; the other half bound: both hands reach out and land, the body folds over them as the legs tuck through, then the legs drive it forward into the air again
+  const sg = Math.sin(d.ph), cg = Math.cos(d.ph), W = d.wW, A = d.wA, mx = (x, y) => x + (y - x) * W, bnd = d.cr ? 0 : 1, bs = sg * bnd, bc = cg * bnd, ks = d.cr ? sg * W : 0, kc = d.cr ? cg * W : 0, rear = d.pi ? S.rear * A : 0;
+  const HP = mx(1.1, 1.1 + 0.1 * bs - 0.2 * Math.max(0, bc)) - rear * 0.45, sX = mx(0.25, 0.25 - 0.25 * bs) - rear * 0.1 - w * 0.3 + br * 0.015, cX = mx(0.2, 0.2 - 0.1 * bs) - rear * 0.1 + br * 0.03, LT = HP + sX + cX;
+  const ax = -LT + mx(0, -0.2 * bnd - 0.7 * bs) - w * 0.4, fx0 = mx(-0.3, -0.3 - 0.9 * Math.max(0, -bs) - 0.6 * Math.max(0, bc)), actR = d.pi && (S.both || d.sd > 0) ? A : 0, actL = d.pi && (S.both || d.sd < 0) ? A : 0, lp = (x, y, k) => x + (y - x) * k, th = mx(-0.2, -0.2 - 0.3 * bnd + 1.4 * bs) + (d.pi ? S.leg * A : 0) - HP, sh = mx(1.6, 1.6 - 0.35 * bnd - 0.75 * bs + 0.5 * Math.max(0, bc)) - (d.pi ? S.leg * A * 0.8 : 0), ft = mx(0.5, 0.5 - 0.3 * bnd + 0.5 * bs);
+  const O = d.pi ? { hips: [HP, ks * 0.22, 0], spine: [sX, -ks * 0.12, 0], chest: [cX, -ks * 0.1, 0], neck: [-0.6, 0, 0], head: [-0.85 - (LT - 1.55) * 0.8 - w * 0.3, Math.sin(t * 1.1) * 0.25 * st * (1 - A), 0],
+    armR: [lp(ax - ks * 0.5, S.a[0], actR), lp(0, S.a[1], actR), lp(0.45, S.a[2], actR) - fl * 0.6], foreR: [lp(fx0 - Math.max(0, kc) * 0.6, S.f, actR), 0, 0], armL: [lp(ax + ks * 0.5, S.a[0], actL), lp(0, -S.a[1], actL), lp(-0.45, -S.a[2], actL) + fl * 0.6], foreL: [lp(fx0 - Math.max(0, -kc) * 0.6, S.f, actL), 0, 0],
+    legL: [th - ks * 0.8, 0, 0.22 + Math.max(0, kc) * 0.25], legR: [th + ks * 0.8, 0, -0.22 - Math.max(0, -kc) * 0.25], shinL: [sh + ks * 0.8 + Math.max(0, kc) * 0.6, 0, 0], shinR: [sh - ks * 0.8 + Math.max(0, -kc) * 0.6, 0, 0], footL: [ft, 0, 0], footR: [ft, 0, 0] }
+  : { spine: [0.3 - w * 0.45 + br * 0.015 - wind * 0.2 + smash * 0.32 - 0 * 0.3, 0, 0], chest: [0.16 + br * 0.03 - w * 0.2 + smash * 0.2 - 0 * 0.16, wind * -0.25, 0], neck: [-0.1, 0, 0], head: [-0.3 - w * 0.45 + smash * 0.15, 0, 0],
     armL: [-0.1 - fl * 0.6 - smash * 0.3, 0, 0.26 + w * 0.5 + fl * 0.6 - br * 0.02], foreL: [-0.4 + w * 0.3, 0, 0], armR: [-0.45 - w * 0.5 - wind * 2.3 - smash * 0.5 + 0 * 0.4, 0, -0.2 - w * 0.4 - fl * 0.6], foreR: [-0.75 + br * 0.05 - wind * 0.5 + smash * 0.45 + 0 * 0.5, 0, 0],
     legL: [-0.32 * st + 0 * 0.25, 0, 0.13 + 0 * 0.2], legR: [-0.32 * st + 0 * 0.25, 0, -0.13 - 0 * 0.2], shinL: [0.6 * st - 0 * 0.3, 0, 0], shinR: [0.6 * st - 0 * 0.3, 0, 0], footL: [-0.28 * st, 0, 0], footR: [-0.28 * st, 0, 0] };
   // dead: every joint goes limp. The limbs trail behind as he drops, flop once when he lands, and settle flat in a slightly different sprawl each time
-  const rg = d.rg || [0, 0, 0, 0, 0, 0], k = Math.min(1, d.dead / 0.45), sw = f > 0 && k < 1 ? Math.sin(k * Math.PI) : 0, tau = Math.max(0, d.dead - 0.45), fp = f > 0 && k >= 1 ? Math.exp(-6 * tau) * Math.cos(13 * tau) : 0;
-  const Dp = f > 0 ? { head: [0.35 * sw - 0.05, rg[0] * 0.7 * f, 0], armL: [-1.1 * sw - 0.3 * fp, 0, 0.2 + rg[1] * 0.5], foreL: [-0.5 * sw, 0, rg[2] * 0.5], armR: [-1.3 * sw - 0.35 * fp, 0, -0.2 - rg[3] * 0.5], foreR: [-0.6 * sw, 0, -rg[4] * 0.5],
-    legL: [-0.55 * sw - 0.12 * fp, 0, 0.1 + rg[5] * 0.16], legR: [-0.4 * sw - 0.1 * fp, 0, -0.1 - rg[2] * 0.16], shinL: [0.7 * sw, 0, 0], shinR: [0.5 * sw, 0, 0] } : null;
-  for (const n in B) { const a = P[n], b = n === 'armR' || n === 'foreR' ? a : Wk[n], o = O[n], dp = Dp && Dp[n]; if (!a && !b && !o && !Dp) continue; const c = [0, 0, 0]; for (let q = 0; q < 3; q++) { c[q] = (a ? a[q] : 0) * st + (b ? b[q] : 0) * d.wW + (o ? o[q] : 0); if (Ap[n]) c[q] = c[q] * (1 - aw) + Ap[n][q] * aw; if (Dp) c[q] = c[q] * (1 - f) + (dp ? dp[q] : 0); }
-    if (n === 'hips') c[1] += tw * 0.2; else if (n === 'spine') c[1] += tw * 0.35; else if (n === 'chest') c[1] += tw * 0.45; else if (n === 'head') c[1] -= tw * 0.75; else if (n === 'armL') c[0] += tw * 0.5;
+  const rg = d.rg || [0, 0, 0, 0, 0, 0], k = Math.min(1, d.dead / (d.dD || 0.45)), sw = f > 0 && k < 1 ? Math.sin(k * Math.PI) : 0, tau = Math.max(0, d.dead - (d.dD || 0.45)), fp = f > 0 && k >= 1 ? Math.exp(-6 * tau) * Math.cos(13 * tau) : 0;
+  const Dp = f > 0 ? { head: [0.35 * sw - 0.05, rg[0] * 0.7 * f, 0], armL: [-1.1 * sw - 0.3 * fp, 0, d.pi ? -0.35 + rg[1] * 0.9 : 0.2 + rg[1] * 0.5], foreL: [-0.5 * sw - (d.pi ? (0.3 + rg[2]) * f : 0), 0, rg[2] * 0.5], armR: [-1.3 * sw - 0.35 * fp, 0, d.pi ? 0.35 - rg[3] * 0.9 : -0.2 - rg[3] * 0.5], foreR: [-0.6 * sw - (d.pi ? (0.3 + rg[4]) * f : 0), 0, -rg[4] * 0.5],
+    legL: [-0.55 * sw - 0.12 * fp, 0, 0.1 + rg[5] * 0.16], legR: [-0.4 * sw - 0.1 * fp, 0, -0.1 - rg[2] * 0.16], shinL: [0.7 * sw + (d.pi ? rg[5] * 0.9 * f : 0), 0, 0], shinR: [0.5 * sw + (d.pi ? rg[0] * 0.9 * f : 0), 0, 0] } : null;
+  for (const n in B) { const arm = d.pi, a = arm ? null : P[n], b = arm ? null : n === 'armR' || n === 'foreR' ? a : Wk[n], o = O[n], dp = Dp && Dp[n]; if (!a && !b && !o && !Dp) continue; const c = [0, 0, 0]; for (let q = 0; q < 3; q++) { c[q] = (a ? a[q] : 0) * st + (b ? b[q] : 0) * d.wW + (o ? o[q] : 0); if (Ap[n]) c[q] = c[q] * (1 - aw) + Ap[n][q] * aw; if (Dp) c[q] = c[q] * (1 - f) + (dp ? dp[q] : 0); }
+    if (n === 'hips') c[1] += tw * 0.2; else if (n === 'spine') c[1] += tw * 0.35; else if (n === 'chest') c[1] += tw * 0.45; else if (n === 'head') c[1] -= tw * 0.75; else if (n === 'armL' && !d.pi) c[0] += tw * 0.5;
     EG.set(c[0], c[1], c[2]); B[n].quaternion.setFromEuler(EG); }
   B.handR.quaternion.setFromEuler(EG.set(wrist[0] * aw * (1 - f), wrist[1] * aw * (1 - f), 0)); } }
 function idle(t) { const b = Math.sin(t * 1.6), s = Math.sin(t * 0.8); return { hips: [0, 0, s * 0.02], spine: [-0.015 + b * 0.008, 0, -s * 0.015], chest: [-0.01 + b * 0.012, Math.sin(t * 0.5) * 0.04, 0], head: [Math.sin(t * 0.7) * 0.03, Math.sin(t * 0.4) * 0.16, 0], armL: [0.06, 0, -0.64 + b * 0.01], foreL: [-0.38, 0, 0], armR: [0.06, 0, 0.64 - b * 0.01], foreR: [-0.3, 0, 0], legL: [0, 0, 0.02 - s * 0.02], legR: [0, 0, -0.02 - s * 0.02], _y: 0, _x: s * 0.012 }; }
@@ -658,19 +700,17 @@ const INV = { spine: [0, 0.12, 0.2], chest: [0, 0.2, 0.28], neck: [0.14, 0.25, -
 const AIM = { spine: [0, 0.12, 0], chest: [0, 0.2, 0], neck: [0, 0.35, 0], head: [0.02, 0.75, 0], armL: [0, 0, 0.78], armR: [0, 0, -0.78], foreL: [0, 0, 0], handL: [0, 0, 0], handR: [0, 0, 0] }, STANCE = { legL: [0, 0, 0.17], legR: [0, 0, -0.17] };
 const solver = new CCDIKSolver(rama.children.find(o => o.isSkinnedMesh), [{ target: BI.tgtL, effector: BI.handL, links: [{ index: BI.foreL }, { index: BI.armL }], iteration: 14 }, { target: BI.tgtR, effector: BI.handR, links: [{ index: BI.foreR }, { index: BI.armR }], iteration: 14 }]);
 
-const TEXT = { idle: ['RAMA STANDS', 'He breathes and shifts his weight.'], walk: ['RAMA WALKS', 'A walk cycle around the fire, bow carried low.'], run: ['RAMA RUNS', 'A sprint: both feet leave the ground each stride, knees drive high and the arms pump.'], sit: ['RAMA SITS', 'Cross-legged, facing the fire, his bow laid beside him.'] };
-const TEXT_S = { idle: ['VISHWAMITRA STANDS', 'The sage stands with his short staff in hand.'], walk: ['VISHWAMITRA WALKS', 'He circles the fire, staff carried at his side.'], run: ['VISHWAMITRA RUNS', 'The same run as Rama, on the same skeleton.'], sit: ['VISHWAMITRA AT THE YAGYA', 'Seated cross-legged, one hand resting in the U of his staff, the other feeding the fire.'] };
 let namaste = false, wNam = 0; const qT = new THREE.Quaternion();
 let wSit = 0, invoking = false, wInv = 0, invP = 0, haltW = 0, mKick = 0, twist = 0;
 let move = 'idle', firing = false, wWalk = 0, wRun = 0, wAim = 0, phase = 0, pathA = 0.6, facing = 0, draw = 0, fireT = 0, hits = 0, T = 0;
-let yaw = 0.5, pitch = 0.74, dist = 10.5, drag = null; const tgt = V3(0, 1, 0), ndc = new THREE.Vector2(0.3, 0.1);
+let yaw = 0.5, pitch = 0.74, dist = 10.5, drag = null; let camInit = 0; const tgt = V3(0, 1, 0), ndc = new THREE.Vector2(0.3, 0.1);
 const ray = new THREE.Raycaster(), plane = new THREE.Plane(V3(0, 1, 0), -1.15), aimPt = V3(0, 1.15, 9);
-function ui() { const mv = who === 'rama' ? move : SG.move, tx = who === 'rama' ? TEXT : TEXT_S; $('arrows').style.display = who === 'rama' ? '' : 'none'; document.querySelector('#tabs [data-f]').textContent = who === 'rama' ? 'Rapid fire' : 'Lightning'; document.querySelectorAll('#tabs button, #who button').forEach(b => b.classList.toggle('on', b.dataset.w ? b.dataset.w === who : b.dataset.n ? (who === 'rama' ? namaste : SG.namaste) : b.dataset.f ? (who === 'rama' ? firing : SG.firing) : b.dataset.m === mv)); $('dev').textContent = who === 'rama' ? 'राम' : 'विश्वामित्र'; $('name').textContent = who === 'sage' && SG.namaste ? 'VISHWAMITRA OFFERS NAMASTE' : who === 'sage' && SG.firing ? tx[mv][0] + ' · LIGHTNING' : who === 'rama' && namaste ? 'RAMA OFFERS NAMASTE' : who === 'rama' && firing ? tx[mv][0] + ' · FIRING' : tx[mv][0]; $('desc').textContent = (who === 'rama' && firing ? 'Rapid fire toward the pointer. The upper body turns and both arms are solved with inverse kinematics while the legs keep moving. ' : tx[mv][1] + ' ') + 'Drag to orbit, scroll to zoom.'; }
+function ui() { const mv = who === 'rama' ? move : SG.move; $('arrows').style.display = who === 'rama' ? '' : 'none'; document.querySelector('#tabs [data-f]').textContent = who === 'rama' ? 'Rapid fire' : 'Lightning'; document.querySelectorAll('#tabs button, #who button').forEach(b => b.classList.toggle('on', b.dataset.w ? b.dataset.w === who : b.dataset.n ? (who === 'rama' ? namaste : SG.namaste) : b.dataset.f ? (who === 'rama' ? firing : SG.firing) : b.dataset.m === mv)); }
 function setMove(m) { if (who === 'rama') { move = m; if (m === 'sit') firing = false; else namaste = false; } else { SG.move = m; if (m === 'sit') SG.firing = false; else SG.namaste = false; } }
 function toggleNam() { if (who === 'rama') { namaste = !namaste; if (namaste) { move = 'sit'; firing = false; } } else { SG.namaste = !SG.namaste; if (SG.namaste) { SG.move = 'sit'; SG.firing = false; } } }
 function toggleFire() { if (who === 'rama') { firing = !firing; if (firing && move === 'sit') move = 'idle'; } else { SG.firing = !SG.firing; if (SG.firing) { SG.namaste = false; if (SG.move === 'sit') SG.move = 'idle'; } } }
 $('tabs').onclick = e => { const d = e.target.dataset; if (d.w) who = d.w; else if (d.m) setMove(d.m); else if (d.n) toggleNam(); else if (d.f) toggleFire(); else return; ui(); };
-$('who').onclick = $('tabs').onclick; $('summon').onclick = e => { e.stopPropagation(); summon(); };
+$('who').onclick = $('tabs').onclick; $('summon').onclick = e => { e.stopPropagation(); if (e.target.dataset.k) summon(e.target.dataset.k); };
 addEventListener('keydown', e => { const m = { Digit1: 'idle', Digit2: 'walk', Digit3: 'run', Digit4: 'sit' }[e.code]; if (m) setMove(m); else if (e.code === 'KeyV' || e.code === 'Tab') { who = who === 'rama' ? 'sage' : 'rama'; e.preventDefault(); } else if (e.code === 'KeyF' || e.code === 'Space') { toggleFire(); e.preventDefault(); } else if (e.code === 'KeyN') toggleNam(); else return; ui(); });
 const cv = renderer.domElement; cv.style.cursor = 'grab';
 cv.addEventListener('pointerdown', e => { drag = [e.clientX, e.clientY]; });
@@ -699,8 +739,9 @@ function setPose(delta) {
     if (wSit > 0.001 && SITQ[name]) bn.quaternion.slerp(SITQ[name], wSit * wSit * (3 - 2 * wSit)); }
   let y = a._y; y += (b._y - y) * ww; y += (c._y - y) * wr; { const es = wSit * wSit * (3 - 2 * wSit); bone.hips.position.set(a._x * (1 - moving) * (1 - es), (REST.hips[2] + y) * (1 - es) + SIT_Y * es, 0); }
 }
-function frame(now) {
-  requestAnimationFrame(frame); const raw = Math.min(0.05, (now - prev) / 1000); prev = now; slowT = Math.max(0, slowT - raw); const dt = raw * (slowT > 0 ? 0.2 : 1); T += dt;
+let fpsN = 0, fpsT = 0, shown = 0;
+function frame(now) { fpsN++; if (now - fpsT >= 500) { $('fps').textContent = Math.round(fpsN * 1000 / (now - fpsT)) + ' fps · ' + grunts.length + ' enemies'; fpsN = 0; fpsT = now; }
+  requestAnimationFrame(frame); const raw = Math.max(0, Math.min(0.05, (now - prev) / 1000)); prev = now; slowT = Math.max(0, slowT - raw); const dt = raw * (slowT > 0 ? 0.2 : 1); T += dt;
   wWalk += ((move === 'walk' ? 1 : 0) - wWalk) * Math.min(1, dt * 5); wRun += ((move === 'run' ? 1 : 0) - wRun) * Math.min(1, dt * 5); wSit += ((move === 'sit' ? 1 : 0) - wSit) * Math.min(1, dt * 3); if (move !== 'sit' && namaste) { namaste = false; ui(); } wNam += ((namaste && wSit > 0.8 ? 1 : 0) - wNam) * Math.min(1, dt * 4); wAim += ((firing ? 1 : 0) - wAim) * Math.min(1, dt * 7); wInv += ((invoking ? 1 : 0) - wInv) * Math.min(1, dt * (invoking ? 5 : 12));
   haltW = KINDS[kind].halt ? wInv : 0; const still = (1 - haltW) * (1 - wSit), sp = (1.3 * wWalk + 5.0 * wRun) * still; pathA += sp * dt / 4.0; phase += dt * (wWalk * 1.3 / 0.36 + wRun * 10) * still; rama.position.set(Math.sin(pathA) * 4.0, 0, Math.cos(pathA) * 4.0);
   // aim at the point under the pointer
@@ -780,13 +821,14 @@ function frame(now) {
   flames.forEach((m, i) => { m.scale.set((1 + Math.sin(T * 9 + i) * 0.1) * (1 + fireFlare * 0.5), (1 + Math.sin(T * 12 + i * 2) * 0.18) * (1 + fireFlare * 1.1), 1 + fireFlare * 0.5); m.rotation.y = T * (1 + i); }); fireL.intensity = 9 + Math.sin(T * 13) * 1.2 + Math.sin(T * 7.3) * 0.8 + fireFlare * 16;
   key.position.copy(rama.position).addScaledVector(sunDir, 16).add(V3(0, 4, 0)); key.target.position.copy(rama.position);
   // camera: one orbiting view from above, never cutting in close
-  tgt.lerp(tmp.copy(who === 'rama' ? rama.position : V.group.position).add(V3(0, 0.9, 0)), Math.min(1, dt * 4));
+  tgt.lerp(tmp.copy(who === 'rama' ? rama.position : V.group.position).add(V3(0, 0.9, 0)), camInit ? Math.min(1, dt * 4) : (camInit = 1));
   cam.position.set(tgt.x + Math.sin(yaw) * Math.cos(pitch) * dist + (Math.random() - 0.5) * shake * 0.5, tgt.y + Math.sin(pitch) * dist + (Math.random() - 0.5) * shake * 0.5, tgt.z + Math.cos(yaw) * Math.cos(pitch) * dist); cam.lookAt(tgt);
   composer.render();
+  if (!shown && T > 0.8) { shown = 1; $('load').style.opacity = 0; setTimeout(() => $('load').remove(), 700); } // the curtain lifts only once the scene has run for a moment: shaders are compiled and everything has settled
 }
-let prev = performance.now(); ui(); pickKind(0); $('load').style.opacity = 0; setTimeout(() => $('load').remove(), 700);
+let prev = performance.now(); ui(); pickKind(0);
 requestAnimationFrame(frame);
-window.L = { grunts, summon, bone, rama, pickKind, set: (m, f) => { move = m; firing = !!f; ui(); }, sage: m => { SG.move = m; ui(); }, SG, view: (y, p, d) => { yaw = y; pitch = p; dist = d; }, pick: w => { who = w; ui(); }, V, state: () => ({ move, firing, shots: shots.length, hits, draw, wAim, wWalk, wRun }) };
+window.L = { PB, renderer, camDbg: () => [tgt.x, tgt.z, shake, cam.position.x, cam.position.y, cam.position.z].map(v => +v.toFixed(3)), grunts, summon, bone, rama, pickKind, set: (m, f) => { move = m; firing = !!f; ui(); }, sage: m => { SG.move = m; ui(); }, SG, view: (y, p, d) => { yaw = y; pitch = p; dist = d; }, pick: w => { who = w; ui(); }, V, state: () => ({ move, firing, shots: shots.length, hits, draw, wAim, wWalk, wRun }) };
 </script>
 </body>
 </html>
