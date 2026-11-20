@@ -789,8 +789,9 @@ function frame(now) { fpsN++; if (now - fpsT >= 500) { $('fps').textContent = Ma
   ray.setFromCamera(ndc, cam); if (ray.ray.intersectPlane(plane, tmp)) { let best = null, bd = 2.5; for (const d of grunts) { if (d.dead || d.flung) continue; const l = Math.hypot(d.g.position.x - tmp.x, d.g.position.z - tmp.z); if (l < bd) { bd = l; best = d; } } aimLock = best; if (best) bodyPt(best, tmp); aimPt.lerp(tmp, Math.min(1, dt * 14)); } else aimLock = null;
   tmp.copy(aimPt).sub(tmp2.copy(rama.position).setY(1.3)); if (tmp.length() > 0.8) aimDir.copy(tmp.normalize());
   const aimFace = Math.atan2(-aimDir.z, aimDir.x), wrap = a => Math.atan2(Math.sin(a), Math.cos(a)), mvW = Math.max(wWalk, wRun) * (1 - haltW);
-  // backpedal: when he is shooting at something his waist cannot reach while his legs face the way he is going, the legs turn to face the other way and he goes backwards instead
-  { const off = Math.abs(wrap(aimFace - mface)); if (wAim < 0.5 || mvW < 0.3) back = false; else if (off > 1.85) back = true; else if (off < 1.3) back = false; wBk += ((back ? 1 : 0) - wBk) * Math.min(1, dt * 8); }
+  // backpedal. He shoots side-on, bow arm toward the target, so `off` is 0 with the target on his left, 90 degrees with it dead ahead or dead behind, and 180 with it on his right.
+  // Ahead, behind and left he keeps running forwards and turns at the waist. Only when the target is well round to his right (off past about 130 degrees) do the legs turn to face the other way and run backwards; they turn back once it is under about 110
+  { const off = Math.abs(wrap(aimFace - mface)); if (wAim < 0.5 || mvW < 0.3) back = false; else if (off > 2.25) back = true; else if (off < 1.95) back = false; wBk += ((back ? 1 : 0) - wBk) * Math.min(1, dt * 8); }
   const moveFace = mface + (back ? Math.PI : 0);
   let dfA = wrap(aimFace - moveFace); if (Math.abs(dfA) > 2.3 && twist !== 0 && Math.sign(dfA) !== Math.sign(twist)) dfA -= Math.sign(dfA) * 6.2832; // target behind him: keep twisting the same way, never snap to the other side
   const want = move === 'sit' ? Math.atan2(-rama.position.x, -rama.position.z) : wAim > 0.5 ? aimFace - Math.max(-1.45, Math.min(1.45, dfA)) * mvW : moveFace; // standing: turn the whole body; moving: turn only as far as the waist cannot
