@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Artwork · Ramayana</title>
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Tiro+Devanagari+Sanskrit&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css?v=5">
+</head>
+<body class="page">
+<header>
+  <a href="index.html">← RAMAYANA</a>
+  <h1>Character artwork · Level 1</h1>
+  <p class="lede">The eleven characters of Siddhashrama, drawn in six styles. Every figure is generated in code from one jointed rig, so the styles can be compared like for like.</p>
+  <div class="tabs" id="tabs"></div>
+</header>
+<section class="about" id="about"></section>
+<main class="grid" id="grid"></main>
+<script src="src/art.js?v=6"></script>
+<script>
+document.body.insertAdjacentHTML('afterbegin', Art.defs());
+const tabs = document.getElementById('tabs'), grid = document.getElementById('grid'), about = document.getElementById('about');
+const ids = ['master', ...Object.keys(Art.STYLES).filter(k => k !== 'master'), 'compare'];
+function show(id) {
+  location.hash = id;
+  [...tabs.children].forEach(b => b.classList.toggle('on', b.dataset.id === id));
+  grid.classList.toggle('compare', id === 'compare');
+  if (id === 'compare') {
+    about.innerHTML = '<h2>Side by side</h2><p>A hero, a common enemy and a boss in each style, left to right: ' + Object.values(Art.STYLES).map(s => s.name).join(', ') + '.</p>';
+    grid.innerHTML = ['rama', 'rak', 'tataka'].map(cid => { const c = Art.CAST.find(x => x.id === cid); return Object.keys(Art.STYLES).map(sid => `<figure class="card">${Art.svg(c, sid)}<figcaption><small>${c.name} · ${Art.STYLES[sid].name}</small></figcaption></figure>`).join(''); }).join('');
+    return;
+  }
+  const st = Art.STYLES[id];
+  about.innerHTML = `<h2>${st.name}<small>${st.sub}</small></h2><p>${st.blurb}</p>`;
+  grid.innerHTML = Art.CAST.map(c => `<figure class="card">${Art.svg(c, id)}<figcaption><b>${c.name}</b><span class="dev" lang="sa">${c.dev}</span><small>${c.role}</small></figcaption></figure>`).join('');
+}
+tabs.innerHTML = ids.map(id => `<button data-id="${id}">${id === 'compare' ? 'Side by side' : Art.STYLES[id].name}</button>`).join('');
+tabs.onclick = e => { if (e.target.dataset.id) show(e.target.dataset.id); };
+show(ids.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'master');
+</script>
+</body>
+</html>

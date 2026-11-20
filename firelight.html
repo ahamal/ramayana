@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Firelight · Ramayana</title>
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Tiro+Devanagari+Sanskrit&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css?v=7">
+<style>
+  body.fl { background: #07060d; }
+  .fl .grid { grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 22px; }
+  .fl .card svg { border-radius: 2px; }
+  .fl .card small { padding-top: 8px; font-size: 14px; }
+</style>
+</head>
+<body class="page fl">
+<header>
+  <a href="index.html">← RAMAYANA</a>
+  <h1>Firelight · Level 1 cast</h1>
+  <p class="lede">A separate art direction from the puppet studies: posed, cel-shaded figures lit by a single source, each set in its own forest scene. Heroes stand in the glow of the sacred fire; the rakshasas come out of the moonlit dark.</p>
+</header>
+<main class="grid" id="grid"></main>
+<script src="src/firelight.js?v=11"></script>
+<script>
+document.body.insertAdjacentHTML('afterbegin', Fire.defs());
+document.getElementById('grid').innerHTML = Fire.CAST.map((c, i) => `<figure class="card">${Fire.card(c, i)}<figcaption><small>${c.role}</small></figcaption></figure>`).join('');
+</script>
+</body>
+</html>

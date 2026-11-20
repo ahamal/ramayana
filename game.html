@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Ramayana: The Six Nights</title>
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
+<style>
+  :root { --gold: #f2c84a; --ink: #1a120c; --panel: rgba(26, 16, 10, .82); --line: rgba(242, 200, 74, .35); --saffron: #ff8a1a; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0a1024; color: #f4e8d0; font: 14px/1.4 system-ui, sans-serif; user-select: none; -webkit-user-select: none; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  h1, h2, .serif, button { font-family: Marcellus, Georgia, serif; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; backdrop-filter: blur(6px); }
+  #top { position: fixed; top: 10px; left: 10px; right: 10px; display: flex; gap: 10px; align-items: flex-start; pointer-events: none; }
+  #top > div { padding: 8px 12px; pointer-events: auto; }
+  #info { min-width: 150px; }
+  #night { font-family: Marcellus, serif; font-size: 17px; color: var(--gold); }
+  #phase { font-size: 12px; opacity: .85; }
+  #fire { flex: 1; max-width: 420px; margin: 0 auto; }
+  .lbl { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+  .bar { height: 10px; border-radius: 5px; background: rgba(0, 0, 0, .5); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff5a10, #ffd24a); transition: width .2s; }
+  #hp i { background: linear-gradient(90deg, #2f6fd0, #7fb0ff); }
+  #res { display: flex; gap: 14px; align-items: center; font-size: 16px; font-variant-numeric: tabular-nums; }
+  #res b { color: var(--gold); }
+  #mute, #pause { background: none; border: 0; color: inherit; font-size: 18px; cursor: pointer; padding: 0 2px; }
+  #bosses { position: fixed; top: 84px; left: 50%; transform: translateX(-50%); width: min(480px, 86vw); display: grid; gap: 6px; pointer-events: none; }
+  #bosses .lbl { font-family: Marcellus, serif; font-size: 15px; color: #ffb0a0; text-shadow: 0 1px 3px #000; }
+  #bosses .bar i { background: linear-gradient(90deg, #8a1020, #ff4030); }
+  #bottom { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; padding: 6px; max-width: calc(100vw - 16px); }
+  #bottom button { position: relative; overflow: hidden; width: 78px; min-height: 62px; padding: 5px 3px; border-radius: 8px; border: 1px solid var(--line); background: rgba(60, 38, 20, .9); color: #f4e8d0; cursor: pointer; font-size: 12px; line-height: 1.2; }
+  #bottom button span { display: block; font-size: 20px; }
+  #bottom button small { display: block; color: var(--gold); font-family: system-ui; }
+  #bottom button.on { background: #8a4a12; border-color: var(--gold); box-shadow: 0 0 10px rgba(255, 170, 40, .5); }
+  #bottom button.poor { opacity: .45; }
+  #bottom button .cd { position: absolute; left: 0; bottom: 0; width: 100%; background: rgba(0, 0, 0, .65); pointer-events: none; }
+  #go { width: 104px !important; background: linear-gradient(#b05a10, #7a3208) !important; }
+  .hide { display: none !important; }
+  #vig { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 130px 30px rgba(255, 30, 20, .6); opacity: 0; transition: opacity .35s; }
+  #fire.low { animation: pulse .7s infinite alternate; }
+  @keyframes pulse { to { box-shadow: 0 0 24px #ff3020; border-color: #ff5040; } }
+  #paused { position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%); padding: 14px 34px; font-family: Marcellus, serif; font-size: 26px; color: var(--gold); pointer-events: none; }
+  #pop { position: fixed; padding: 8px; transform: translate(-50%, -110%); text-align: center; min-width: 150px; }
+  #pop button { margin: 4px 2px 0; padding: 5px 9px; border-radius: 6px; border: 1px solid var(--line); background: #5a3414; color: #f4e8d0; cursor: pointer; }
+  #pop button:disabled { opacity: .4; }
+  #banner { position: fixed; bottom: 104px; left: 50%; transform: translateX(-50%); width: min(560px, 90vw); padding: 12px 18px; text-align: center; font-family: Marcellus, serif; font-size: 17px; opacity: 0; transition: opacity .5s; pointer-events: none; }
+  #banner.show { opacity: 1; }
+  #toast { position: fixed; bottom: 190px; left: 50%; transform: translateX(-50%); padding: 6px 14px; background: rgba(0, 0, 0, .7); border-radius: 20px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  .float { position: fixed; pointer-events: none; font-weight: 700; text-shadow: 0 1px 3px #000; animation: up 1.2s ease-out forwards; }
+  @keyframes up { to { transform: translateY(-46px); opacity: 0; } }
+  .overlay { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at center, rgba(40, 18, 6, .72), rgba(6, 4, 12, .95)); padding: 16px; text-align: center; }
+  .overlay .card { max-width: 560px; }
+  .overlay h1 { font-size: clamp(40px, 9vw, 72px); margin: 0; color: var(--gold); letter-spacing: .06em; text-shadow: 0 0 30px rgba(255, 140, 30, .6); }
+  .overlay h2 { margin: 4px 0 18px; font-weight: 400; color: var(--saffron); letter-spacing: .12em; text-transform: uppercase; font-size: 15px; }
+  .overlay p { font-size: 15px; line-height: 1.6; opacity: .92; }
+  .overlay .keys { font-size: 13px; opacity: .75; }
+  .overlay button { margin-top: 14px; padding: 12px 34px; font-size: 19px; border-radius: 30px; border: 1px solid var(--gold); background: linear-gradient(#c86a14, #8a3a08); color: #fff4d8; cursor: pointer; }
+  #stars { font-size: 44px; color: var(--gold); letter-spacing: .15em; }
+  @media (max-width: 640px) {
+    #bottom button { width: 52px; min-height: 54px; font-size: 0; } #bottom button span { font-size: 22px; } #bottom button small { font-size: 11px; }
+    #go { width: 70px !important; font-size: 11px !important; } #info { min-width: 0; } #res { gap: 8px; font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="top">
+  <div id="info" class="panel"><div id="night">Siddhashrama</div><div id="phase"></div>
+    <div class="lbl" style="margin-top:5px"><span>Rama</span></div><div class="bar" id="hp"><i></i></div></div>
+  <div id="fire" class="panel"><div class="lbl"><span class="serif">🔥 Sacred Fire</span><span id="sanctN">100</span></div><div class="bar" id="sanct"><i></i></div></div>
+  <div id="res" class="panel"><span title="Wood">🪵 <b id="wood">0</b></span><span title="Merit, earned by defeating rakshasas">✦ <b id="merit">0</b></span><button id="pause" title="Pause (P)">⏸️</button><button id="mute" title="Mute (M)">🔊</button></div>
+</div>
+<div id="vig"></div>
+<div id="paused" class="panel hide">Paused</div>
+<div id="bosses"></div>
+<div id="banner" class="panel"></div>
+<div id="toast"></div>
+
+<div id="bottom" class="panel">
+  <button data-b="arch" title="Archer Platform (1)"><span>🏹</span>Archers<small>🪵40</small></button>
+  <button data-b="shr" title="Rishi's Shrine (2): slows and weakens"><span>🕉️</span>Shrine<small>🪵50</small></button>
+  <button data-b="braz" title="Fire Brazier (3): burns ground foes"><span>🔥</span>Brazier<small>🪵60</small></button>
+  <button data-b="wall" title="Palisade (4): blocks the path"><span>🪵</span>Palisade<small>🪵10</small></button>
+  <button id="post" title="Post Lakshmana (L)"><span>🛡️</span>Lakshmana<small>post</small></button>
+  <button id="q" class="hide" title="Agneyastra (Q)"><span>☄️</span>Agneya<small>Q</small><i class="cd"></i></button>
+  <button id="e" class="hide" title="Manavastra (E)"><span>💫</span>Manava<small>E</small><i class="cd"></i></button>
+  <button id="go"><span>🌙</span><b id="goT">Begin Night</b></button>
+</div>
+
+<div id="pop" class="panel hide"><div id="popName" class="serif"></div><button id="up"></button><button id="sell"></button></div>
+
+<div id="title" class="overlay"><div class="card">
+  <h1>RAMAYANA</h1><h2>The Six Nights of Siddhashrama</h2>
+  <p>Sage Vishwamitra has begun a yajna that must burn for six nights. The rakshasas of the forest mean to defile it.
+  You are Rama. With Lakshmana at your side, guard the sacred fire until the sixth dawn.</p>
+  <p class="keys">Move: WASD / arrows, or tap and drag · Build: 1–4 then click · Begin night: Space · Astras: Q, E · Pause: P</p>
+  <button id="begin">Take up the bow</button>
+</div></div>
+
+<div id="end" class="overlay hide"><div class="card">
+  <h1 id="endT"></h1><div id="stars"></div><p id="endP"></p>
+  <button onclick="location.reload()">Play again</button>
+</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="src/audio.js?v=2"></script>
+<script src="src/models.js?v=2"></script>
+<script src="src/game.js?v=2"></script>
+</body>
+</html>

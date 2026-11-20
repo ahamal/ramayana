@@ -1,0 +1,44 @@
+:root { --gold: #e9b23a; --ink: #120b08; --paper: #f1e3c4; --saffron: #ff8a1a; --line: rgba(233, 178, 58, .3); }
+* { box-sizing: border-box; }
+html { background: var(--ink); }
+body { margin: 0; min-height: 100vh; color: var(--paper); font: 16px/1.55 Georgia, serif;
+  background: radial-gradient(ellipse 90% 60% at 50% 0, #4a2208 0, #1c0f08 55%, var(--ink) 100%) fixed; }
+h1, h2, b, .tabs button, nav a b { font-family: Marcellus, Georgia, serif; font-weight: 400; }
+a { color: var(--gold); }
+.dev { font-family: 'Tiro Devanagari Sanskrit', serif; }
+
+/* home */
+.home main { max-width: 760px; margin: 0 auto; padding: 12vh 20px 60px; text-align: center; }
+.home .dev { font-size: 30px; color: var(--saffron); margin: 0; }
+.home h1 { font-size: clamp(48px, 12vw, 104px); letter-spacing: .08em; margin: 0; color: var(--gold); text-shadow: 0 0 50px rgba(255, 140, 30, .45); }
+.tag { letter-spacing: .14em; text-transform: uppercase; font-size: 13px; opacity: .7; margin: 6px 0 44px; }
+nav { display: grid; gap: 14px; text-align: left; }
+nav a { display: block; padding: 20px 24px; border: 1px solid var(--line); border-radius: 4px; text-decoration: none; color: var(--paper);
+  background: linear-gradient(90deg, rgba(120, 60, 15, .35), rgba(40, 20, 10, .2)); transition: border-color .2s, transform .2s; }
+nav a:hover { border-color: var(--gold); transform: translateX(4px); }
+nav a b { display: block; font-size: 24px; color: var(--gold); }
+nav a span { opacity: .8; font-size: 15px; }
+
+/* inner pages */
+.page header { max-width: 1280px; margin: 0 auto; padding: 26px 20px 8px; }
+.page header a { font-size: 14px; text-decoration: none; letter-spacing: .08em; }
+.page h1 { font-size: clamp(30px, 5vw, 46px); margin: 6px 0 2px; color: var(--gold); letter-spacing: .04em; }
+.page .lede { max-width: 720px; opacity: .85; margin: 0 0 18px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.tabs button { padding: 9px 16px; font-size: 16px; border-radius: 3px; cursor: pointer; color: var(--paper); background: rgba(90, 45, 12, .4); border: 1px solid var(--line); }
+.tabs button.on { background: var(--gold); color: var(--ink); border-color: var(--gold); }
+.about { max-width: 1280px; margin: 0 auto; padding: 14px 20px 0; }
+.about h2 { margin: 0; font-size: 24px; color: var(--paper); }
+.about h2 small { font: 14px Georgia, serif; color: var(--saffron); letter-spacing: .06em; margin-left: 10px; }
+.about p { max-width: 760px; margin: 4px 0 0; opacity: .82; font-size: 15px; }
+.grid { max-width: 1280px; margin: 0 auto; padding: 18px 20px 70px; display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); }
+.card { margin: 0; }
+.card svg { display: block; width: 100%; height: auto; border-radius: 3px; box-shadow: 0 10px 30px rgba(0, 0, 0, .55); }
+.card figcaption { padding: 9px 2px 0; }
+.card b { font-size: 19px; color: var(--gold); }
+.card .dev { margin-left: 8px; color: var(--saffron); font-size: 16px; }
+.card small { display: block; opacity: .75; font-size: 13.5px; line-height: 1.35; }
+.grid.compare { grid-template-columns: repeat(6, minmax(140px, 1fr)); overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: Marcellus, serif; font-weight: 400; color: var(--gold); }
