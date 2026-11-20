@@ -23,6 +23,8 @@
   #arrows button { font: 13px Marcellus, serif; padding: 6px 11px; color: #fff3df; background: rgba(40, 18, 40, .55); border: 1px solid rgba(255, 210, 150, .3); border-radius: 3px; cursor: pointer; }
   #arrows button.on { color: #1c0d16; border-color: transparent; }
   #flash { position: fixed; inset: 0; background: #fff6dc; opacity: 0; pointer-events: none; }
+  #summon { position: fixed; right: 24px; top: 50px; font: 15px Marcellus, serif; padding: 9px 16px; color: #fff3df; background: rgba(60, 20, 70, .6); border: 1px solid rgba(200, 150, 255, .5); border-radius: 3px; cursor: pointer; backdrop-filter: blur(4px); }
+  #summon:active { background: #b98aff; color: #1a0f24; }
   #hits { position: fixed; right: 26px; top: 20px; font: 14px Marcellus, serif; letter-spacing: .1em; opacity: .85; }
   #load { position: fixed; inset: 0; display: grid; place-items: center; background: #140d22; font: 20px Marcellus, serif; letter-spacing: .2em; color: #ffd08a; transition: opacity .6s; }
 </style>
@@ -34,6 +36,7 @@
 <div id="cap" class="ui"><div class="dev" id="dev">राम</div><h1 id="name"></h1><p id="desc"></p></div>
 <div id="flash"></div>
 <div id="arrows"></div>
+<button id="summon">Summon</button>
 <div id="who"><button data-w="rama">Rama</button><button data-w="sage">Vishwamitra</button></div>
 <div id="tabs"><button data-m="idle">Stand</button><button data-m="walk">Walk</button><button data-m="run">Run</button><button data-m="sit">Sit</button><button data-n="1">Namaste</button><button data-f="1">Rapid fire</button></div>
 <div id="load">SHAPING RAMA…</div>
@@ -578,7 +581,7 @@ const foldR = (() => { const rp = eq(0, 0, -0.78); return rp.clone().invert().mu
 const grunts = [], EG = new THREE.Euler();
 function makeGrunt(d, seed) { const g = d.g; while (g.children.length) g.remove(g.children[0]);
   const R = makeRig(), skin = toon(0x4b3f5c, { vertexColors: true, rim: 0.45 }), sk = toon(0x4b3f5c, { rim: 0.45 }), cloth = toon(0x5a1410, { vertexColors: true }), iron = toon(0x2c2a30, { rim: 0.5 }), boneC = toon(0xd8cdb0, { rim: 0.4 }), hairC = toon(0x16101c, { rim: 0.25 }), eyeC = new THREE.MeshBasicMaterial({ color: 0xffa020 }), WOOD = toon(0x7a4a22), DARK = toon(0x15101a);
-  R.group.scale.set(1.2, 1.1, 1.28); R.group.position.y = -0.04; g.add(R.group);
+  { const k = d.k || 1; R.group.scale.set(1.0 * k, 0.9 * k, 1.04 * k); } R.group.position.y = -0.04; g.add(R.group);
   R.skin(V.body.geometry, skin); R.skin(dhotiGeo, cloth);
   { const b = R.on('hips', new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.024, 10, 36), iron), [0, 1.03, 0.004]); b.rotation.x = Math.PI / 2; b.scale.set(1, 0.76, 1); }
   { const n = R.on('chest', new THREE.Group(), [0, 1.44, 0.02]); n.rotation.x = 0.5; for (let i = 0; i < 9; i++) { const a = -1.4 + i / 8 * 2.8; cyl(n, 0.002, 0.012, 0.05, boneC, [Math.sin(a) * 0.12, -0.02, Math.cos(a) * 0.1], [Math.PI, 0, 0]); } tor(n, 0.12, 0.006, hairC, [0, 0, 0], [Math.PI / 2, 0, 0], [1, 0.84, 1]); }
@@ -594,6 +597,11 @@ function makeGrunt(d, seed) { const g = d.g; while (g.children.length) g.remove(
   d.mats = new Set(); g.traverse(o => { if (o.isMesh) { o.castShadow = true; d.mats.add(o.material); } });
   d.mat = skin; d.mat2 = sk; d.base = skin.color.clone(); d.rig = R; d.seed = seed; grunts.push(d); }
 for (const [k, i] of [1, 4, 7].entries()) makeGrunt(dummies[i], k);
+// summoning: one to three rakshasas step out of the dark at random points round the clearing and walk in. Summoned ones are gone for good when they die
+function summon() { const n = 1 + ((Math.random() * 3) | 0); for (let i = 0; i < n && grunts.length < 14; i++) { const a = Math.random() * 6.283, r = 11 + Math.random() * 2.5, g = new THREE.Group(); g.position.set(Math.cos(a) * r, 0, Math.sin(a) * r); g.rotation.y = Math.atan2(-g.position.x, -g.position.z); scene.add(g);
+    const d = { g, mat: null, home: g.position.clone(), vel: V3(), wob: 0, rest: 0, char: 0, flung: false, ft: 0, summoned: true, k: 0.88 + Math.random() * 0.3 }; dummies.push(d); makeGrunt(d, Math.random() * 9);
+    tmpA.copy(g.position).setY(1); puff(tmpA, 0x9a5ad0, 30, 3, 0.7, -1); ring(tmpA.setY(0.06), 1.3, 0xb070ff, 0.6); flash(tmpA.setY(1), 0x9a5ad0, 14); } }
+function banish(d) { scene.remove(d.g); scene.remove(d.club); for (const o of [d.g, d.club]) o.traverse(m => { if (m.isMesh && !m.isSkinnedMesh) m.geometry.dispose(); }); d.mats.forEach(m => m.dispose()); grunts.splice(grunts.indexOf(d), 1); dummies.splice(dummies.indexOf(d), 1); }
 const GS = [1.2, 1.1, 1.28], kf = (u, K) => { for (let i = 0; i < K.length - 1; i++) if (u <= K[i + 1][0]) { let t = (u - K[i][0]) / (K[i + 1][0] - K[i][0]); t = t * t * (3 - 2 * t); return K[i][1] + (K[i + 1][1] - K[i][1]) * t; } return K[K.length - 1][1]; };
 // three strikes, picked at random each swing. Each gives the club arm, forearm and wrist angles, the torso twist and the forward lean at a moment u of the swing (0..1); in all of them the wrist lets go last
 const pulseS = u => u > 0.4 && u < 0.62 ? Math.sin((u - 0.4) / 0.22 * Math.PI) : 0, STRIKES = [
@@ -604,27 +612,30 @@ const pulseS = u => u > 0.4 && u < 0.62 ? Math.sin((u - 0.4) / 0.22 * Math.PI) :
   u => ({ a: [kf(u, [[0, -0.6], [0.35, -2.7], [0.42, -2.6], [0.5, -0.95], [0.68, -0.7], [1, -0.6]]), 0, 0.3], f: [kf(u, [[0, -0.7], [0.35, -1.5], [0.44, -1.4], [0.5, -0.15], [0.7, -0.3], [1, -0.7]]), 0, 0], // chop: club dropped behind his head, then brought down in front
     w: [kf(u, [[0, 0.4], [0.35, -0.4], [0.44, -0.3], [0.5, 1.2], [0.68, 1.5], [1, 0.4]]), 0], tw: kf(u, [[0, 0], [0.35, -0.2], [0.5, 0.15], [1, 0]]), lean: kf(u, [[0, 0], [0.35, -0.3], [0.5, 0.45], [0.75, 0.2], [1, 0]]) })];
 function gruntUpdate(dt) { for (const d of grunts) { const B = d.rig.bone, g = d.g, R = d.rig.group;
-  if (d.hp === undefined) { d.hp = 3; d.pw = 0; d.wW = 0; d.wA = 0; d.ph = d.seed * 2; d.at = 0; d.dead = 0; d.lu = 0; }
+  if (d.hp === undefined) { d.hp = 2; d.pw = 0; d.wW = 0; d.wA = 0; d.ph = d.seed * 2; d.at = 0; d.dead = 0; d.lu = 0; }
   // health: every fresh blow costs one, a heavy one costs all three, and so does burning through; being flung away sends him back to the start
   const r0 = Math.hypot(g.position.x, g.position.z) || 1;
-  if (d.flung) d.wasFlung = true; else if (d.wasFlung) { d.wasFlung = false; d.hp = 3; d.char = 0; }
-  if (!d.dead && !d.flung) { if (d.wob > d.pw + 0.25) d.hp -= d.vel.length() > 6 ? 3 : 1; if (d.char > 0.7) d.hp = 0; if (d.hp <= 0) { d.dead = 0.0001; d.vel.multiplyScalar(0.4); d.rg = Array.from({ length: 6 }, () => Math.random()); if (d.vel.length() > 0.8) g.rotation.y = Math.atan2(-d.vel.x, -d.vel.z); scene.attach(d.club); d.club.scale.setScalar(1.2); d.cv = V3(-g.position.x / r0 * 0.8, 1.6, -g.position.z / r0 * 0.8); d.mats.forEach(m => { m.transparent = true; m.needsUpdate = true; }); } }
+  if (d.flung) d.wasFlung = true; else if (d.wasFlung) { d.wasFlung = false; d.hp = 2; d.char = 0; }
+  if (!d.dead && !d.flung) { if (d.wob > d.pw + 0.25) d.hp -= d.vel.length() > 6 ? 3 : 1; if (d.char > 0.7) d.hp = 0; if (d.hp <= 0) { d.dead = 0.0001; d.vel.multiplyScalar(0.4); d.rg = Array.from({ length: 6 }, () => Math.random()); if (d.vel.length() > 0.8) g.rotation.y = Math.atan2(-d.vel.x, -d.vel.z); scene.attach(d.club); d.club.scale.setScalar(1.0 * (d.k || 1)); d.cv = V3(-g.position.x / r0 * 0.8, 1.6, -g.position.z / r0 * 0.8); d.mats.forEach(m => { m.transparent = true; m.needsUpdate = true; }); } }
   d.pw = d.wob; d.rest = 0;
   const r = Math.hypot(g.position.x, g.position.z) || 1, stag = d.wob > 0.3 || d.hold > 0 || d.flung || d.dead > 0, walking = !stag && r > 5.4, attacking = !stag && !walking;
-  if (!d.flung && !d.dead) { const want = Math.atan2(-g.position.x, -g.position.z); g.rotation.y += Math.atan2(Math.sin(want - g.rotation.y), Math.cos(want - g.rotation.y)) * Math.min(1, dt * 5); }
-  if (walking) { g.position.x -= g.position.x / r * 0.85 * dt; g.position.z -= g.position.z / r * 0.85 * dt; d.ph += dt * 5.2; }
+  // he comes in at a run, weaving from side to side, and turns to face wherever he is heading; once in range he squares up to the fire, bouncing on his feet
+  { const nx = -g.position.x / r, nz = -g.position.z / r, lat = walking ? Math.sin(T * 1.9 + d.seed * 3) * 1.4 : 0, vx = nx * 2.6 - nz * lat, vz = nz * 2.6 + nx * lat;
+    if (walking) { g.position.x += vx * dt; g.position.z += vz * dt; d.ph += dt * 10; }
+    if (!d.flung && !d.dead) { const want = walking ? Math.atan2(vx, vz) : Math.atan2(nx, nz); g.rotation.y += Math.atan2(Math.sin(want - g.rotation.y), Math.cos(want - g.rotation.y)) * Math.min(1, dt * 9); R.position.y = -0.04 + 0.035 * Math.abs(Math.sin(T * 5 + d.seed)) * d.wA; } }
   d.wW += ((walking ? 1 : 0) - d.wW) * Math.min(1, dt * 6); d.wA += ((attacking ? 1 : 0) - d.wA) * Math.min(1, dt * 6);
   // attack: a sidearm swing. He coils to his right with the club cocked back, whips his torso round, and the forearm and wrist snap through last so the club head flicks across in front of him
-  { const was = Math.floor(d.at); d.at = attacking ? d.at + dt / 1.6 : 0; if (Math.floor(d.at) !== was || d.sk === undefined) d.sk = (Math.random() * STRIKES.length) | 0; }
+  { const was = Math.floor(d.at); d.at = attacking ? d.at + dt / 1.05 : 0; if (Math.floor(d.at) !== was || d.sk === undefined) d.sk = (Math.random() * STRIKES.length) | 0; }
   const u = d.at % 1, wind = 0, S = STRIKES[d.sk](u), smash = S.lean * d.wA, aw = kf(u, [[0, 0], [0.12, 1], [0.75, 1], [1, 0]]) * d.wA, tw = S.tw * d.wA, Ap = { armR: S.a, foreR: S.f }, wrist = S.w;
   if (attacking && d.lu < 0.48 && u >= 0.48) { d.club.localToWorld(tmpA.set(0, 0.42, 0)); puff(tmpA, 0xffe2b0, 16, 3.2, 0.3, 2); flash(tmpA, 0xffc890, 10); shake = Math.max(shake, 0.05); if (d.sk === 2) { tmpA.y = 0.08; puff(tmpA, 0xffd9a0, 14, 2.4, 0.4, 3); ring(tmpA, 0.8, 0xffc890, 0.3); } }
   d.lu = u;
   // death: he topples onto his back, lies a moment, then withers away in dark wisps and a fresh one sets out from the start
-  let f = 0; if (d.dead > 0) { d.dead += dt; const k = Math.min(1, d.dead / 0.45); f = k * k; const sc = Math.max(0, 1 - Math.max(0, d.dead - 1.3) / 0.8); { const tb = Math.max(0, d.dead - 0.45), bn = k >= 1 ? 0.07 * Math.exp(-7 * tb) * Math.abs(Math.sin(14 * tb)) : 0; R.rotation.x = -1.5708 * (f - bn); R.position.y = -0.04 + 0.19 * f; } d.mats.forEach(m => { m.opacity = sc; });
+  let f = 0; if (d.dead > 0) { d.dead += dt; const k = Math.min(1, d.dead / 0.45); f = k * k; const sc = Math.max(0, 1 - Math.max(0, d.dead - 1.3) / 0.8); { const tb = Math.max(0, d.dead - 0.45), bn = k >= 1 ? 0.07 * Math.exp(-7 * tb) * Math.abs(Math.sin(14 * tb)) : 0; R.rotation.x = -1.5708 * (f - bn); R.position.y = -0.04 + 0.15 * f; } d.mats.forEach(m => { m.opacity = sc; });
     { const c = d.club; if (c.position.y > 0.075) { d.cv.y -= 9 * dt; c.position.addScaledVector(d.cv, dt); c.rotation.x += dt * 5; if (c.position.y <= 0.075) { c.position.y = 0.075; c.rotation.set(Math.PI / 2, 0, d.seed * 2.3 + 0.6); puff(c.position, 0xffd9a0, 5, 1.2, 0.3, 2); } } }
     if (d.dead > 1.3) puff(tmpA.set(g.position.x + (Math.random() - 0.5) * 0.6, 0.2, g.position.z + (Math.random() - 0.5) * 0.9), 0x9a5ad0, 2, 0.5, 0.6, -2.5);
-    if (d.dead > 2.3) { d.dead = 0; d.hp = 3; d.char = 0; d.wob = 0; d.pw = 0; d.vel.set(0, 0, 0); g.position.copy(d.home); R.rotation.x = 0; R.position.y = -0.04; d.grip.add(d.club); d.club.position.copy(d.clubP); d.club.quaternion.copy(d.clubQ); d.club.scale.setScalar(1); d.mats.forEach(m => { m.opacity = 1; m.transparent = false; m.needsUpdate = true; }); puff(tmpA.copy(d.home).setY(1), 0x9a5ad0, 16, 2, 0.5, 0); f = 0; } }
-  const t = T * 1.15 + d.seed * 2.1, P = idle(t), Wk = walk(d.ph), w = d.dead ? 0 : d.wob, fl = d.flung ? 1 : 0, br = Math.sin(t * 2.1), st = 1 - d.wW;
+    if (d.dead > 2.3 && d.summoned) { banish(d); continue; }
+    if (d.dead > 2.3) { d.dead = 0; d.hp = 2; d.char = 0; d.wob = 0; d.pw = 0; d.vel.set(0, 0, 0); g.position.copy(d.home); R.rotation.x = 0; R.position.y = -0.04; d.grip.add(d.club); d.club.position.copy(d.clubP); d.club.quaternion.copy(d.clubQ); d.club.scale.setScalar(1); d.mats.forEach(m => { m.opacity = 1; m.transparent = false; m.needsUpdate = true; }); puff(tmpA.copy(d.home).setY(1), 0x9a5ad0, 16, 2, 0.5, 0); f = 0; } }
+  const t = T * 1.15 + d.seed * 2.1, P = idle(t), Wk = run(d.ph), w = d.dead ? 0 : d.wob, fl = d.flung ? 1 : 0, br = Math.sin(t * 2.1), st = 1 - d.wW;
   const O = { spine: [0.3 - w * 0.45 + br * 0.015 - wind * 0.2 + smash * 0.32 - 0 * 0.3, 0, 0], chest: [0.16 + br * 0.03 - w * 0.2 + smash * 0.2 - 0 * 0.16, wind * -0.25, 0], neck: [-0.1, 0, 0], head: [-0.3 - w * 0.45 + smash * 0.15, 0, 0],
     armL: [-0.1 - fl * 0.6 - smash * 0.3, 0, 0.26 + w * 0.5 + fl * 0.6 - br * 0.02], foreL: [-0.4 + w * 0.3, 0, 0], armR: [-0.45 - w * 0.5 - wind * 2.3 - smash * 0.5 + 0 * 0.4, 0, -0.2 - w * 0.4 - fl * 0.6], foreR: [-0.75 + br * 0.05 - wind * 0.5 + smash * 0.45 + 0 * 0.5, 0, 0],
     legL: [-0.32 * st + 0 * 0.25, 0, 0.13 + 0 * 0.2], legR: [-0.32 * st + 0 * 0.25, 0, -0.13 - 0 * 0.2], shinL: [0.6 * st - 0 * 0.3, 0, 0], shinR: [0.6 * st - 0 * 0.3, 0, 0], footL: [-0.28 * st, 0, 0], footR: [-0.28 * st, 0, 0] };
@@ -659,7 +670,7 @@ function setMove(m) { if (who === 'rama') { move = m; if (m === 'sit') firing = 
 function toggleNam() { if (who === 'rama') { namaste = !namaste; if (namaste) { move = 'sit'; firing = false; } } else { SG.namaste = !SG.namaste; if (SG.namaste) { SG.move = 'sit'; SG.firing = false; } } }
 function toggleFire() { if (who === 'rama') { firing = !firing; if (firing && move === 'sit') move = 'idle'; } else { SG.firing = !SG.firing; if (SG.firing) { SG.namaste = false; if (SG.move === 'sit') SG.move = 'idle'; } } }
 $('tabs').onclick = e => { const d = e.target.dataset; if (d.w) who = d.w; else if (d.m) setMove(d.m); else if (d.n) toggleNam(); else if (d.f) toggleFire(); else return; ui(); };
-$('who').onclick = $('tabs').onclick;
+$('who').onclick = $('tabs').onclick; $('summon').onclick = e => { e.stopPropagation(); summon(); };
 addEventListener('keydown', e => { const m = { Digit1: 'idle', Digit2: 'walk', Digit3: 'run', Digit4: 'sit' }[e.code]; if (m) setMove(m); else if (e.code === 'KeyV' || e.code === 'Tab') { who = who === 'rama' ? 'sage' : 'rama'; e.preventDefault(); } else if (e.code === 'KeyF' || e.code === 'Space') { toggleFire(); e.preventDefault(); } else if (e.code === 'KeyN') toggleNam(); else return; ui(); });
 const cv = renderer.domElement; cv.style.cursor = 'grab';
 cv.addEventListener('pointerdown', e => { drag = [e.clientX, e.clientY]; });
@@ -775,7 +786,7 @@ function frame(now) {
 }
 let prev = performance.now(); ui(); pickKind(0); $('load').style.opacity = 0; setTimeout(() => $('load').remove(), 700);
 requestAnimationFrame(frame);
-window.L = { grunts, bone, rama, pickKind, set: (m, f) => { move = m; firing = !!f; ui(); }, sage: m => { SG.move = m; ui(); }, SG, view: (y, p, d) => { yaw = y; pitch = p; dist = d; }, pick: w => { who = w; ui(); }, V, state: () => ({ move, firing, shots: shots.length, hits, draw, wAim, wWalk, wRun }) };
+window.L = { grunts, summon, bone, rama, pickKind, set: (m, f) => { move = m; firing = !!f; ui(); }, sage: m => { SG.move = m; ui(); }, SG, view: (y, p, d) => { yaw = y; pitch = p; dist = d; }, pick: w => { who = w; ui(); }, V, state: () => ({ move, firing, shots: shots.length, hits, draw, wAim, wWalk, wRun }) };
 </script>
 </body>
 </html>
