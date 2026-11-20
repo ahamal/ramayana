@@ -195,6 +195,7 @@ addEventListener('keydown', (e) => {
     }
     e.preventDefault();
   } else if (e.code === 'KeyN') toggleNam();
+  else if (e.code === 'KeyG') FOLLOW = !FOLLOW;
   else return;
   ui();
 });
@@ -420,7 +421,8 @@ const LAK = cloneHero(
 const HEROES = [RAMA, LAK];
 let SEL = RAMA,
   CUR = RAMA,
-  AUTO = false;
+  AUTO = false,
+  FOLLOW = false;
 const IN = { x: 0, z: 0, walk: false, fire: false, at: null };
 // taking control of a brother, or of the sage. The brother you leave holds the spot where you left him
 function selectHero(w) {
@@ -440,10 +442,14 @@ function selectHero(w) {
 //   inside his range     he stands and shoots;
 //   closer than he likes he backs away from it, still shooting, sliding round the edge of the ground if he runs out of room.
 // The two switch-over distances are a little apart, so he does not dither on the line. With nothing to fight he walks back to his post.
-function brain(h) {
+function brain(h, dt) {
   const P = h.group.position;
   let best = null,
-    bd = 1e9;
+    bd = 1e9,
+    // the push away from everything that is too close, each counting for more the nearer it is
+    tx = 0,
+    tz = 0,
+    crowd = 0;
   for (const d of grunts) {
     if (d.dead || d.flung) continue;
     const l = Math.hypot(d.g.position.x - P.x, d.g.position.z - P.z);
@@ -451,7 +457,22 @@ function brain(h) {
       bd = l;
       best = d;
     }
+    if (l < h.keep + 0.8) {
+      const k = 1 - l / (h.keep + 0.8);
+      tx += ((P.x - d.g.position.x) / (l || 1)) * k;
+      tz += ((P.z - d.g.position.z) / (l || 1)) * k;
+      crowd++;
+    }
   }
+  // he stays on the enemy he is already shooting unless it is gone, or another has come much closer. Otherwise, in a crowd,
+  // the nearest one changes from moment to moment and he snaps from target to target
+  const cur = h.tgt && !h.tgt.dead && !h.tgt.flung && grunts.includes(h.tgt) ? h.tgt : null,
+    cd = cur ? Math.hypot(cur.g.position.x - P.x, cur.g.position.z - P.z) : 1e9;
+  if (cur && cd <= h.range && bd > cd * 0.6) {
+    best = cur;
+    bd = cd;
+  }
+  h.tgt = best;
   IN.at = best && bd <= h.range ? best : null;
   IN.fire = !!IN.at;
   IN.x = IN.z = 0;
@@ -463,7 +484,16 @@ function brain(h) {
   if (move === 'sit') return;
   let dx = 0,
     dz = 0;
-  if (best) {
+  // following: with Follow on, the brother you are not playing stays with the one you are. He still fights, but will not stray far:
+  // past the length of his leash he drops everything and comes back
+  const lead = FOLLOW && who !== 'sage' && h !== SEL ? SEL.group.position : null,
+    ld = lead ? Math.hypot(lead.x - P.x, lead.z - P.z) : 0;
+  if (lead) h.post.copy(P);
+  if (lead && ld > 6.5 && !(best && bd < h.keep)) {
+    h.mode = null;
+    dx = lead.x - P.x;
+    dz = lead.z - P.z;
+  } else if (best) {
     if (bd < h.keep) h.mode = 'back';
     else if (bd > h.range * 0.92) h.mode = 'close';
     else if (h.mode === 'back' ? bd > h.keep + 1.2 : h.mode === 'close' ? bd < h.range * 0.72 : !h.mode) h.mode = 'hold';
@@ -473,8 +503,10 @@ function brain(h) {
       dx = ex;
       dz = ez;
     } else if (h.mode === 'back') {
-      dx = -ex;
-      dz = -ez;
+      // away from the whole crowd, not just the nearest of them. Hemmed in on all sides the pushes cancel, and he stands his ground and shoots
+      const tl = Math.hypot(tx, tz);
+      dx = crowd > 1 ? (tl > 0.25 ? tx / tl : 0) : -ex;
+      dz = crowd > 1 ? (tl > 0.25 ? tz / tl : 0) : -ez;
       // at the edge of the ground he cannot back off any further outwards: he slides round the edge instead
       const r = Math.hypot(P.x, P.z) || 1,
         out = (dx * P.x + dz * P.z) / r;
@@ -487,6 +519,14 @@ function brain(h) {
         }
       }
     }
+  } else if (lead) {
+    // nothing to fight: walk at his brother's shoulder. He sets off once he has fallen three paces behind and stops two paces short
+    h.mode = null;
+    if (ld > (keyed ? 2.2 : 3.2)) {
+      dx = lead.x - P.x;
+      dz = lead.z - P.z;
+      IN.walk = ld < 4.5;
+    }
   } else {
     h.mode = null;
     dx = h.post.x - P.x;
@@ -495,10 +535,16 @@ function brain(h) {
     if (l < (keyed ? 0.25 : 0.9)) dx = dz = 0;
     IN.walk = l < 3;
   }
-  const l = Math.hypot(dx, dz);
-  if (l > 1e-3) {
-    IN.x = dx / l;
-    IN.z = dz / l;
+  // the heading he wants is eased, so a change of mind turns him over a few frames instead of flipping him on the spot,
+  // and he needs a clear wish to move before he sets off
+  const l = Math.hypot(dx, dz),
+    k = Math.min(1, dt * 7);
+  h.hx = (h.hx || 0) + ((l > 1e-3 ? dx / l : 0) - (h.hx || 0)) * k;
+  h.hz = (h.hz || 0) + ((l > 1e-3 ? dz / l : 0) - (h.hz || 0)) * k;
+  const hl = Math.hypot(h.hx, h.hz);
+  if (hl > (keyed ? 0.3 : 0.6)) {
+    IN.x = h.hx / hl;
+    IN.z = h.hz / hl;
   }
 }
 // the player's keys, turned into the same kind of orders: a direction on the ground, relative to the camera
@@ -517,7 +563,7 @@ function heroUpdate(dt) {
   const one = (h, auto) => {
     loadHero(h);
     AUTO = auto;
-    if (auto) brain(h);
+    if (auto) brain(h, dt);
     else keysIn();
     heroStep(dt);
     saveHero(h);

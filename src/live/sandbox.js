@@ -32,12 +32,13 @@ function ui() {
   const mv = who !== 'sage' ? move : SG.move;
   $('arrows').style.display = who === 'rama' ? '' : 'none';
   document.querySelector('#tabs [data-f]').textContent = who === 'sage' ? 'Lightning' : 'Rapid fire';
+  document.querySelector('#tabs [data-g]').style.display = who === 'sage' ? 'none' : '';
   document
     .querySelectorAll('#tabs button, #who button')
     .forEach((b) =>
       b.classList.toggle(
         'on',
-        b.dataset.w ? b.dataset.w === who : b.dataset.n ? (who !== 'sage' ? namaste : SG.namaste) : b.dataset.f ? latch : b.dataset.m === mv,
+        b.dataset.w ? b.dataset.w === who : b.dataset.n ? (who !== 'sage' ? namaste : SG.namaste) : b.dataset.f ? latch : b.dataset.g ? FOLLOW : b.dataset.m === mv,
       ),
     );
 }
@@ -46,6 +47,7 @@ $('tabs').onclick = (e) => {
   if (d.w) selectHero(d.w);
   else if (d.m) setMove(d.m);
   else if (d.n) toggleNam();
+  else if (d.g) FOLLOW = !FOLLOW;
   else if (d.f) {
     latch = !latch;
     if (latch) press();
