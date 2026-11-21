@@ -815,7 +815,8 @@ function heroStep(dt) {
       aimPt.lerp(tmp, Math.min(1, dt * 14));
     } else aimLock = null;
   }
-  tmp.copy(aimPt).sub(tmp2.copy(rama.position).setY(1.3));
+  // (the aim is taken from his own chest height, wherever the ground has put him)
+  tmp.copy(aimPt).sub(tmp2.copy(rama.position).setY(rama.position.y + 1.3));
   if (tmp.length() > 0.8) aimDir.copy(tmp.normalize());
   const aimFace = Math.atan2(-aimDir.z, aimDir.x),
     wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a)),
@@ -1132,7 +1133,14 @@ function heroStep(dt) {
   if (invoking && Math.random() < 0.9) {
     const a = Math.random() * 6.283,
       r = 0.5 + Math.random() * 2.4;
-    puff(tmp2.set(rama.position.x + Math.cos(a) * r, rama.position.y + 0.1, rama.position.z + Math.sin(a) * r), KINDS[kind].color, 1, 0.3, 1.1, -2.2 - invP * 2);
+    puff(
+      tmp2.set(rama.position.x + Math.cos(a) * r, rama.position.y + 0.1, rama.position.z + Math.sin(a) * r),
+      KINDS[kind].color,
+      1,
+      0.3,
+      1.1,
+      -2.2 - invP * 2,
+    );
   }
   reticle.visible = firing;
   reticle.position.copy(aimPt);
@@ -1210,7 +1218,13 @@ function shotsUpdate(dt) {
     if (!hitP && !s.lock)
       for (const d of dummies) {
         const q = s.g.position;
-        if (!d.flung && !d.dead && Math.hypot(q.x - d.g.position.x, q.z - d.g.position.z) < 0.42 && q.y - d.g.position.y < 1.85 && q.y - d.g.position.y > -0.5) {
+        if (
+          !d.flung &&
+          !d.dead &&
+          Math.hypot(q.x - d.g.position.x, q.z - d.g.position.z) < 0.42 &&
+          q.y - d.g.position.y < 1.85 &&
+          q.y - d.g.position.y > -0.5
+        ) {
           hitP = q.clone();
           d.wob = 1;
           d.pw = -1;
@@ -1218,7 +1232,8 @@ function shotsUpdate(dt) {
           break;
         }
       }
-    if (!hitP && (s.g.position.y < groundY(s.g.position.x, s.g.position.z) + 0.02 || s.g.position.distanceTo(s.from) > 70)) hitP = s.g.position.clone();
+    if (!hitP && (s.g.position.y < groundY(s.g.position.x, s.g.position.z) + 0.02 || s.g.position.distanceTo(s.from) > 70))
+      hitP = s.g.position.clone();
     if (hitP) {
       s.live = false;
       s.g.position.copy(hitP).addScaledVector(tmp2, -0.45);

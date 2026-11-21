@@ -1034,7 +1034,14 @@ function gruntUpdate(dt) {
         }
       }
       if (d.dead > 1.3)
-        puff(tmpA.set(g.position.x + (Math.random() - 0.5) * 0.6, g.position.y + 0.2, g.position.z + (Math.random() - 0.5) * 0.9), 0x9a5ad0, 2, 0.5, 0.6, -2.5);
+        puff(
+          tmpA.set(g.position.x + (Math.random() - 0.5) * 0.6, g.position.y + 0.2, g.position.z + (Math.random() - 0.5) * 0.9),
+          0x9a5ad0,
+          2,
+          0.5,
+          0.6,
+          -2.5,
+        );
       if (d.dead > 2.3) {
         banish(d);
         continue;

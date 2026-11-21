@@ -81,8 +81,84 @@ hem = (P) => {
 };
 // true while any prisoner of the first camp, the one by the road, is still bound
 const captive = () => CAMPS[0].prisoners.some((p) => !p.free);
-// the ground is spread wide enough for the whole map, and the hills are moved back behind its far edge
-scene.children.find((m) => m.material === GROUND).scale.setScalar(2.6);
+// ---------- the lie of the land ----------
+// The ground is not flat. Everything north of the cliff's line is high ground, at the level the altar stands on; south of
+// it is low country, five metres down. As far east as the cliff's end the fall between them is a cliff, almost sheer; beyond
+// that it opens out into a long easy hillside, which is the way up and down, and the road takes it.
+// On top of that the land rolls a little everywhere, except where it has to be level: by the rivers, along the road, round the
+// hermitage, under each camp and along the cliff itself.
+const DROP = 5,
+  ease = (t) => ((t = Math.max(0, Math.min(1, t))), t * t * (3 - 2 * t)),
+  // how wide the fall from the high ground to the low is at a given x: a cliff's width, then widening into the hillside
+  fallW = (x) => 2.4 + 26 * ease((x - (CLIFF_END - 4)) / 16),
+  // the height of the land without its small ups and downs
+  landBase = (x, z) => -DROP * ease((z - cliffZ(x)) / fallW(x) + 0.5),
+  // each camp stands on a level pad at whatever height the land has at its middle
+  PADS = [[CAMP.x, CAMP.z], ...WORK].map(([x, z]) => [x, z, landBase(x, z)]);
+groundY = (x, z) => {
+  let h = landBase(x, z),
+    // how far this spot is from anything that must be level: at nothing or less the land does not roll at all
+    calm = Math.min(
+      Math.abs(x - riverX(z)) - 6,
+      Math.abs(x - riverX(z, EX)) - 6,
+      x < -28 ? Math.abs(z - roadZ(x)) - 5 : 1e9,
+      Math.hypot(x - YARD[0], z - YARD[1]) - 50,
+      x < CLIFF_END + 6 ? Math.abs(z - cliffZ(x)) - 5 : 1e9,
+      southRoad(x, z, 3) || x < WX ? -1 : 1e9,
+    );
+  for (const q of PADS) {
+    const d = Math.max(Math.abs(x - q[0]), Math.abs(z - q[1]));
+    if (d < 15) h += (q[2] - h) * (1 - ease((d - 10) / 5));
+    calm = Math.min(calm, d - 13);
+  }
+  return h + (0.5 * Math.sin(x * 0.11 + 1.3) * Math.cos(z * 0.09) + 0.3 * Math.sin(x * 0.23 - z * 0.17)) * ease(calm / 9);
+};
+// The ground itself is a sheet of small squares pulled to that shape, grass-coloured except where it is too steep for
+// anything to grow, where it shows as bare rock. The scene's own flat ground is kept, sunk well below everything and spread
+// wide, as the land seen in the far distance beyond the sheet's edge
+{
+  const far = scene.children.find((m) => m.material === GROUND);
+  far.scale.setScalar(2.6);
+  far.position.y = -DROP - 1.6;
+  far.geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(far.geometry.attributes.position.count * 3).fill(1), 3));
+  const xa = -150,
+    za = -112,
+    st = 1.5,
+    nx = 184,
+    nz = 139,
+    pos = [],
+    col = [],
+    idx = [],
+    // (the tint that turns the ground's own green to the grey-brown of rock)
+    rockTint = [1.22, 1.02, 1.8];
+  for (let j = 0; j <= nz; j++)
+    for (let i = 0; i <= nx; i++) {
+      const x = xa + i * st,
+        z = za + j * st,
+        steep = Math.hypot(groundY(x + 0.5, z) - groundY(x - 0.5, z), groundY(x, z + 0.5) - groundY(x, z - 0.5)),
+        k = ease((steep - 0.55) / 0.6);
+      pos.push(x, groundY(x, z), z);
+      col.push(1 + (rockTint[0] - 1) * k, 1 + (rockTint[1] - 1) * k, 1 + (rockTint[2] - 1) * k);
+      if (i < nx && j < nz) {
+        const a = j * (nx + 1) + i;
+        idx.push(a, a + nx + 1, a + 1, a + 1, a + nx + 1, a + nx + 2);
+      }
+    }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  const land = new THREE.Mesh(g, GROUND);
+  land.receiveShadow = true;
+  // (a finger's breadth below true, as the scene's own ground was, so that the altar's stone floor, which lies exactly at
+  // ground level, is not fought over by the two surfaces)
+  land.position.y = -0.02;
+  scene.add(land);
+  GROUND.vertexColors = true;
+  GROUND.needsUpdate = true;
+}
+// the hills are moved back behind the map's far edge
 scene.children
   .filter((m) => HILL_MATS.includes(m.material))
   .forEach((m, i) => {
@@ -346,7 +422,14 @@ for (let i = 0; i < 22; i++) {
       // (the strip is cut a little wider than the road looks, because the picture laid on it fades out toward both edges)
       w = (1.85 + 0.25 * Math.sin(s * 0.7)) * end,
       w2 = w * (0.9 + 0.15 * Math.sin(s * 0.31 + 1));
-    pos.push(p.x - nx * w, 0.012, p.z - nz * w, p.x + nx * w2, 0.012, p.z + nz * w2);
+    // (it lies on the ground, just clear of it, whatever the ground's height)
+    {
+      const ax = p.x - nx * w,
+        az = p.z - nz * w,
+        bx = p.x + nx * w2,
+        bz = p.z + nz * w2;
+      pos.push(ax, groundY(ax, az) + 0.05, az, bx, groundY(bx, bz) + 0.05, bz);
+    }
     uv.push(0, s / 9, 1, s / 9);
     if (i) idx.push(i * 2 - 2, i * 2 - 1, i * 2, i * 2 - 1, i * 2 + 1, i * 2);
   });
@@ -599,9 +682,11 @@ if ((vWP.z > ${RIVER_FROM.toFixed(1)} && abs(vWP.z) > ${CROSS.toFixed(1)} && wR 
     let n = 0;
     for (let z = z0; ; z = Math.min(z1, z + 1), n++) {
       const cx = riverX(z, c);
-      wp.push(cx - 2.05, -DEEP, z, cx + 2.05, -DEEP, z);
+      // (the river follows the land: where the land drops at the cliff, so does the water, in a fall)
+      const gy = landBase(cx, z);
+      wp.push(cx - 2.05, gy - DEEP, z, cx + 2.05, gy - DEEP, z);
       wuv.push(0, z, 1, z);
-      bp.push(cx - 2.5, 0, z, cx - 2.0, -DEEP - 0.05, z, cx + 2.0, -DEEP - 0.05, z, cx + 2.5, 0, z);
+      bp.push(cx - 2.5, gy, z, cx - 2.0, gy - DEEP - 0.05, z, cx + 2.0, gy - DEEP - 0.05, z, cx + 2.5, gy, z);
       if (n) {
         const a = n * 2 - 2,
           q = n * 4 - 4;
@@ -711,35 +796,22 @@ const FALL = V3(riverX(RIVER_FROM), 0, RIVER_FROM);
     }
 }
 // ---------- the cliff ----------
-// a wall of rock south of the altar, from the first river to its end in the east: big crags in two ranks, the back rank
-// taller, with smaller rock tumbled along its foot on the low side. It stops everyone
-for (let x = CLIFF_FROM; x <= CLIFF_END; x += 2.3) {
-  const z = cliffZ(x),
-    // it runs down to nothing over its last few paces, so the end is a slope of rock and not a sawn-off wall
-    fall = Math.min(1, (CLIFF_END + 1.5 - x) / 7),
-    // (it is kept to about a man and a half high, so that from the camera's side it does not hide whoever stands beyond it)
-    r = R(1.6, 2.1) * (0.45 + 0.55 * fall);
-  ROCK[(Math.random() * 2) | 0].push([x + R(-0.4, 0.4), r * 0.55, z - 0.7 + R(-0.3, 0.3), R(0, 6), R(0, 6), R(0, 6), r * 1.15, r, r]);
-  ROCK[(Math.random() * 2) | 0].push([
-    x + 1.1 + R(-0.4, 0.4),
-    r * 0.3,
-    z + 0.9 + R(-0.3, 0.3),
-    R(0, 6),
-    R(0, 6),
-    R(0, 6),
-    r * 0.9,
-    r * 0.8,
-    r * 0.85,
-  ]);
-  if (Math.random() < 0.6) rock(x + R(-1, 1), z + R(2.6, 3.8), R(0.3, 0.7), false);
-  SOLIDS.push({ x, z, r: 3 * (0.5 + 0.5 * fall) });
+// The cliff is the land itself (see the lie of the land, above): a steep face of bare rock. It needs little dressing: only
+// here and there a crag standing out of the face, and a scatter of fallen stones along its foot.
+// A line of blocking circles down the middle of the face keeps everyone from walking up or down it
+for (let x = CLIFF_FROM; x <= CLIFF_END + 1; x += 2.1) SOLIDS.push({ x, z: cliffZ(x), r: 1.5 });
+for (let x = CLIFF_FROM + 3; x <= CLIFF_END - 3; x += R(7, 12)) {
+  const r = R(0.9, 1.5);
+  ROCK[(Math.random() * 2) | 0].push([x, 0.1 * r, cliffZ(x) + 0.5 + R(-0.3, 0.3), R(0, 6), R(0, 6), R(0, 6), r * 1.2, r * 1.2, r]);
 }
+for (let x = CLIFF_FROM + 1; x <= CLIFF_END; x += R(2.5, 6)) rock(x, cliffZ(x) + R(2.4, 4.6), R(0.25, 0.75), false);
 // every lot is now complete: each becomes one batch
 for (const l of LOTS) {
   const m = new THREE.InstancedMesh(l.geo, l.mat, l.length),
     o = new THREE.Object3D();
   l.forEach((p, i) => {
-    o.position.set(p[0], p[1], p[2]);
+    // (each thing's height is counted from the ground where it stands)
+    o.position.set(p[0], p[1] + groundY(p[0], p[2]), p[2]);
     o.rotation.set(p[3], p[4], p[5]);
     o.scale.set(p[6], p[7], p[8]);
     o.updateMatrix();
@@ -799,7 +871,7 @@ const HM = {
 // a group standing at a site [x, z, turn], and a way to turn a spot measured inside it into a place on the map
 function site([x, z, a]) {
   const g = new THREE.Group();
-  g.position.set(x, 0, z);
+  g.position.set(x, groundY(x, z), z);
   g.rotation.y = a;
   scene.add(g);
   g.at = (lx, lz) => ({ x: x + lx * Math.cos(a) + lz * Math.sin(a), z: z - lx * Math.sin(a) + lz * Math.cos(a) });
@@ -1165,7 +1237,7 @@ function prisoner(x, z, i, job, ends) {
     sk = toon(tone, { rim: 0.3 }),
     cloth = toon([0xd9c9a3, 0xc9a25a, 0xe2ddd0][i % 3], { vertexColors: true }),
     hair = toon(i % 3 === 1 ? 0xb9b4ac : 0x1a1418, { rim: 0.2 });
-  g.position.set(x, 0, z);
+  g.position.set(x, groundY(x, z), z);
   scene.add(g);
   g.add(rig.group);
   rig.group.scale.setScalar(0.95);
@@ -1324,28 +1396,26 @@ function workCamp(x, z, guards, jobs) {
   const red = toon(0x7a1616, { rim: 0.1 }),
     sackM = toon(0xb39a6a, { rim: 0.1 }),
     A = [x - 5, z + 4.5],
-    B = [x + 4.5, z + 5.5];
-  cyl(scene, 0.06, 0.08, 3.6, WOOD, [x - 2.2, 1.8, z - 3]);
-  add(scene, new THREE.BoxGeometry(1.0, 1.5, 0.03), red, [x - 1.66, 2.75, z - 3]);
-  add(scene, new THREE.BoxGeometry(1.02, 0.16, 0.035), DARK, [x - 1.66, 2.45, z - 3]);
+    B = [x + 4.5, z + 5.5],
+    // (everything in the camp stands on its level pad, at the height the land has there)
+    G = new THREE.Group();
+  G.position.y = groundY(x, z);
+  scene.add(G);
+  cyl(G, 0.06, 0.08, 3.6, WOOD, [x - 2.2, 1.8, z - 3]);
+  add(G, new THREE.BoxGeometry(1.0, 1.5, 0.03), red, [x - 1.66, 2.75, z - 3]);
+  add(G, new THREE.BoxGeometry(1.02, 0.16, 0.035), DARK, [x - 1.66, 2.45, z - 3]);
   SOLIDS.push({ x: x - 2.2, z: z - 3, r: 0.2 });
   for (let i = 0; i < 7; i++)
-    add(
-      scene,
-      new THREE.DodecahedronGeometry(0.16, 0),
-      ROCKM[i % 2],
-      [x + Math.cos(i * 0.9) * 0.55, 0.08, z + Math.sin(i * 0.9) * 0.55],
-      [i, i * 2, 0],
-    );
-  add(scene, new THREE.ConeGeometry(0.22, 0.6, 7), new THREE.MeshBasicMaterial({ color: 0xff8a2a }), [x, 0.36, z]).castShadow = false;
+    add(G, new THREE.DodecahedronGeometry(0.16, 0), ROCKM[i % 2], [x + Math.cos(i * 0.9) * 0.55, 0.08, z + Math.sin(i * 0.9) * 0.55], [i, i * 2, 0]);
+  add(G, new THREE.ConeGeometry(0.22, 0.6, 7), new THREE.MeshBasicMaterial({ color: 0xff8a2a }), [x, 0.36, z]).castShadow = false;
   const fl = glow(0xffb040, 1.1);
   fl.position.set(x, 0.5, z);
-  scene.add(fl);
+  G.add(fl);
   SOLIDS.push({ x, z, r: 0.7 });
-  add(scene, new THREE.BoxGeometry(6.5, 0.06, 2.6), toon(0x4a3626, { rim: 0 }), [x + 0.5, 0.03, z - 5.6]).castShadow = false;
+  add(G, new THREE.BoxGeometry(6.5, 0.06, 2.6), toon(0x4a3626, { rim: 0 }), [x + 0.5, 0.03, z - 5.6]).castShadow = false;
   for (const [hx, hz] of [A, B])
     for (let i = 0; i < 4; i++)
-      sph(scene, 0.34, sackM, [hx + (i % 2) * 0.55 - 0.3, i > 1 ? 0.62 : 0.26, hz - 1 + (i > 1 ? 0.15 : (i % 2) * 0.2)], [1.2, 0.75, 0.85]);
+      sph(G, 0.34, sackM, [hx + (i % 2) * 0.55 - 0.3, i > 1 ? 0.62 : 0.26, hz - 1 + (i > 1 ? 0.15 : (i % 2) * 0.2)], [1.2, 0.75, 0.85]);
   let dig = 0,
     haul = 0;
   const men = jobs.map((job, i) =>
@@ -1447,6 +1517,7 @@ function campUpdate(dt) {
     }
     for (const p of c.prisoners) {
       const P = p.g.position;
+      P.y = groundY(P.x, P.z);
       if (!p.free) {
         // still at work. Out of sight he is hidden and left alone
         p.g.visible = !far;
@@ -1709,8 +1780,9 @@ function arriveUpdate(dt) {
 // It makes its own elements and carries its own styles, like the dialogue box
 const MINI = { W: 252, shown: false, n: 0 };
 {
-  const XL = X0,
-    XR = EX + 5,
+  // (it shows the land between the two rivers and no more: they are the limits, and each runs down one edge of it)
+  const XL = WX - 3.5,
+    XR = EX + 3.5,
     W = MINI.W,
     H = Math.round((W * (ZS - ZN)) / (XR - XL)),
     k = W / (XR - XL),
@@ -1735,6 +1807,15 @@ const MINI = { W: 252, shown: false, n: 0 };
   g.scale(2, 2);
   g.fillStyle = '#74904f';
   g.fillRect(0, 0, W, H);
+  // the low country is a shade darker, by how far down it is, so the cliff and the hillside show
+  for (let py = 0; py < H; py += 2)
+    for (let px = 0; px < W; px += 2) {
+      const low = -landBase(XL + px / k, ZN + py / k) / DROP;
+      if (low > 0.02) {
+        g.fillStyle = `rgba(30,48,28,${(0.34 * low).toFixed(3)})`;
+        g.fillRect(px, py, 2, 2);
+      }
+    }
   g.fillStyle = 'rgba(58,104,52,.75)';
   for (const t of WOODS) {
     g.beginPath();
@@ -1869,7 +1950,7 @@ const EDGE = new THREE.InstancedMesh(
 {
   const o = new THREE.Object3D();
   DASH.forEach(([x, z, a], i) => {
-    o.position.set(x, 0.05, z);
+    o.position.set(x, groundY(x, z) + 0.06, z);
     // laid flat, then turned about the vertical so each dash lies along the line
     o.rotation.set(-Math.PI / 2, a, 0, 'YXZ');
     o.updateMatrix();
@@ -1885,7 +1966,7 @@ const HOLD = new THREE.InstancedMesh(EDGE.geometry, EDGE.material.clone(), Math.
   const o = new THREE.Object3D();
   o.rotation.set(-Math.PI / 2, Math.PI / 2, 0, 'YXZ');
   for (let i = 0; i < HOLD.count; i++) {
-    o.position.set(HOLD_X + 0.45, 0.05, ZN + i * 1.5);
+    o.position.set(HOLD_X + 0.45, groundY(HOLD_X + 0.45, ZN + i * 1.5) + 0.06, ZN + i * 1.5);
     o.updateMatrix();
     HOLD.setMatrixAt(i, o.matrix);
   }
