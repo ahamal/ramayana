@@ -3,6 +3,9 @@
 // ---------- the practice ground ----------
 // things nobody can walk through: each is a circle on the ground. The altar is the first; the pillars add themselves below
 const SOLIDS = [{ x: 0, z: 0, r: 1.05 }];
+// How high the ground is at a spot. Here it is flat; a level with hills and cliffs gives its own rule, and everything that
+// stands on the ground (heroes, enemies, arrows that fall) asks this instead of assuming zero
+let groundY = (x, z) => 0;
 function kolam() {
   const c = document.createElement('canvas');
   c.width = c.height = 1024;

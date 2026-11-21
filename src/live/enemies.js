@@ -380,10 +380,12 @@ const FOES = {
   defiler: { hp: 2, speed: 3.2, reach: 2.5, swing: 2.6, radius: 0, mass: 0, aimY: 1.55, barY: 2.35 },
 };
 // a level may name the spot (at) instead of the angle; the enemy then simply stands there, with no flash of arrival
+// how many enemies may be about at once: a level with several camps raises it
+let SPAWN_MAX = 16;
 function spawn(a, kind, at) {
   const pi = kind === 'pish',
     br = kind === 'brute';
-  if (grunts.length >= 16) return;
+  if (grunts.length >= SPAWN_MAX) return;
   const r = 11 + Math.random() * 2.5,
     g = new THREE.Group();
   if (at) g.position.copy(at);
@@ -767,6 +769,10 @@ const BSTR = [
 ];
 function gruntUpdate(dt) {
   for (const d of grunts) {
+    // one that a level has put to sleep (far off, standing idle, out of sight) costs nothing until it is woken
+    if (d.asleep) continue;
+    // his feet are on the ground, whatever its height where he stands (while he is being thrown through the air he is not)
+    if (!d.flung) d.g.position.y = groundY(d.g.position.x, d.g.position.z);
     const B = d.rig.bone,
       g = d.g,
       R = d.rig.group;
@@ -928,6 +934,7 @@ function gruntUpdate(dt) {
         for (const h of S.both ? [B.handR, B.handL] : [d.sd > 0 ? B.handR : B.handL]) {
           h.getWorldPosition(tmpA);
           puff(tmpA, 0xffd0c0, 7, 2.2, 0.25, 2);
+          if (d.onHit) d.onHit();
         }
     } else if (!d.df && attacking && d.lu < 0.48 && u >= 0.48) {
       d.club.localToWorld(tmpA.set(0, 0.42, 0));
@@ -944,7 +951,7 @@ function gruntUpdate(dt) {
     d.lu = u;
     if (d.br) {
       const st2 = Math.sin(d.ph) > 0;
-      if (walking && st2 !== d.stp) puff(tmpA.set(g.position.x, 0.08, g.position.z), 0xd9b98a, 8, 1.6, 0.5, 2);
+      if (walking && st2 !== d.stp) puff(tmpA.set(g.position.x, g.position.y + 0.08, g.position.z), 0xd9b98a, 8, 1.6, 0.5, 2);
       d.stp = st2;
     }
     // defiler: flies level with wings beating, slows to a hover near the altar, and every few seconds tips its pot so a stream of filth falls on the fire
@@ -1011,13 +1018,15 @@ function gruntUpdate(dt) {
         else m.opacity = sc;
       }); // the body crumbles away; the few plain parts (the eyes) fade with it
       if (d.club) {
-        const c = d.club;
-        if (c.position.y > 0.075) {
+        const c = d.club,
+          // (the ground under the falling club, wherever that is)
+          floor = groundY(c.position.x, c.position.z) + 0.075;
+        if (c.position.y > floor) {
           d.cv.y -= 9 * dt;
           c.position.addScaledVector(d.cv, dt);
           c.rotation.x += dt * 5;
-          if (c.position.y <= 0.075) {
-            c.position.y = 0.075;
+          if (c.position.y <= floor) {
+            c.position.y = floor;
             c.rotation.set(Math.PI / 2, 0, d.seed * 2.3 + 0.6);
             if (d.df) puff(c.position, 0x6ee040, 22, 2.4, 0.5, 3);
             else puff(c.position, 0xffd9a0, 5, 1.2, 0.3, 2);
@@ -1025,7 +1034,7 @@ function gruntUpdate(dt) {
         }
       }
       if (d.dead > 1.3)
-        puff(tmpA.set(g.position.x + (Math.random() - 0.5) * 0.6, 0.2, g.position.z + (Math.random() - 0.5) * 0.9), 0x9a5ad0, 2, 0.5, 0.6, -2.5);
+        puff(tmpA.set(g.position.x + (Math.random() - 0.5) * 0.6, g.position.y + 0.2, g.position.z + (Math.random() - 0.5) * 0.9), 0x9a5ad0, 2, 0.5, 0.6, -2.5);
       if (d.dead > 2.3) {
         banish(d);
         continue;

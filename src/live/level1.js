@@ -6,6 +6,8 @@
 
 // ---------- the stage ----------
 setDay();
+// (tree trunks here are a warm mid brown, not the scene's own dark one)
+TREE_MATS.trunk.color.set(0x7b5a3d);
 shadowFollow = true;
 BOUND = 1e5;
 PLAYABLE = ['rama', 'lak'];
@@ -21,19 +23,64 @@ const WX = -90,
   X0 = START_X - 14,
   R = (a, b) => a + Math.random() * (b - a),
   riverX = (z, c = WX) => c + 1.6 * Math.sin(z * 0.16 + (c > 0 ? 1.7 : 0)),
+  // the road's line from the river as far as the hermitage: level with the crossing, wandering a little
   roadZ = (x) => 0.5 * Math.sin(x * 0.21),
   RIVER_FROM = -18,
-  CAMP = V3(-55, 0, 0),
+  // the demons' camp is a little way past the river and off the road, on its far side
+  CAMP = V3(-66, 0, -3.5),
+  // until the prisoners are freed nobody may go further east than this: a dotted line across the map, just beyond the camp
+  HOLD_X = -66 + 12,
   // on the road (which ends at the clearing), in the demons' camp, or in or beside either river or the ridge the first one falls from
-  onRoad = (x, z, pad) => x < 2 && Math.abs(z - roadZ(x)) < pad,
-  inCamp = (x, z, pad) => Math.abs(x - CAMP.x) < pad && Math.abs(z) < pad,
+  onRoad = (x, z, pad) => x < -33 && Math.abs(z - roadZ(x)) < pad,
+  // The hermitage is laid out evenly about the line that runs north through the altar. The road comes in from the river on the
+  // west, sweeps round the far side of the altar in a half ring (its middle is YARD, a little north of the fire), and comes back
+  // down on the east, where it rounds the end of the cliff and goes on south into the low country.
+  // Three round houses stand outside the half ring, facing its middle: the hall at the top, the largest, and a smaller one
+  // either side of it, the sage's on the left and the pupils' on the right. Each place is [x, z, the way it faces]
+  YARD = [0, -6],
+  RING = 20,
+  SAGE_HOUSE = [-26.8, -21.5, 1.047],
+  HALL = [0, -38.5, 0],
+  LONG = [26.8, -21.5, -1.047],
+  // matching each other either side as well: the wood store beyond the sage's house and the lotus pond beyond the pupils';
+  // the water jars and the cow's shelter out of the way behind the hall
+  WOODSHED = [-38, -9, 1.35],
+  POND = [38, -10, 0],
+  JARS = [-9, -48, 0],
+  SHED = [9.5, -49, 0],
+  // South of the altar the ground breaks in a cliff: a wall of rock that runs from the first river east to CLIFF_END. Nobody
+  // can cross it, so whoever comes up from the south must go round its end, where the road is. cliffZ is its line
+  CLIFF_FROM = WX + 3.6,
+  CLIFF_END = 30,
+  cliffZ = (x) => 15.5 + 1.5 * Math.sin(x * 0.09),
+  // (the stretch of road that runs on south past the cliff's end, for keeping trees off it before the road itself is drawn)
+  southRoad = (x, z, pad) => x > 31 - pad && x < 46 + pad && z > 8 && z < 38 + pad,
+  nearCliff = (x, z, pad) => x > CLIFF_FROM - 3 && x < CLIFF_END + 3 + pad && Math.abs(z - cliffZ(x)) < 3.4 + pad,
+  // every point of the road as drawn, filled in below: for keeping things off it
+  ROADLINE = [],
+  nearRoad = (x, z, pad) => ROADLINE.some((p) => Math.abs(p.x - x) < pad && Math.abs(p.z - z) < pad && Math.hypot(p.x - x, p.z - z) < pad),
+  // the hermitage's ground: nothing wild grows here. It is everything within the half ring and a good way outside it, north of the cliff
+  inHut = (x, z, pad) => Math.hypot(x - YARD[0], z - YARD[1]) < 48 + pad && z < cliffZ(x) - 2 + pad,
+  // the four camps where prisoners are kept at work, away from the road
+  WORK = [
+    [-36, 38],
+    [18, 44],
+    [62, 18],
+    [64, -40],
+  ],
+  inCamp = (x, z, pad) => [[CAMP.x, CAMP.z], ...WORK].some((q) => Math.abs(x - q[0]) < pad && Math.abs(z - q[1]) < pad),
   nearRiver = (x, z, pad) =>
     (z > RIVER_FROM - 4 ? Math.abs(x - riverX(z)) < 2.6 + pad : Math.abs(x - WX) < 5 + pad) || Math.abs(x - riverX(z, EX)) < 2.6 + pad;
 // the ground anyone may walk on is a rectangle here, not a circle round the fire
+// (once both brothers are over the first river there is no going back: its near bank becomes the western limit)
+let crossed = false;
 hem = (P) => {
-  P.x = Math.max(X0, Math.min(EX - 3.5, P.x));
+  if (!crossed && HEROES.every((h) => h.group.position.x > WX + 7)) crossed = true;
+  P.x = Math.max(crossed ? riverX(P.z) + 3.4 : X0, Math.min(captive() ? HOLD_X : EX - 3.5, P.x));
   P.z = Math.max(ZN, Math.min(ZS, P.z));
 };
+// true while any prisoner of the first camp, the one by the road, is still bound
+const captive = () => CAMPS[0].prisoners.some((p) => !p.free);
 // the ground is spread wide enough for the whole map, and the hills are moved back behind its far edge
 scene.children.find((m) => m.material === GROUND).scale.setScalar(2.6);
 scene.children
@@ -54,52 +101,198 @@ const LOTS = [],
     LOTS.push(l);
     return l;
   };
+// A mass of leaves is not a smooth ball. It is a lump: a rough, faceted shape, uneven all over and flattened underneath,
+// so that light falls on it in flat planes. There are three such shapes, so neighbouring masses differ
+function lump(seed) {
+  const geo = new THREE.IcosahedronGeometry(1, 1),
+    P = geo.attributes.position;
+  for (let i = 0; i < P.count; i++) {
+    const x = P.getX(i),
+      y = P.getY(i),
+      z = P.getZ(i),
+      // the same point always moves the same way, so the facets that meet at it stay joined
+      h = Math.sin(Math.round(x * 50) * 12.9898 + Math.round(y * 50) * 78.233 + Math.round(z * 50) * 37.719 + seed * 4.1) * 43758.5453,
+      k = 1 + (h - Math.floor(h) - 0.5) * 0.36,
+      yy = y * k;
+    P.setXYZ(i, x * k, yy < -0.25 ? -0.25 + (yy + 0.25) * 0.35 : yy, z * k);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+// the head of a palm, made in one piece: eleven fronds springing from the top of the trunk. Each is a long leaf, folded along
+// its middle, that rises a little and then arches over and droops, widest a third of the way out and running to a point.
+// Every other one is shorter and hangs lower, as the older fronds of a palm do
+function palmHead() {
+  const P = [];
+  for (let i = 0; i < 11; i++) {
+    const a = (i / 11) * 6.283 + (i % 2) * 0.14,
+      old = i % 2,
+      L = old ? 2.0 : 2.6,
+      lift = old ? 0.08 : 0.5,
+      ca = Math.cos(a),
+      sa = Math.sin(a),
+      at = (t, side) => {
+        const r = L * t,
+          w = 0.34 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 0.98 + 0.02)), 0.7) * side;
+        return [ca * r - sa * w, L * (lift * 1.3 * t - t * t * (0.55 + lift * 0.5)) - Math.abs(side) * 0.09, sa * r + ca * w];
+      };
+    for (let k = 0; k < 7; k++)
+      for (const side of [-1, 1])
+        P.push(...at(k / 7, 0), ...at((k + 1) / 7, 0), ...at((k + 1) / 7, side), ...at(k / 7, 0), ...at((k + 1) / 7, side), ...at(k / 7, side));
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
 const BUSHM = [toon(0x3c7a34, { rim: 0.2 }), toon(0x4f8f3a, { rim: 0.2 }), toon(0x2f6a3a, { rim: 0.2 })],
   ROCKM = [toon(0x8a8f96, { rim: 0.12 }), toon(0x73777f, { rim: 0.12 })],
-  crownG = new THREE.IcosahedronGeometry(1.7, 1),
-  topG = new THREE.IcosahedronGeometry(1.1, 1),
-  blobG = new THREE.IcosahedronGeometry(1, 1),
+  LUMPS = [lump(1), lump(2), lump(3)],
   rockG = new THREE.DodecahedronGeometry(1, 0),
-  TRUNK = lot(new THREE.CylinderGeometry(0.18, 0.26, 3, 8), TREE_MATS.trunk),
-  CROWN = [lot(crownG, TREE_MATS.leaf), lot(crownG, TREE_MATS.leaf2)],
-  TOP = [lot(topG, TREE_MATS.leaf2), lot(topG, TREE_MATS.leaf)],
-  BUSH = BUSHM.map((m) => lot(blobG, m)),
+  // a tree is made of limbs (a trunk is a limb too: a tapering length of wood between two points) and masses of leaves.
+  // Its leaves are of one green, in two tones: the darker for the under and inner masses, the lighter for those on top in the sun.
+  // There are three such greens. LEAF[green][tone] is the three lump shapes in that colour
+  LIMB = lot(new THREE.CylinderGeometry(0.62, 1, 1, 7), TREE_MATS.trunk),
+  LEAF = [
+    [0x2f6a3a, 0x40883f],
+    [0x3d7a3a, 0x5c9a44],
+    [0x4f8a38, 0x7aa848],
+  ].map((pair) => pair.map((c) => LUMPS.map((geo) => lot(geo, toon(c, { rim: 0.2 }))))),
+  PALM = lot(palmHead(), toon(0x5f9a3e, { rim: 0.2 })),
+  NUT = lot(new THREE.IcosahedronGeometry(1, 0), toon(0x6a4a2a, { rim: 0.1 })),
+  BUSH = BUSHM.map((m, i) => lot(LUMPS[i], m)),
   ROCK = ROCKM.map((m) => lot(rockG, m)),
   WOODS = [];
 
 // ---------- forest ----------
 // The clearing's own ring of trees can be very large (up to thirteen units tall), and the camera always looks from the near side.
 // So every one of them on the near side goes, along with any standing on the road or in the camp
-for (const t of [...TREES])
-  if (t.z > 4 || (t.x < 0 && t.z > -4.5) || inCamp(t.x, t.z, 10)) {
-    t.parts.forEach((m) => scene.remove(m));
-    SOLIDS.splice(SOLIDS.indexOf(t.solid), 1);
-    TREES.splice(TREES.indexOf(t), 1);
+// (the rest are taken up too, and planted again below as trees of this level's own kinds, a little smaller)
+const OLD_TREES = [];
+for (const t of [...TREES]) {
+  if (!(t.z > 4 || (t.x < 0 && t.z > -4.5) || onRoad(t.x, t.z, 4.5) || inCamp(t.x, t.z, 10) || inHut(t.x, t.z, 3))) OLD_TREES.push(t);
+  t.parts.forEach((m) => scene.remove(m));
+  SOLIDS.splice(SOLIDS.indexOf(t.solid), 1);
+  TREES.splice(TREES.indexOf(t), 1);
+}
+const LQ = new THREE.Quaternion(),
+  LE = new THREE.Euler(),
+  LUP = V3(0, 1, 0),
+  LD = V3();
+// a limb from one point to another, r thick at its foot
+function limb(ax, ay, az, bx, by, bz, r) {
+  LD.set(bx - ax, by - ay, bz - az);
+  const len = LD.length();
+  LE.setFromQuaternion(LQ.setFromUnitVectors(LUP, LD.divideScalar(len)));
+  LIMB.push([(ax + bx) / 2, (ay + by) / 2, (az + bz) / 2, LE.x, LE.y, LE.z, r, len, r]);
+}
+// Four kinds of tree, so that no two neighbours need look alike, and within a kind no two are quite the same.
+// Each has a proper trunk, swelling at the foot, and a head built up of many overlapping lumps that read as one crown:
+// darker ones low and inside, lighter ones on top.
+//   0  round-headed: the trunk forks into boughs under a full, domed crown
+//   1  tall and narrow: a straight trunk carrying a slim crown that tapers to a point, like a cypress or an ashoka
+//   2  wide and spreading: a short thick trunk, long boughs, and a broad low canopy, like a banyan or a rain tree
+//   3  a palm: a slender curving trunk with a head of arching, drooping fronds and a few nuts under them
+function tree(x, z, s, kind) {
+  const fam = LEAF[(Math.random() * 3) | 0],
+    turn = R(0, 6.283),
+    // one mass of leaves: tone 0 dark, 1 light; r across, flat is how squat it is
+    leaf = (tone, px, py, pz, r, flat) => fam[tone][(Math.random() * 3) | 0].push([px, py, pz, 0, R(0, 6.283), 0, r, r * flat, r]),
+    // the trunk: a swelling at the foot, then the bole up to height h
+    bole = (h, r) => {
+      limb(x, -0.3, z, x, 0.5 * s, z, r * 1.5);
+      limb(x, 0.3 * s, z, x, h, z, r);
+    };
+  let trunk = 0.24 * s;
+  if (kind === 0) {
+    const fork = R(2.0, 2.6) * s,
+      n = 4;
+    bole(fork, trunk);
+    for (let i = 0; i < 3; i++) {
+      const a = turn + i * 2.1;
+      limb(x, fork - 0.2 * s, z, x + Math.cos(a) * 1.0 * s, fork + 1.2 * s, z + Math.sin(a) * 1.0 * s, trunk * 0.55);
+    }
+    for (let i = 0; i < n; i++) {
+      const a = turn + (i / n) * 6.283 + R(-0.25, 0.25),
+        out = R(1.0, 1.35) * s;
+      leaf(0, x + Math.cos(a) * out * 0.85, fork + R(0.9, 1.2) * s, z + Math.sin(a) * out * 0.85, R(0.9, 1.1) * s, 0.72);
+    }
+    leaf(1, x, fork + 1.8 * s, z, 1.45 * s, 0.8);
+  } else if (kind === 1) {
+    const h = R(5.8, 7) * s;
+    trunk = 0.2 * s;
+    bole(h * 0.8, trunk);
+    for (let i = 0; i < 4; i++) {
+      const t = i / 3,
+        a = turn + i * 2.4,
+        r = (1.05 - 0.55 * t) * s,
+        off = 0.22 * s * (1 - t);
+      leaf(i < 2 ? 0 : 1, x + Math.cos(a) * off, h * (0.4 + 0.56 * t), z + Math.sin(a) * off, r, i === 3 ? 1.5 : 1.1);
+    }
+  } else if (kind === 2) {
+    const fork = R(1.5, 1.9) * s,
+      n = 5;
+    trunk = 0.36 * s;
+    bole(fork + 0.4 * s, trunk);
+    for (let i = 0; i < n; i++) {
+      const a = turn + (i / n) * 6.283 + R(-0.2, 0.2),
+        out = R(1.7, 2.2) * s,
+        up = fork + R(0.9, 1.3) * s,
+        bx = x + Math.cos(a) * out,
+        bz = z + Math.sin(a) * out;
+      if (i % 2 === 0) limb(x, fork, z, bx, up - 0.2 * s, bz, trunk * 0.42);
+      leaf(0, bx, up, bz, R(1.1, 1.35) * s, 0.55);
+    }
+    leaf(1, x, fork + 1.6 * s, z, 2.0 * s, 0.5);
+  } else {
+    // the trunk leans and curves: three lengths of it, each a little slimmer, bending over toward the top
+    const h = R(5, 6.4) * s,
+      cx = Math.cos(turn) * s,
+      cz = Math.sin(turn) * s,
+      at = (t) => [x + cx * 1.3 * t * t, h * t, z + cz * 1.3 * t * t];
+    trunk = 0.19 * s;
+    limb(x, -0.3, z, x, 0.4 * s, z, trunk * 1.5);
+    for (let i = 0; i < 4; i++) limb(...at(i / 4), ...at((i + 1) / 4), trunk * (1 - i * 0.12));
+    const [tx, ty, tz] = at(1);
+    PALM.push([tx, ty, tz, 0, turn, 0, s, s, s]);
+    for (let i = 0; i < 3; i++)
+      NUT.push([
+        tx + Math.cos(turn + i * 2.1) * 0.2 * s,
+        ty - 0.2 * s,
+        tz + Math.sin(turn + i * 2.1) * 0.2 * s,
+        0,
+        0,
+        0,
+        0.15 * s,
+        0.17 * s,
+        0.15 * s,
+      ]);
   }
-function tree(x, z, s) {
-  const i = WOODS.length % 2;
-  TRUNK.push([x, 1.5 * s - 0.3, z, 0, 0, 0, s, s, s]);
-  CROWN[i].push([x, 3.8 * s, z, 0, x * 7.3, 0, s, 0.85 * s, s]);
-  TOP[i].push([x + 0.5 * s, 5 * s, z - 0.3 * s, 0, 0, 0, s, s, s]);
-  SOLIDS.push({ x, z, r: 0.3 * s });
+  SOLIDS.push({ x, z, r: trunk + 0.06 });
   WOODS.push({ x, z, s });
 }
+for (const t of OLD_TREES) tree(t.x, t.z, Math.min(1.3, t.s * 0.75), [0, 2, 1][(Math.random() * 3) | 0]);
 // trees stand in groves with open ground between them, not evenly everywhere. None on the road, in the camp, or in the clearing;
 // just on the camera's side of the road, and on the near side of the clearing, only small ones that do not hide the brothers
-for (let i = 0; i < 520; i++) {
+for (let i = 0; i < 420; i++) {
   const x = R(X0 - 22, EX + 38),
     z = R(ZN - 30, ZS + 4),
     c = Math.hypot(x, z),
     grove = Math.sin(x * 0.045 + 1.3) * Math.cos(z * 0.06 - 0.7) + 0.35 * Math.sin(x * 0.11 + z * 0.09);
-  if (grove < 0.1 || nearRiver(x, z, 1.5) || onRoad(x, z, 5) || inCamp(x, z, 12)) continue;
+  if (grove < 0.1 || nearRiver(x, z, 1.5) || onRoad(x, z, 5) || inCamp(x, z, 12) || inHut(x, z, 3) || nearCliff(x, z, 2) || southRoad(x, z, 3))
+    continue;
   if (c < 52 && (z < 9 || c < 14)) continue;
-  const small = c < 52 || (x < 2 && z > 0 && z < 16);
-  tree(x, z, small ? R(0.5, 0.7) : R(0.6, 1.1));
+  const small = c < 52 || (x < 2 && z > roadZ(x) && z < roadZ(x) + 16);
+  // which kind grows here. Palms like the riverbanks; elsewhere round and spreading trees are commonest, tall ones fewer
+  const k = Math.random(),
+    wet = nearRiver(x, z, 9),
+    kind = wet ? (k < 0.5 ? 3 : k < 0.75 ? 0 : 2) : k < 0.42 ? 0 : k < 0.68 ? 2 : k < 0.9 ? 1 : 3;
+  tree(x, z, small ? R(0.5, 0.7) : R(0.6, 1.1), kind);
 }
 // bushes: few, and never scattered singly. One clump sits at the foot of about every third tree, as undergrowth,
 // and some more stand in small groups a little back from the road
 function bush(x, z, r) {
-  if (nearRiver(x, z, 0.6) || onRoad(x, z, 3.4) || inCamp(x, z, 7) || Math.hypot(x, z) < 12) return;
+  if (nearRiver(x, z, 0.6) || onRoad(x, z, 3.4) || inCamp(x, z, 7) || inHut(x, z, 0) || nearCliff(x, z, 0.5) || southRoad(x, z, 1)) return;
   for (let k = 0; k < 3; k++) {
     const q = r * R(0.6, 1);
     BUSH[(Math.random() * 3) | 0].push([x + R(-0.5, 0.5) * r, r * 0.45, z + R(-0.5, 0.5) * r, 0, R(0, 6), 0, q, q * 0.7, q]);
@@ -113,23 +306,95 @@ for (let i = 0; i < 22; i++) {
     z = roadZ(x) + (i % 2 ? 1 : -1) * R(4.5, 7.5);
   for (let k = 0; k < 3; k++) bush(x + R(-1.4, 1.4), z + R(-1, 1), R(0.4, 0.75));
 }
-// the road: a strip of bare trodden earth from the start to the clearing, so it is plain which way to go
+// the road: one strip of bare trodden earth. It comes from the start along the river road, turns north and goes round the far
+// side of the altar in a half ring past the three houses, comes back down, rounds the end of the cliff and stops in the low country
 {
-  const pos = [],
+  const line = [];
+  for (let x = START_X - 10; x < -34; x += 1.5) line.push(V3(x, 0, roadZ(x)));
+  // from there on it is one smooth curve: it turns north to the foot of the half ring, goes round it, comes down the far side
+  // the same way, and then bears off round the end of the cliff and away south
+  const through = [V3(-34, 0, roadZ(-34)), V3(-27, 0, 0.6), V3(-22.4, 0, -1.6)];
+  for (let t = -1.45; t <= 1.46; t += 0.145) through.push(V3(YARD[0] + RING * Math.sin(t), 0, YARD[1] - RING * Math.cos(t)));
+  for (const [x, z] of [
+    [22.4, -1.6],
+    [26.5, 6],
+    [36, 14.5],
+    [41, 23],
+    [41.5, 34],
+  ])
+    through.push(V3(x, 0, z));
+  const curve = new THREE.CatmullRomCurve3(through, false, 'centripetal');
+  line.push(...curve.getSpacedPoints(Math.ceil(curve.getLength() / 0.6)));
+  // how far along the road each point is, and the whole length
+  const along = [0];
+  for (let i = 1; i < line.length; i++) along.push(along[i - 1] + line[i].distanceTo(line[i - 1]));
+  ROADLINE.push(...line);
+  const LEN = along[along.length - 1],
+    pos = [],
+    uv = [],
     idx = [];
-  let n = 0;
-  for (let x = START_X - 10; x <= -10; x += 1.5, n++) {
-    const w = 1.5 + 0.25 * Math.sin(x * 0.7),
-      c = roadZ(x);
-    pos.push(x, 0.012, c - w, x, 0.012, c + w);
-    if (n) idx.push(n * 2 - 2, n * 2 - 1, n * 2, n * 2 - 1, n * 2 + 1, n * 2);
-  }
+  line.forEach((p, i) => {
+    const a = line[Math.max(0, i - 1)],
+      b = line[Math.min(line.length - 1, i + 1)],
+      l = Math.hypot(b.x - a.x, b.z - a.z) || 1,
+      nx = -(b.z - a.z) / l,
+      nz = (b.x - a.x) / l,
+      s = along[i],
+      // it keeps its width to the very end and stops in a blunt, rounded tip
+      e = Math.min(1, (LEN - s) / 1.5),
+      end = Math.sqrt(1 - (1 - e) * (1 - e)),
+      // (the strip is cut a little wider than the road looks, because the picture laid on it fades out toward both edges)
+      w = (1.85 + 0.25 * Math.sin(s * 0.7)) * end,
+      w2 = w * (0.9 + 0.15 * Math.sin(s * 0.31 + 1));
+    pos.push(p.x - nx * w, 0.012, p.z - nz * w, p.x + nx * w2, 0.012, p.z + nz * w2);
+    uv.push(0, s / 9, 1, s / 9);
+    if (i) idx.push(i * 2 - 2, i * 2 - 1, i * 2, i * 2 - 1, i * 2 + 1, i * 2);
+  });
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx);
   g.computeVertexNormals();
-  const m = new THREE.Mesh(g, toon(0x9a8460, { rim: 0 }));
+  // The road is the plain flat earth colour it always was. The only thing the picture laid along it adds is the edge:
+  // instead of a hard line, each side wanders a little and melts into the grass. The picture repeats every nine paces, and joins itself without a seam
+  const W = 128,
+    H = 512,
+    c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext('2d'),
+    im = ctx.createImageData(W, H),
+    // a wavering line that comes back to where it began after the full length, so the picture tiles
+    wave = (y, k) =>
+      Math.sin((y / H) * 6.283 * 2 + k) * 0.5 + Math.sin((y / H) * 6.283 * 5 + k * 2.3) * 0.3 + Math.sin((y / H) * 6.283 * 11 + k * 0.7) * 0.2,
+    rnd = (x, y) => {
+      const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+      return v - Math.floor(v);
+    };
+  for (let y = 0; y < H; y++) {
+    const e1 = 9 + 4 * wave(y, 0.4),
+      e2 = W - 9 + 4 * wave(y, 3.1);
+    for (let x = 0; x < W; x++) {
+      const d = Math.min(x - e1, e2 - x),
+        // how much road there is here: none outside the edge, all of it a hand's breadth inside, crumbling in between
+        t = Math.max(0, Math.min(1, d / 11)),
+        cover = t * t * (3 - 2 * t),
+        v = 143,
+        i = (y * W + x) * 4;
+      im.data[i] = v * 1.08;
+      im.data[i + 1] = v * 0.93;
+      im.data[i + 2] = v * 0.68;
+      im.data[i + 3] = 255 * Math.max(0, Math.min(1, cover));
+    }
+  }
+  ctx.putImageData(im, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 8;
+  const m = new THREE.Mesh(g, toon(0xffffff, { map: tex, transparent: true, depthWrite: false, rim: 0 }));
   m.receiveShadow = true;
+  m.renderOrder = -1;
   scene.add(m);
 }
 // rocks: small ones anywhere, and a few boulders nobody can walk through
@@ -141,8 +406,117 @@ for (let i = 0; i < 170; i++) {
   const x = R(X0 - 10, EX + 20),
     z = R(ZN - 10, ZS),
     big = i % 7 === 0;
-  if (onRoad(x, z, 3.4) || inCamp(x, z, 8) || Math.hypot(x, z) < 14 || nearRiver(x, z, big ? 1 : -1.6)) continue;
+  if (onRoad(x, z, 3.4) || inCamp(x, z, 8) || inHut(x, z, 0) || nearCliff(x, z, 0.5) || nearRoad(x, z, 3.2) || nearRiver(x, z, big ? 1 : -1.6))
+    continue;
   rock(x, z, big ? R(0.8, 1.4) : R(0.15, 0.45), big);
+}
+
+// ---------- grass and herbs ----------
+// Things that grow underfoot and stop nobody: tufts of grass, and here and there a few
+// herbs together, each a low rosette of leaves with small flowers standing over it, white, yellow or violet.
+// None grow on the road, in the water, on the altar's floor or where a house stands
+{
+  // a tuft: seven blades fanned out from one root, each a short, broad blade leaning well outward, so the tuft is a low soft clump
+  const blades = [];
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * 6.283 + R(-0.3, 0.3),
+      lean = R(0.1, 0.24),
+      h = R(0.11, 0.2),
+      cx = Math.cos(a),
+      cz = Math.sin(a);
+    blades.push(cx * 0.03 - cz * 0.045, 0, cz * 0.03 + cx * 0.045, cx * 0.03 + cz * 0.045, 0, cz * 0.03 - cx * 0.045, cx * lean, h, cz * lean);
+  }
+  const tuftG = new THREE.BufferGeometry();
+  tuftG.setAttribute('position', new THREE.Float32BufferAttribute(blades, 3));
+  tuftG.computeVertexNormals();
+  // a herb's rosette: six pointed leaves lying out from the middle and tipped up a little
+  const leaves = [];
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * 6.283,
+      cx = Math.cos(a),
+      cz = Math.sin(a),
+      at = (r, y, side) => [cx * r - cz * side, y, cz * r + cx * side];
+    leaves.push(
+      ...at(0.02, 0.02, 0),
+      ...at(0.11, 0.07, 0.045),
+      ...at(0.2, 0.1, 0),
+      ...at(0.02, 0.02, 0),
+      ...at(0.2, 0.1, 0),
+      ...at(0.11, 0.07, -0.045),
+    );
+  }
+  const herbG = new THREE.BufferGeometry();
+  herbG.setAttribute('position', new THREE.Float32BufferAttribute(leaves, 3));
+  herbG.computeVertexNormals();
+  const TUFT = [lot(tuftG, toon(0x7da548, { rim: 0.1 })), lot(tuftG, toon(0x6a9440, { rim: 0.1 }))],
+    HERB = lot(herbG, toon(0x4c8a3c, { rim: 0.1 })),
+    STEM = lot(new THREE.CylinderGeometry(0.008, 0.008, 1, 4), toon(0x5a9440, { rim: 0 })),
+    bloomG = new THREE.IcosahedronGeometry(1, 0),
+    BLOOM = [0xf4f0e6, 0xf2cf3a, 0x9a78d8].map((c) => lot(bloomG, toon(c, { rim: 0.15 }))),
+    HOUSES = [
+      [SAGE_HOUSE, 7.2],
+      [HALL, 8.2],
+      [LONG, 7.2],
+      [WOODSHED, 2.6],
+      [SHED, 3.6],
+      [POND, 4.5],
+    ],
+    // may something grow here?
+    open = (x, z) => {
+      if (x < X0 || x > EX - 4 || z < ZN || z > ZS) return false;
+      if (nearRiver(x, z, 0.4) || nearCliff(x, z, 0) || Math.hypot(x, z) < 5.2) return false;
+      if (HOUSES.some(([q, r]) => Math.hypot(x - q[0], z - q[1]) < r)) return false;
+      if (nearRoad(x, z, 2.4)) return false;
+      return true;
+    };
+  // a patch of n tufts scattered within spread of a spot, and now and then a few herbs with it
+  const patch = (px, pz, n, spread, herbs) => {
+    for (let k = 0; k < n; k++) {
+      const x = px + R(-spread, spread),
+        z = pz + R(-spread, spread),
+        sc = R(0.8, 1.2);
+      if (open(x, z)) TUFT[(Math.random() * 2) | 0].push([x, 0, z, 0, R(0, 6.28), 0, sc, sc * R(0.8, 1.2), sc]);
+    }
+    const kind = (Math.random() * 3) | 0;
+    for (let k = 0; k < herbs; k++) {
+      const x = px + R(-spread, spread),
+        z = pz + R(-spread, spread),
+        sc = R(0.9, 1.5),
+        h = R(0.16, 0.3) * sc;
+      if (!open(x, z)) continue;
+      HERB.push([x, 0, z, 0, R(0, 6.28), 0, sc, sc, sc]);
+      STEM.push([x, h / 2, z, 0, 0, 0, 1, h, 1]);
+      for (let b = 0; b < 3; b++)
+        BLOOM[kind].push([x + R(-0.04, 0.04) * sc, h + R(-0.03, 0.03), z + R(-0.04, 0.04) * sc, 0, 0, 0, 0.03 * sc, 0.03 * sc, 0.03 * sc]);
+    }
+  };
+  // They do not grow just anywhere, only where such things do:
+  // round the foot of most trees, in their shade;
+  for (const t of [...WOODS, ...TREES])
+    if (Math.random() < 0.7)
+      patch(t.x, t.z, 4 + ((Math.random() * 4) | 0), 0.9 + t.s * 0.7, Math.random() < 0.35 ? 2 + ((Math.random() * 2) | 0) : 0);
+  // along both verges of the road, in broken stretches;
+  for (let i = 2; i < ROADLINE.length - 2; i++) {
+    const p = ROADLINE[i],
+      q = ROADLINE[i + 1],
+      l = Math.hypot(q.x - p.x, q.z - p.z) || 1;
+    for (const side of [-1, 1])
+      if (Math.random() < l * 0.16) {
+        const off = side * R(2.7, 3.7);
+        patch(p.x - ((q.z - p.z) / l) * off, p.z + ((q.x - p.x) / l) * off, 3 + ((Math.random() * 3) | 0), 0.7, Math.random() < 0.3 ? 2 : 0);
+      }
+  }
+  // on the banks of both rivers;
+  for (const c of [WX, EX])
+    for (let z = c === WX ? RIVER_FROM + 2 : ZN; z < ZS; z += 2.5)
+      for (const side of [-1, 1])
+        if (Math.random() < 0.5) patch(riverX(z, c) + side * R(3.3, 4.6), z, 3 + ((Math.random() * 3) | 0), 0.7, Math.random() < 0.25 ? 2 : 0);
+  // and round the pond
+  for (let i = 0; i < 14; i++) {
+    const a = R(0, 6.283),
+      r = R(4.7, 5.8);
+    patch(POND[0] + Math.cos(a) * r, POND[1] + Math.sin(a) * r, 3 + ((Math.random() * 3) | 0), 0.5, Math.random() < 0.4 ? 2 : 0);
+  }
 }
 
 // ---------- river ----------
@@ -193,7 +567,7 @@ function waterMat(fall, head = RIVER_FROM) {
 // Each river runs in a channel cut below the ground. The ground itself is not drawn where a channel is; inside the gap are sloping earth
 // banks and the water, well down. Where the road crosses the first river the gap is simply not cut: the crossing is the land itself.
 const DEEP = 0.9,
-  CROSS = 2.4;
+  CROSS = 4.5;
 {
   // the ground leaves two river-shaped holes, the first one broken at the crossing
   const base = GROUND.onBeforeCompile;
@@ -260,7 +634,8 @@ if ((vWP.z > ${RIVER_FROM.toFixed(1)} && abs(vWP.z) > ${CROSS.toFixed(1)} && wR 
     wall.castShadow = false;
   }
   // nobody walks through water: two rows of blocking circles down each river, the first left open at the crossing
-  for (let z = RIVER_FROM; z <= ZS + 6; z += 1.2) if (Math.abs(z) > 3.3) for (const o of [-1.2, 1.2]) SOLIDS.push({ x: riverX(z) + o, z, r: 1.5 });
+  for (let z = RIVER_FROM; z <= ZS + 6; z += 1.2)
+    if (Math.abs(z) > CROSS + 0.9) for (const o of [-1.2, 1.2]) SOLIDS.push({ x: riverX(z) + o, z, r: 1.5 });
   for (let z = ZN - 6; z <= ZS + 6; z += 1.2) for (const o of [-1.2, 1.2]) SOLIDS.push({ x: riverX(z, EX) + o, z, r: 1.5 });
 }
 
@@ -301,6 +676,64 @@ const FALL = V3(riverX(RIVER_FROM), 0, RIVER_FROM);
     SOLIDS.push({ x: WX, z, r: 2.6 });
   }
 }
+// ---------- the compound ----------
+{
+  // The altar is set square to Vishwamitra: the fire pit is turned so a flat side, not a corner, faces him (and the camera).
+  // Its six pillars are rebuilt to match, the same either side of the line from him through the fire: two low ones at the front
+  // so the fire is in plain view, two middling ones at the sides, and two tall ones at the back, framing him
+  fire.rotation.y = Math.PI / 4;
+  for (const m of [...scene.children]) if (m.material === STONE && Math.abs(Math.hypot(m.position.x, m.position.z) - 4.2) < 0.01) scene.remove(m);
+  for (const o of [...SOLIDS]) if (o.r === 0.4 && Math.abs(Math.hypot(o.x, o.z) - 4.2) < 0.01) SOLIDS.splice(SOLIDS.indexOf(o), 1);
+  const pillar = (h) => [
+    [0.36, 0],
+    [0.36, 0.14],
+    [0.27, 0.2],
+    [0.3, 0.3],
+    [0.22, 0.38],
+    [0.2, h - 0.5],
+    [0.25, h - 0.44],
+    [0.22, h - 0.36],
+    [0.33, h - 0.2],
+    [0.36, h - 0.06],
+    [0.3, h],
+    [0.001, h],
+  ];
+  for (const [a, h] of [
+    [0.52, 1.5],
+    [Math.PI / 2, 2.5],
+    [Math.PI - 0.52, 3.4],
+  ])
+    for (const sx of [-1, 1]) {
+      const x = sx * Math.sin(a) * 4.2,
+        z = Math.cos(a) * 4.2;
+      lathe(scene, pillar(h), STONE, [x, 0, z]);
+      SOLIDS.push({ x, z, r: 0.4 });
+    }
+}
+// ---------- the cliff ----------
+// a wall of rock south of the altar, from the first river to its end in the east: big crags in two ranks, the back rank
+// taller, with smaller rock tumbled along its foot on the low side. It stops everyone
+for (let x = CLIFF_FROM; x <= CLIFF_END; x += 2.3) {
+  const z = cliffZ(x),
+    // it runs down to nothing over its last few paces, so the end is a slope of rock and not a sawn-off wall
+    fall = Math.min(1, (CLIFF_END + 1.5 - x) / 7),
+    // (it is kept to about a man and a half high, so that from the camera's side it does not hide whoever stands beyond it)
+    r = R(1.6, 2.1) * (0.45 + 0.55 * fall);
+  ROCK[(Math.random() * 2) | 0].push([x + R(-0.4, 0.4), r * 0.55, z - 0.7 + R(-0.3, 0.3), R(0, 6), R(0, 6), R(0, 6), r * 1.15, r, r]);
+  ROCK[(Math.random() * 2) | 0].push([
+    x + 1.1 + R(-0.4, 0.4),
+    r * 0.3,
+    z + 0.9 + R(-0.3, 0.3),
+    R(0, 6),
+    R(0, 6),
+    R(0, 6),
+    r * 0.9,
+    r * 0.8,
+    r * 0.85,
+  ]);
+  if (Math.random() < 0.6) rock(x + R(-1, 1), z + R(2.6, 3.8), R(0.3, 0.7), false);
+  SOLIDS.push({ x, z, r: 3 * (0.5 + 0.5 * fall) });
+}
 // every lot is now complete: each becomes one batch
 for (const l of LOTS) {
   const m = new THREE.InstancedMesh(l.geo, l.mat, l.length),
@@ -316,16 +749,285 @@ for (const l of LOTS) {
   scene.add(m);
 }
 
-// ---------- Vishwamitra's hut ----------
-// a stand-in for now, just beyond the altar: round mud walls, a thatched cone of a roof and a dark doorway facing the fire
+// ---------- the hermitage ----------
+// what it is built of: mud walls on a stone footing with a painted band at the foot, timber, plank doors, and hay for the roofs
+// thatch is drawn with a picture of straw: a greyish, weathered ground covered in fine strands running down the slope, some paler,
+// some darker, with the odd deep gap between bundles
+function strawPicture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#a39b85';
+  g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 1500; i++) {
+    const v = 110 + Math.random() * 100,
+      x = Math.random() * 256,
+      y = Math.random() * 256,
+      len = 30 + Math.random() * 110;
+    g.strokeStyle = `rgba(${v | 0},${(v * 0.95) | 0},${(v * 0.8) | 0},${0.25 + Math.random() * 0.5})`;
+    g.lineWidth = 0.6 + Math.random() * 1.4;
+    for (const oy of [0, -256]) {
+      g.beginPath();
+      g.moveTo(x, y + oy);
+      g.lineTo(x + (Math.random() - 0.5) * 5, y + oy + len);
+      g.stroke();
+    }
+  }
+  for (let i = 0; i < 70; i++) {
+    g.fillStyle = `rgba(40,34,26,${0.25 + Math.random() * 0.3})`;
+    g.fillRect(Math.random() * 256, Math.random() * 256, 1 + Math.random(), 20 + Math.random() * 60);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 1);
+  t.anisotropy = 8;
+  return t;
+}
+const STRAW = strawPicture();
+const HM = {
+  mud: toon(0xc9a36f, { rim: 0.1 }),
+  band: toon(0x9c4a2c, { rim: 0.1 }),
+  lime: toon(0xefe6d2, { rim: 0.05 }),
+  // the roofs are thatch: grey weathered straw, its strands showing, laid in courses each with a darker edge
+  thatch: toon(0xffffff, { map: STRAW, rim: 0.1 }),
+  thatch2: toon(0xb9b2a4, { map: STRAW, rim: 0.05 }),
+  plank: toon(0x8a5a30, { rim: 0.1 }),
+  dark: toon(0x20140f, { rim: 0 }),
+  clay: toon(0xb5603a, { rim: 0.2 }),
+};
+// a group standing at a site [x, z, turn], and a way to turn a spot measured inside it into a place on the map
+function site([x, z, a]) {
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  g.rotation.y = a;
+  scene.add(g);
+  g.at = (lx, lz) => ({ x: x + lx * Math.cos(a) + lz * Math.sin(a), z: z - lx * Math.sin(a) + lz * Math.cos(a) });
+  return g;
+}
+// A round house, R across the wall from the middle. A round stone footing with a step at the door; a mud wall with a painted band
+// and a white line at the foot, timber posts set into it and a timber ring along its top; plank doors in a timber frame; shuttered
+// windows; and a low cone of thatch, gentler in its upper half, with a darker edge under its eave, that
+// overhangs all round on a ring of posts to make a veranda.
+//   wins: how far round from the door (in radians) each window is
+function house(q, { R: r, wins }) {
+  const g = site(q),
+    { mud, band, lime, thatch, thatch2, plank, dark } = HM,
+    FH = 2.7,
+    Y0 = 0.6,
+    top = Y0 + FH,
+    over = 1.4,
+    RR = r + over,
+    ry = top - 0.32,
+    // something set against the wall, a given way round from the door: it is built facing out along z and then turned
+    wall = (a) => {
+      const w = new THREE.Group();
+      w.rotation.y = a;
+      g.add(w);
+      return (x, y, z, m, p) => add(w, new THREE.BoxGeometry(x, y, z), m, [p[0], p[1], r + p[2]]);
+    };
+  // footing, wall, the band and line at its foot, and the timber: posts round the wall and a ring along its top
+  add(g, new THREE.CylinderGeometry(RR - 0.1, RR + 0.05, Y0, 48), STONE, [0, Y0 / 2, 0]);
+  add(g, new THREE.CylinderGeometry(r, r, FH, 40), mud, [0, Y0 + FH / 2, 0]);
+  add(g, new THREE.CylinderGeometry(r + 0.03, r + 0.04, 0.5, 40), band, [0, Y0 + 0.25, 0]);
+  add(g, new THREE.CylinderGeometry(r + 0.035, r + 0.035, 0.07, 40), lime, [0, Y0 + 0.56, 0]);
+  tor(g, r + 0.02, 0.09, WOOD, [0, top - 0.08, 0], [Math.PI / 2, 0, 0]);
+  for (let i = 0; i < 8; i++) {
+    const a = ((i + 0.5) / 8) * Math.PI * 2;
+    cyl(g, 0.1, 0.1, FH, WOOD, [Math.sin(a) * r, Y0 + FH / 2, Math.cos(a) * r]);
+  }
+  // a pair of plank doors in a timber frame, with a stone step up to the footing
+  {
+    const bx = wall(0);
+    bx(1.4, 2.15, 0.12, plank, [0, Y0 + 1.075, -0.02]);
+    bx(0.03, 2.15, 0.14, dark, [0, Y0 + 1.075, -0.02]);
+    for (const sx of [-1, 1]) bx(0.18, 2.3, 0.24, WOOD, [sx * 0.79, Y0 + 1.15, -0.02]);
+    bx(2.0, 0.2, 0.28, WOOD, [0, Y0 + 2.36, -0.02]);
+    bx(2.2, 0.16, 0.6, STONE, [0, 0.08, over + 0.75]);
+  }
+  // a window: a dark opening in a timber frame, its two shutters folded back against the wall
+  for (const a of wins) {
+    const bx = wall(a),
+      y = Y0 + 1.6;
+    bx(0.7, 0.75, 0.12, dark, [0, y, -0.03]);
+    bx(0.86, 0.09, 0.18, WOOD, [0, y + 0.42, -0.01]);
+    bx(0.94, 0.09, 0.22, WOOD, [0, y - 0.42, 0]);
+    for (const sx of [-1, 1]) bx(0.33, 0.75, 0.05, plank, [sx * 0.53, y, -0.03]);
+  }
+  // The roof is thatch, in the shape of a cone that eases off half way up: steeper from the eave to the middle, then at a
+  // gentler angle up to the peak, so the top is low and blunt. The eave comes well past the posts and the footing.
+  // Under it is a second, slightly darker layer of the same shape that reaches a little further out, so only its edge shows.
+  // The straw picture is wrapped many times round, so its strands stay fine and run from the peak down to the eave
+  const RT = RR + 0.8,
+    HT = RT * 0.52,
+    low = (0.64 * HT) / (RT * 0.5),
+    yb = ry - 0.45,
+    shape = new THREE.LatheGeometry([new THREE.Vector2(RT, 0), new THREE.Vector2(RT * 0.5, HT * 0.64), new THREE.Vector2(0.001, HT)], 44);
+  {
+    const uv = shape.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * Math.round(RT * 1.1));
+  }
+  add(g, shape, thatch, [0, yb, 0]);
+  add(g, shape, thatch2, [0, yb - 0.06, 0], [0, 0, 0], [1 + 0.07 / RT, 1, 1 + 0.07 / RT]);
+  // the veranda: a ring of posts on stone bases round the edge of the footing, under the eave
+  // (few of them, and stout)
+  const n = Math.round((2 * Math.PI * (RR - 0.4)) / 4.4),
+    ph = yb + low * (RT - (RR - 0.4)) - Y0 - 0.4;
+  for (let i = 0; i < n; i++) {
+    const a = ((i + 0.5) / n) * Math.PI * 2,
+      x = Math.sin(a) * (RR - 0.4),
+      z = Math.cos(a) * (RR - 0.4);
+    cyl(g, 0.17, 0.2, ph, WOOD, [x, Y0 + ph / 2, z]);
+    add(g, new THREE.BoxGeometry(0.52, 0.22, 0.52), STONE, [x, Y0 + 0.11, z], [0, a, 0]);
+    add(g, new THREE.BoxGeometry(0.46, 0.14, 0.46), WOOD, [x, Y0 + ph - 0.07, z], [0, a, 0]);
+  }
+  SOLIDS.push({ x: q[0], z: q[1], r: r + 1.1 });
+  return g;
+}
+// the sage's own house, on the left
+house(SAGE_HOUSE, { R: 4.4, wins: [0.9, -0.9] });
+// the hall, where the pupils eat and are taught
+house(HALL, { R: 5.4, wins: [0.6, -0.6, 1.3, -1.3] });
+// the pupils' house, on the right, the same size as the sage's
+house(LONG, { R: 4.4, wins: [0.9, -0.9] });
+
+// ---------- behind the houses ----------
 {
-  const hut = new THREE.Group();
-  hut.position.set(0, 0, -12);
-  scene.add(hut);
-  cyl(hut, 2.6, 2.7, 2.2, toon(0xb79a72, { rim: 0.1 }), [0, 1.1, 0]);
-  add(hut, new THREE.ConeGeometry(3.5, 2.4, 16), toon(0xc9a455, { rim: 0.15 }), [0, 3.35, 0]);
-  add(hut, new THREE.BoxGeometry(0.9, 1.6, 0.12), toon(0x2a1c14, { rim: 0 }), [0, 0.8, 2.66]);
-  SOLIDS.push({ x: 0, z: -12, r: 2.8 });
+  const { mud, band, lime, thatch, thatch2, clay } = HM,
+    box = (g, w, h, d, m, p, r) => add(g, new THREE.BoxGeometry(w, h, d), m, p, r);
+  // the wood store, between the sage's house and the hall: a small lean-to on four posts with one stack of split logs under it, and the chopping block beside it
+  {
+    const g = site(WOODSHED),
+      LOGM = [toon(0x7a4a22, { rim: 0.1 }), toon(0x8a5a2c, { rim: 0.1 })];
+    for (const sx of [-1, 1]) {
+      cyl(g, 0.07, 0.09, 1.8, WOOD, [sx * 1.2, 0.9, 0.8]);
+      cyl(g, 0.07, 0.09, 1.4, WOOD, [sx * 1.2, 0.7, -0.8]);
+    }
+    box(g, 3.1, 0.32, 2.5, thatch, [0, 1.86, 0], [-0.22, 0, 0]);
+    box(g, 3.3, 0.12, 2.7, thatch2, [0, 1.68, 0], [-0.22, 0, 0]);
+    for (let row = 0; row < 4; row++)
+      for (let i = 0; i < 5 - (row % 2); i++)
+        cyl(g, 0.11, 0.12, 1.5, LOGM[row % 2], [R(-0.04, 0.04), 0.14 + row * 0.21, -0.5 + i * 0.25 + (row % 2) * 0.12], [0, 0, Math.PI / 2]);
+    cyl(g, 0.3, 0.34, 0.42, WOOD, [1.9, 0.21, 0.9]);
+    cyl(g, 0.025, 0.03, 0.75, WOOD, [2.05, 0.7, 0.9], [0, 0, -0.5]);
+    box(g, 0.22, 0.14, 0.05, toon(0x55585e, { rim: 0.3 }), [1.9, 0.48, 0.9], [0, 0, -0.5]);
+    SOLIDS.push({ ...g.at(0, 0), r: 1.3 }, { ...g.at(1.9, 0.9), r: 0.4 });
+  }
+  // the cow's shelter: a low back wall, four posts and a sloping thatch roof, open at the front, with a trough and a heap of hay
+  {
+    const g = site(SHED);
+    box(g, 5.2, 0.14, 4.2, STONE, [0, 0.07, 0]);
+    box(g, 4.6, 1.2, 0.3, mud, [0, 0.74, -1.6]);
+    box(g, 4.66, 0.35, 0.36, band, [0, 0.31, -1.6]);
+    for (const sx of [-1, 1]) {
+      cyl(g, 0.09, 0.11, 2.2, WOOD, [sx * 2.2, 1.24, 1.5]);
+      cyl(g, 0.09, 0.11, 1.7, WOOD, [sx * 2.2, 0.99, -1.6]);
+      box(g, 0.1, 0.1, 3.3, WOOD, [sx * 2.2, 2.07, -0.05], [-0.16, 0, 0]);
+    }
+    box(g, 5.2, 0.18, 4.0, thatch, [0, 2.2, -0.05], [-0.16, 0, 0]);
+    box(g, 5.4, 0.1, 4.2, thatch2, [0, 2.1, -0.05], [-0.16, 0, 0]);
+    box(g, 1.8, 0.34, 0.55, WOOD, [-0.9, 0.31, -0.9]);
+    sph(g, 0.75, thatch, [1.3, 0.5, -0.7], [1.2, 0.7, 1]);
+    SOLIDS.push({ ...g.at(-1.1, -0.6), r: 1.6 }, { ...g.at(1.1, -0.6), r: 1.6 });
+  }
+  // three water jars of different sizes at the back of the sage's house
+  {
+    const g = site(JARS);
+    for (const [x, z, r] of [
+      [0, 0, 0.42],
+      [0.75, 0.25, 0.3],
+      [0.3, 0.7, 0.24],
+    ]) {
+      sph(g, r, clay, [x, r * 0.85, z], [1, 0.9, 1]);
+      tor(g, r * 0.4, r * 0.1, clay, [x, r * 1.72, z], [Math.PI / 2, 0, 0]);
+    }
+    SOLIDS.push({ ...g.at(0.3, 0.3), r: 0.8 });
+  }
+}
+
+// ---------- the lotus pond ----------
+// A round pond lying flat in the ground. Lotus leaves float
+// on it, flat and round; among them are open flowers, pink with a yellow heart, and a few buds still closed on their stalks
+{
+  const [PX, PZ, PA] = POND,
+    A = 3.8,
+    B = 3.8,
+    g = site(POND),
+    many = (geo, mat, list, shadow) => {
+      const m = new THREE.InstancedMesh(geo, mat, list.length),
+        o = new THREE.Object3D();
+      list.forEach((q, i) => {
+        o.position.set(q[0], q[1], q[2]);
+        o.rotation.set(q[3], q[4], q[5], 'YXZ');
+        o.scale.set(q[6], q[7], q[8]);
+        o.updateMatrix();
+        m.setMatrixAt(i, o.matrix);
+      });
+      m.castShadow = !!shadow;
+      m.receiveShadow = true;
+      g.add(m);
+    },
+    // a random spot on the water, no nearer the kerb than k (1 is the kerb itself)
+    spot = (k) => {
+      const a = R(0, 6.283),
+        r = Math.sqrt(Math.random()) * k;
+      return [Math.cos(a) * A * r, Math.sin(a) * B * r];
+    };
+  // the water lies flat in the ground, darker in the middle where it is deep, with a narrow margin of damp earth round it
+  // and a few stones on the bank. There is no kerb
+  const flat = (r, mat, y) => (add(g, new THREE.CircleGeometry(r, 56), mat, [0, y, 0], [-Math.PI / 2, 0, 0]).castShadow = false);
+  flat(A + 0.45, toon(0x6e6044, { rim: 0 }), 0.006);
+  flat(A, toon(0x3f8a94, { rim: 0 }), 0.012);
+  flat(A * 0.62, toon(0x2f7484, { rim: 0 }), 0.016);
+  for (let i = 0; i < 7; i++) {
+    const a = R(0, 6.283),
+      r = R(0.16, 0.34);
+    add(
+      g,
+      new THREE.DodecahedronGeometry(r, 0),
+      ROCKM[i % 2],
+      [Math.cos(a) * (A + 0.35), r * 0.4, Math.sin(a) * (A + 0.35)],
+      [R(0, 6), R(0, 6), R(0, 6)],
+      [1.2, 0.8, 1],
+    );
+  }
+  // leaves
+  const pads = [];
+  for (let i = 0; i < 26; i++) {
+    const [x, z] = spot(0.88),
+      r = R(0.24, 0.46);
+    pads.push([x, 0.03 + i * 0.0005, z, -Math.PI / 2, R(0, 6.28), 0, r, r, 1]);
+  }
+  many(new THREE.CircleGeometry(1, 12, 0.35, 5.6), toon(0x3f8f45, { rim: 0.1 }), pads);
+  // flowers: two rings of petals, the outer ones spread wide and the inner ones more upright, round a yellow heart
+  const petals = [],
+    hearts = [],
+    stalks = [],
+    buds = [];
+  for (let i = 0; i < 7; i++) {
+    const [x, z] = spot(0.8),
+      s = R(0.85, 1.2),
+      y = 0.07;
+    for (let k = 0; k < 8; k++) petals.push([x, y, z, 1.05, (k / 8) * 6.283, 0, 0.075 * s, 0.2 * s, 0.03 * s]);
+    for (let k = 0; k < 6; k++) petals.push([x, y + 0.01, z, 0.5, ((k + 0.5) / 6) * 6.283, 0, 0.06 * s, 0.17 * s, 0.03 * s]);
+    hearts.push([x, y + 0.04, z, 0, 0, 0, 0.055 * s, 0.045 * s, 0.055 * s]);
+  }
+  for (let i = 0; i < 4; i++) {
+    const [x, z] = spot(0.8),
+      h = R(0.3, 0.5);
+    stalks.push([x, 0.02 + h / 2, z, 0, 0, 0, 1, h, 1]);
+    buds.push([x, 0.02 + h + 0.1, z, 0, 0, 0, 0.07, 0.16, 0.07]);
+  }
+  // (a petal is a small pointed leaf shape standing on its base, so that tipping it leans it outward from the flower's heart)
+  const petalG = new THREE.SphereGeometry(1, 8, 6);
+  petalG.translate(0, 1, 0);
+  const pink = toon(0xf08ab0, { rim: 0.25 });
+  many(petalG, pink, petals, true);
+  many(new THREE.SphereGeometry(1, 8, 6), toon(0xf2c53a, { rim: 0.2 }), hearts);
+  many(new THREE.CylinderGeometry(0.015, 0.015, 1, 5), toon(0x4a8a3c, { rim: 0 }), stalks);
+  many(new THREE.SphereGeometry(1, 8, 6), pink, buds, true);
+  // nobody walks through it
+  SOLIDS.push({ x: PX, z: PZ, r: A - 0.1 });
 }
 
 // ---------- the demons' camp ----------
@@ -380,6 +1082,30 @@ function pose(p) {
       }
     p.rig.bone.hips.position.y += W._y * p.wk;
   }
+  // at forced work: hoeing, bent over, both arms swinging the hoe; or bowed under a sack held on his shoulders
+  if (p.jobW > 0.001) {
+    const sw = Math.sin(T * 3.2 + p.ph0),
+      J =
+        p.job === 'dig'
+          ? {
+              spine: [0.5 + 0.12 * sw, 0, 0],
+              chest: [0.2, 0, 0],
+              head: [-0.25, 0, 0],
+              armL: [-0.85 + 0.45 * sw, 0, -0.35],
+              foreL: [-0.7 - 0.25 * sw, 0, 0],
+              armR: [-0.85 + 0.45 * sw, 0, 0.35],
+              foreR: [-0.7 - 0.25 * sw, 0, 0],
+              legL: [-0.25, 0, 0.08],
+              shinL: [0.5, 0, 0],
+              legR: [-0.25, 0, -0.08],
+              shinR: [0.5, 0, 0],
+            }
+          : { spine: [0.32, 0, 0], head: [-0.1, 0, 0], armL: [-1.1, 0, -0.15], foreL: [-2.0, 0, 0], armR: [-1.1, 0, 0.15], foreR: [-2.0, 0, 0] };
+    for (const n in J) {
+      PQ.setFromEuler(PE.set(J[n][0], J[n][1], J[n][2]));
+      p.rig.bone[n].quaternion.slerp(PQ, p.jobW);
+    }
+  }
   // arrived, he folds down cross-legged with his hands on his knees
   if (p.sit > 0) {
     const ks = p.sit * p.sit * (3 - 2 * p.sit),
@@ -430,14 +1156,15 @@ function pose(p) {
     B[n].quaternion.identity().slerp(PQ, kn);
   }
 }
-function prisoner(x, z, i) {
+// job is what the demons have him doing: nothing (he sits bound to a stake), 'dig' (hoeing) or 'carry' (hauling sacks between two heaps)
+function prisoner(x, z, i, job, ends) {
   const g = new THREE.Group(),
     rig = makeRig(),
     tone = [0xb8733a, 0xa5683a, 0xc08a58][i % 3],
     skin = toon(tone, { vertexColors: true, rim: 0.3 }),
     sk = toon(tone, { rim: 0.3 }),
     cloth = toon([0xd9c9a3, 0xc9a25a, 0xe2ddd0][i % 3], { vertexColors: true }),
-    hair = toon(i === 1 ? 0xb9b4ac : 0x1a1418, { rim: 0.2 });
+    hair = toon(i % 3 === 1 ? 0xb9b4ac : 0x1a1418, { rim: 0.2 });
   g.position.set(x, 0, z);
   scene.add(g);
   g.add(rig.group);
@@ -460,13 +1187,26 @@ function prisoner(x, z, i) {
     sph(head, 0.03, sk, [s * 0.115, -0.005, 0], [0.5, 1, 0.8]);
   }
   add(head, new THREE.SphereGeometry(0.128, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.56), hair, [0, 0.012, -0.012], [-0.42, 0, 0], [1, 1.08, 1.04]);
-  if (i !== 2) sph(head, 0.04, hair, [0, 0.15, -0.06], [1, 0.9, 1]);
-  if (i === 1) sph(head, 0.07, hair, [0, -0.125, 0.05], [1.05, 0.95, 0.8]);
-  // the stake he is tied to, and three turns of rope round his chest and the stake together
-  // the stake stands in the ground, not on him, so it stays behind when he walks off
-  cyl(scene, 0.055, 0.07, 1.5, WOOD, [x, 0.75, z - 0.27]);
-  const ropes = [0.36, 0.43, 0.5].map((y) => tor(g, 0.23, 0.016, ROPE, [0, y, -0.1], [Math.PI / 2, 0, 0], [1, 1.2, 1]));
-  SOLIDS.push({ x, z, r: 0.34 });
+  if (i % 3 !== 2) sph(head, 0.04, hair, [0, 0.15, -0.06], [1, 0.9, 1]);
+  if (i % 3 === 1) sph(head, 0.07, hair, [0, -0.125, 0.05], [1.05, 0.95, 0.8]);
+  // bound: the stake he is tied to, and three turns of rope round his chest and the stake together.
+  // (the stake stands in the ground, not on him, so it stays behind when he walks off)
+  // At work: the thing he works with, which he drops when he is freed: a hoe in his hand, or a sack across his shoulders
+  let ropes = [];
+  if (!job) {
+    cyl(scene, 0.055, 0.07, 1.5, WOOD, [x, 0.75, z - 0.27]);
+    ropes = [0.36, 0.43, 0.5].map((y) => tor(g, 0.23, 0.016, ROPE, [0, y, -0.1], [Math.PI / 2, 0, 0], [1, 1.2, 1]));
+    SOLIDS.push({ x, z, r: 0.34 });
+  } else if (job === 'dig') {
+    const hoe = new THREE.Group();
+    cyl(hoe, 0.018, 0.02, 1.3, WOOD, [0, 0, 0.45], [Math.PI / 2, 0, 0]);
+    add(hoe, new THREE.BoxGeometry(0.2, 0.26, 0.03), toon(0x55585e, { rim: 0.3 }), [0, -0.12, 1.08], [0.5, 0, 0]);
+    rig.bone.handR.add(hoe);
+    ropes = [hoe];
+  } else {
+    const sack = rig.on('chest', sph(new THREE.Group(), 0.3, toon(0xb39a6a, { rim: 0.1 }), [0, 0, 0], [1.15, 0.8, 0.8]).parent, [0, 1.56, -0.16]);
+    ropes = [sack];
+  }
   const ik = new CCDIKSolver(body, [
       { target: BI.tgtL, effector: BI.handL, links: [{ index: BI.foreL }, { index: BI.armL }], iteration: 12 },
       { target: BI.tgtR, effector: BI.handR, links: [{ index: BI.foreR }, { index: BI.armR }], iteration: 12 },
@@ -476,112 +1216,276 @@ function prisoner(x, z, i) {
       rig,
       ropes,
       ik,
-      up: 0,
+      up: job ? 1 : 0,
       nam: 0,
       free: false,
+      job,
+      jobW: job ? 1 : 0,
+      ph0: Math.random() * 6.28,
+      ends,
+      leg: 0,
       hold: 0,
       go: false,
-      wk: 0,
+      wk: job === 'carry' ? 1 : 0,
       sit: 0,
       // no two walk alike: each sets off a little after the last, at his own pace, out of step, with his own swing and lean
       ph: Math.random() * 6.28,
-      wait: [0, 0.9, 0.4][i],
-      pace: [2.5, 2.2, 2.7][i],
-      swing: [0.65, 0.45, 0.8][i],
-      lean: [0.08, 0.13, 0.04][i],
-      // his way to the hermitage: onto the road, along it to the edge of the clearing, then to his own place beside the hut
-      path: [
-        [x + 2.5, roadZ(x + 2.5) + (i - 1) * 0.7],
-        [-12, (i - 1) * 0.8],
-        [
-          [-6.5, -6],
-          [-8.2, -7.6],
-          [-6, -8.8],
-        ][i],
-      ],
+      wait: [0, 0.9, 0.4][i % 3],
+      pace: [2.5, 2.2, 2.7][i % 3],
+      swing: [0.65, 0.45, 0.8][i % 3],
+      lean: [0.08, 0.13, 0.04][i % 3],
+      // his way to the hermitage (for the bound ones by the road; the others' is worked out when they are freed): onto the road,
+      // along it to the sage's house, and to his own place on the grass in front of it
+      path: job ? [] : [[x + 2.5, roadZ(x + 2.5) + (i - 1) * 0.7], [-38, roadZ(-38) + (i - 1) * 0.7], [-28, 0.6 + (i - 1) * 0.7], VSEATS[i]],
     };
   pose(p);
   PRISONERS.push(p);
+  return p;
 }
-const CAMP_Z = roadZ(CAMP.x),
-  HELD = V3(CAMP.x, 0, CAMP_Z - 3.6);
-[-1.6, 0, 1.6].forEach((dx, i) => prisoner(CAMP.x + dx, HELD.z + (i === 1 ? -0.4 : 0), i));
-const GUARDS = [
-  ['brute', 6.5, 0.4],
-  ['grunt', -4, -1.6],
-  ['grunt', 3.4, -2.0],
-  ['grunt', -0.5, 2.8],
-].map(([kind, dx, dz]) => {
-  const d = spawn(0, kind, V3(CAMP.x + dx, 0, CAMP_Z + dz));
-  // until roused he stands watching the prisoners
-  d.wait = true;
-  d.to = HELD;
-  d.onHit = () => {
-    const h = d.foe;
-    if (!h) return;
-    const hp = h.group.position;
-    if (Math.hypot(hp.x - d.g.position.x, hp.z - d.g.position.z) > d.rng + 0.8) return;
-    h.hp = Math.max(0, h.hp - (d.br ? 18 : 6));
-    puff(tmpA.set(hp.x, 1.2, hp.z), 0xff6a50, 12, 2.6, 0.3, 2);
-  };
-  return d;
-});
-let roused = false,
-  thanked = false;
+// ---------- the camps ----------
+// There are five. The first is the one by the road, where the prisoners sit bound. In the other four, scattered over the map,
+// the demons have their prisoners at work, hoeing or hauling sacks, under a ragged red banner by a fire.
+// Every camp works the same way: its demons stand idle until a brother comes near or one of them is hurt, then all go for whichever
+// brother is closest; once they are dead its prisoners can be freed, and those bow and walk to the hermitage to sit before the houses.
+SPAWN_MAX = 40;
+const CAMPS = [],
+  apart = (a, b) => Math.hypot(a.x - b.x, a.z - b.z),
+  // places to sit: a row just inside the half ring of road, facing the fire, taken in turn as men are freed
+  VSEATS = Array.from({ length: 15 }, (_, i) => {
+    const t = -0.98 + i * 0.14;
+    return [YARD[0] + (RING - 3.6) * Math.sin(t), YARD[1] - (RING - 3.6) * Math.cos(t)];
+  });
+// (the first three are taken by the men from the camp by the road)
+let seatsTaken = 3;
+// the way from where a man stands to his seat: straight there, unless the cliff is in the way, when he goes round its end,
+// or it would take him across the altar, when he goes round that
+function route(P, seat) {
+  const way = [];
+  let ax = P.x,
+    az = P.z;
+  // from the low country south of the cliff he must first go round its end and up the road
+  if (az > cliffZ(ax) && ax < CLIFF_END + 4) {
+    way.push([38, 19], [25, 4]);
+    [ax, az] = [25, 4];
+  } else if (az > 12 && ax >= CLIFF_END + 4) {
+    way.push([25, 4]);
+    [ax, az] = [25, 4];
+  }
+  const dx = seat[0] - ax,
+    dz = seat[1] - az,
+    t = Math.max(0, Math.min(1, -(ax * dx + az * dz) / (dx * dx + dz * dz))),
+    cx = ax + dx * t,
+    cz = az + dz * t,
+    d = Math.hypot(cx, cz);
+  if (d < 9) way.push(d > 0.5 ? [(cx / d) * 11.5, (cz / d) * 11.5] : [-dz > 0 ? 11.5 : -11.5, 0]);
+  way.push(seat);
+  return way;
+}
+// a camp: where it is, which demons [kind, dx, dz] guard it, and its prisoners, already made
+function camp(x, z, guards, prisoners, watch) {
+  const c = { x, z, prisoners, roused: false, thanked: false, first: !CAMPS.length };
+  c.guards = guards.map(([kind, dx, dz]) => {
+    const d = spawn(0, kind, V3(x + dx, 0, z + dz));
+    // until roused he stands watching the prisoners
+    d.wait = true;
+    d.to = watch;
+    d.onHit = () => {
+      const h = d.foe;
+      if (!h) return;
+      const hp = h.group.position;
+      if (Math.hypot(hp.x - d.g.position.x, hp.z - d.g.position.z) > d.rng + 0.8) return;
+      h.hp = Math.max(0, h.hp - (d.br ? 18 : d.pi ? 4 : 6));
+      puff(tmpA.set(hp.x, 1.2, hp.z), 0xff6a50, 12, 2.6, 0.3, 2);
+    };
+    return d;
+  });
+  CAMPS.push(c);
+  return c;
+}
+// the first camp
+{
+  const HELD = V3(CAMP.x, 0, CAMP.z - 3.6);
+  camp(
+    CAMP.x,
+    CAMP.z,
+    [
+      ['brute', 6.5, 0.4],
+      ['grunt', -4, -1.6],
+      ['grunt', 3.4, -2.0],
+      ['grunt', -0.5, 2.8],
+    ],
+    [-1.6, 0, 1.6].map((dx, i) => prisoner(CAMP.x + dx, HELD.z + (i === 1 ? -0.4 : 0), i)),
+    HELD,
+  );
+}
+// a working camp: a banner on a pole, a fire in a ring of stones, a strip of turned earth where the hoers work and two heaps of
+// sacks that the carriers trudge between. jobs is what each prisoner does
+function workCamp(x, z, guards, jobs) {
+  const red = toon(0x7a1616, { rim: 0.1 }),
+    sackM = toon(0xb39a6a, { rim: 0.1 }),
+    A = [x - 5, z + 4.5],
+    B = [x + 4.5, z + 5.5];
+  cyl(scene, 0.06, 0.08, 3.6, WOOD, [x - 2.2, 1.8, z - 3]);
+  add(scene, new THREE.BoxGeometry(1.0, 1.5, 0.03), red, [x - 1.66, 2.75, z - 3]);
+  add(scene, new THREE.BoxGeometry(1.02, 0.16, 0.035), DARK, [x - 1.66, 2.45, z - 3]);
+  SOLIDS.push({ x: x - 2.2, z: z - 3, r: 0.2 });
+  for (let i = 0; i < 7; i++)
+    add(
+      scene,
+      new THREE.DodecahedronGeometry(0.16, 0),
+      ROCKM[i % 2],
+      [x + Math.cos(i * 0.9) * 0.55, 0.08, z + Math.sin(i * 0.9) * 0.55],
+      [i, i * 2, 0],
+    );
+  add(scene, new THREE.ConeGeometry(0.22, 0.6, 7), new THREE.MeshBasicMaterial({ color: 0xff8a2a }), [x, 0.36, z]).castShadow = false;
+  const fl = glow(0xffb040, 1.1);
+  fl.position.set(x, 0.5, z);
+  scene.add(fl);
+  SOLIDS.push({ x, z, r: 0.7 });
+  add(scene, new THREE.BoxGeometry(6.5, 0.06, 2.6), toon(0x4a3626, { rim: 0 }), [x + 0.5, 0.03, z - 5.6]).castShadow = false;
+  for (const [hx, hz] of [A, B])
+    for (let i = 0; i < 4; i++)
+      sph(scene, 0.34, sackM, [hx + (i % 2) * 0.55 - 0.3, i > 1 ? 0.62 : 0.26, hz - 1 + (i > 1 ? 0.15 : (i % 2) * 0.2)], [1.2, 0.75, 0.85]);
+  let dig = 0,
+    haul = 0;
+  const men = jobs.map((job, i) =>
+    job === 'dig'
+      ? prisoner(x - 1.6 + dig++ * 2.1, z - 5.2 + (i % 2) * 0.5, CAMPS.length + i, 'dig')
+      : prisoner(A[0] + 1 + haul * 2.4, A[1] + 0.4 * haul++, CAMPS.length + i, 'carry', haul % 2 ? [A, B] : [B, A]),
+  );
+  // the hoers face the earth they are working
+  men.forEach((m) => m.job === 'dig' && (m.g.rotation.y = Math.PI));
+  return camp(x, z, guards, men, V3(x, 0, z - 4));
+}
+workCamp(
+  ...WORK[0],
+  [
+    ['grunt', -3.5, 1.5],
+    ['grunt', 3, -2],
+    ['pish', 1, 3],
+  ],
+  ['dig', 'dig', 'carry'],
+);
+workCamp(
+  ...WORK[1],
+  [
+    ['brute', 4, 1],
+    ['grunt', -3.5, -1],
+    ['grunt', 0.5, 3.4],
+  ],
+  ['carry', 'dig', 'carry'],
+);
+workCamp(
+  ...WORK[2],
+  [
+    ['brute', -4, 0.5],
+    ['grunt', 3.5, 2],
+    ['grunt', 2, -2.5],
+    ['pish', -1.5, 3.2],
+  ],
+  ['dig', 'carry', 'dig'],
+);
+workCamp(
+  ...WORK[3],
+  [
+    ['grunt', -3.6, 1],
+    ['grunt', 3.4, 1.6],
+    ['pish', 0, 3.4],
+    ['pish', -2, -2.4],
+  ],
+  ['carry', 'dig', 'dig'],
+);
 function campUpdate(dt) {
-  const live = GUARDS.filter((d) => grunts.includes(d) && !d.dead),
-    flat = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
-  if (!roused) roused = live.length < GUARDS.length || live.some((d) => d.hp < d.hp0) || HEROES.some((h) => flat(h.group.position, CAMP) < 16);
-  if (roused)
+  const me = SEL.group.position;
+  for (const c of CAMPS) {
+    const live = c.guards.filter((d) => grunts.includes(d) && !d.dead),
+      far = apart(me, c) > 62;
+    if (!c.roused)
+      c.roused =
+        live.length < c.guards.length || live.some((d) => d.hp < d.hp0 || d.wob > 0.2) || HEROES.some((h) => apart(h.group.position, c) < 16);
     for (const d of live) {
+      // far off and still idle, a guard is put to sleep and hidden: he costs nothing until someone comes
+      d.asleep = far && !c.roused;
+      d.g.visible = !d.asleep;
+      if (!c.roused) continue;
       let foe = HEROES[0];
-      for (const h of HEROES) if (flat(h.group.position, d.g.position) < flat(foe.group.position, d.g.position)) foe = h;
+      for (const h of HEROES) if (apart(h.group.position, d.g.position) < apart(foe.group.position, d.g.position)) foe = h;
       d.wait = false;
       d.foe = foe;
       d.to = foe.group.position;
-      // near enough to club a man, not the long reach they keep from the altar fire
-      d.rng = d.br ? 2.3 : 1.5;
+      // near enough to club or claw a man, not the long reach they keep from the altar fire
+      d.rng = d.br ? 2.3 : d.pi ? 1.3 : 1.5;
     }
-  const allUp = PRISONERS.every((p) => p.up >= 1);
-  // the moment the last of them is on his feet they thank the brothers. Nobody moves until it has been said
-  if (allUp && !thanked) {
-    thanked = true;
-    const f = PRISONERS.map((p) => snap(p.rig.bone.head, p.g.rotation.y, null));
-    LOCK = true;
-    say(
-      [
-        { who: 'Villager', face: f[0], text: 'You came! We thought no one would.' },
-        { who: 'Elder', face: f[1], text: 'They dragged us from the hermitage at dawn, to spill our blood on the sage’s altar. Bless you both.' },
-        { who: 'Rama', face: RAMA.face, text: 'Go to Vishwamitra. You will be safe by his fire.' },
-      ],
-      () => (LOCK = false),
-    );
-  }
-  for (const p of PRISONERS) {
-    if (!p.free && !live.length) {
-      const h = HEROES.find((o) => flat(o.group.position, p.g.position) < 2.6);
-      if (h) {
+    const allUp = c.prisoners.every((p) => p.free && p.up >= 1);
+    // at the first camp, the moment the last of them is on his feet they thank the brothers. Nobody moves until it has been said
+    if (c.first && allUp && !c.thanked) {
+      c.thanked = true;
+      const f = c.prisoners.map((p) => snap(p.rig.bone.head, p.g.rotation.y, null));
+      LOCK = true;
+      say(
+        [
+          { who: 'Villager', face: f[0], text: 'You came! We thought no one would.' },
+          { who: 'Elder', face: f[1], text: 'They dragged us from the hermitage at dawn, to spill our blood on the sage’s altar. Bless you both.' },
+          { who: 'Rama', face: RAMA.face, text: 'Go to Vishwamitra. You will be safe by his fire.' },
+        ],
+        () => (LOCK = false),
+      );
+    }
+    // with the demons dead, the bound ones are freed one by one as a brother reaches each; the workers all at once, as soon as one comes near
+    if (!live.length) {
+      const near = (p, r) => HEROES.find((o) => apart(o.group.position, p.g.position) < r),
+        saviour = c.first ? null : c.prisoners.map((p) => near(p, 7)).find(Boolean);
+      for (const p of c.prisoners) {
+        const h = p.free ? null : c.first ? near(p, 2.6) : saviour;
+        if (!h) continue;
         p.free = true;
         p.by = h;
-        p.ropes.forEach((o) => p.g.remove(o));
+        // the ropes fall away, or he lets drop what he was made to carry
+        p.ropes.forEach((o) => o.parent.remove(o));
         puff(tmpA.set(p.g.position.x, 0.5, p.g.position.z), 0xe8d8a8, 16, 2, 0.5, 2);
       }
     }
-    if (p.free) {
-      // first he gets to his feet; only when all of them are standing do they bow together. They hold the bow while they give their thanks,
-      // then lower their hands and walk to Vishwamitra's hermitage, where they sit down facing the fire
+    for (const p of c.prisoners) {
+      const P = p.g.position;
+      if (!p.free) {
+        // still at work. Out of sight he is hidden and left alone
+        p.g.visible = !far;
+        if (far || !p.job) continue;
+        if (p.job === 'carry') {
+          const w = p.ends[p.leg],
+            dx = w[0] - P.x,
+            dz = w[1] - P.z,
+            l = Math.hypot(dx, dz) || 1;
+          if (l < 0.6) p.leg ^= 1;
+          P.x += (dx / l) * 0.85 * dt;
+          P.z += (dz / l) * 0.85 * dt;
+          p.ph += (0.85 * dt) / 0.36;
+          const want = Math.atan2(dx, dz);
+          p.g.rotation.y += Math.atan2(Math.sin(want - p.g.rotation.y), Math.cos(want - p.g.rotation.y)) * Math.min(1, dt * 3);
+        }
+        pose(p);
+        continue;
+      }
+      p.g.visible = true;
+      // freed: first he gets to his feet (or straightens from his work); only when all of that camp are standing do they bow together.
+      // They hold the bow a moment (at the first camp, while they give their thanks), then lower their hands and walk to
+      // Vishwamitra's hermitage, where they sit down facing the fire
       p.up = Math.min(1, p.up + dt / 0.45);
+      p.jobW = Math.max(0, p.jobW - dt / 0.4);
       let want;
       if (!p.go) {
+        p.wk = Math.max(0, p.wk - dt * 4);
         if (allUp) p.nam = Math.min(1, p.nam + dt / 0.7);
-        if (p.nam >= 1 && !talking() && (p.hold += dt) > 0.8 + p.wait) p.go = true;
+        if (p.nam >= 1 && !talking() && (p.hold += dt) > (c.first ? 0.8 : 1.6) + p.wait) {
+          p.go = true;
+          if (!p.path.length) p.path = route(P, VSEATS[Math.min(VSEATS.length - 1, seatsTaken++)]);
+        }
         // on his feet he turns to whoever freed him
         const q = p.by.group.position;
-        want = Math.atan2(q.x - p.g.position.x, q.z - p.g.position.z);
+        want = Math.atan2(q.x - P.x, q.z - P.z);
       } else {
         p.nam = Math.max(0, p.nam - dt / 0.4);
-        const P = p.g.position,
-          w = p.path[0],
+        const w = p.path[0],
           dx = w ? w[0] - P.x : -P.x,
           dz = w ? w[1] - P.z : -P.z,
           l = Math.hypot(dx, dz) || 1,
@@ -614,7 +1518,7 @@ function campUpdate(dt) {
 // ---------- arriving at the hermitage ----------
 // When the brother you are playing comes near the altar with no enemy about, the scene takes over:
 //   seat   both walk to their places before the fire, sit and bow
-//   pause  a second after both are down, and any freed villagers have sat down too...
+//   pause  a moment after both are down...
 //   om     ...Vishwamitra, eyes shut, makes them wait through one long Om
 //   come   then he rises and walks over to them
 //   talk   he tells them why they are here
@@ -680,22 +1584,25 @@ function sageWalk(to, dt, pass) {
     dx = to.x - P.x,
     dz = to.z - P.z,
     l = Math.hypot(dx, dz),
-    turn = (want, rate) => (SG.yaw += Math.atan2(Math.sin(want - SG.yaw), Math.cos(want - SG.yaw)) * Math.min(1, dt * rate));
+    wrap = (v) => Math.atan2(Math.sin(v), Math.cos(v));
   // a point he is only passing (pass) counts as reached from a pace off, so he is already turning for the next as he rounds it
-  if (l < (pass ? 1.1 : 0.15)) return true;
-  SG.move = 'walk';
+  if (l < (pass ? 1.1 : 0.2)) return true;
   if (SG.yaw == null) SG.yaw = SG.facing;
-  // he turns toward the spot gradually and walks the way he is facing, so his path bends instead of cornering.
-  // Only over the last half pace does he step straight onto the spot, slowing as he comes up to it
-  const want = Math.atan2(dx, dz);
-  turn(want, pass ? 2.2 : 3.2);
-  // a little quicker than his stroll round the fire, with his stride quickened to match so his feet do not slide
-  const k = SG.wWalk * (1 - SG.wSit) * dt * (pass ? 1 : Math.min(1, 0.3 + l / 1.5)),
-    v = Math.min(l, 1.7 * k),
-    a = !pass && l < 0.6 ? want : SG.facing;
+  // He turns toward the spot gradually, and only ever steps the way his body is actually facing: never sideways.
+  // While he is still turned well away from where he is going (as when he first gets up, facing the fire) he stands and turns,
+  // and sets off once he has come round. That also means he cannot circle a spot he is close to
+  const want = Math.atan2(dx, dz),
+    off = Math.abs(wrap(want - SG.facing)),
+    go = off < 0.6;
+  SG.yaw += wrap(want - SG.yaw) * Math.min(1, dt * 3);
+  SG.move = go ? 'walk' : 'idle';
+  // a little quicker than his stroll round the fire, with his stride quickened to match so his feet do not slide.
+  // His pace is tied to how far his walk has got going, so he gathers way and loses it with his legs
+  const k = SG.wWalk * (1 - SG.wSit) * dt,
+    v = go ? Math.min(l, 1.7 * k) : 0;
   SG.phase += (0.6 * k) / 0.36;
-  P.x += Math.sin(a) * v;
-  P.z += Math.cos(a) * v;
+  P.x += Math.sin(SG.facing) * v;
+  P.z += Math.cos(SG.facing) * v;
   return false;
 }
 function arriveUpdate(dt) {
@@ -714,11 +1621,12 @@ function arriveUpdate(dt) {
       to('seat');
     }
   } else if (A.step === 'seat') {
-    if (HEROES.every((h) => h.sat && h.s.wSit > 0.9)) to('pause');
+    // once both are seated the camera passes over to Vishwamitra at the altar, and stays with him as he comes across and goes back
+    if (HEROES.every((h) => h.sat && h.s.wSit > 0.9)) {
+      CAM = V.group.position;
+      to('pause');
+    }
   } else if (A.step === 'pause') {
-    // he waits for the freed villagers too, if any are still on their way to sit by his hut
-    // (only once all three are free: they do not set off until then, so a man left tied cannot hold the scene up for ever)
-    if (PRISONERS.every((p) => p.free) && PRISONERS.some((p) => p.sit < 1)) A.t = 0;
     // then he keeps them waiting. His eyes close, and he says one long Om before anything else happens: patience.
     // The brothers hold their bow all through it, and until he has come over and begins to speak
     if (A.t > 1.5) {
@@ -727,9 +1635,9 @@ function arriveUpdate(dt) {
       to('om');
     }
   } else if (A.step === 'rise') {
-    // five more seconds of stillness after the Om. His eyes open near the end of it, and then he gets up
-    if (A.t > 4.2) sageEyes(false);
-    if (A.t > 5) {
+    // three more seconds of stillness after the Om. His eyes open near the end of it, and then he gets up
+    if (A.t > 2.3) sageEyes(false);
+    if (A.t > 3) {
       SG.at = V.group.position.clone();
       to('come');
     }
@@ -769,17 +1677,176 @@ function arriveUpdate(dt) {
   } else if (A.step === 'back') {
     if (!A.via) A.via = sageWalk(SAGE_VIA, dt, true);
     else if (sageWalk(SAGE_HOME, dt)) {
-      SG.at = SG.yaw = null;
+      // he sits; over the next moment he is eased the last hand's breadth onto his own spot (see 'up')
+      SG.yaw = null;
       SG.pathA = Math.PI;
       SG.move = 'sit';
+      // the camera drifts back to the brother being played
+      CAM = SEL.group.position;
       to('up');
     }
   } else if (A.step === 'up') {
-    if (A.t > 0.4) {
+    if (SG.at) SG.at.lerp(SAGE_HOME, Math.min(1, dt * 6));
+    if (A.t > 0.6) {
+      SG.at = null;
       LOCK = false;
+    }
+    if (A.t > 1.8) {
+      CAM = null;
       to('done');
     }
   }
+}
+
+// ---------- the minimap ----------
+// A small map of the whole level in the bottom right corner, north at the top, in the manner of the old strategy games.
+// It appears once Vishwamitra has had his say. The ground, trees, rivers, road, pond, houses and altar are painted once;
+// over them, a few times a second, go the things that move or change:
+//   a red pennant   a camp whose demons are still alive
+//   red dots        demons that are awake
+//   pale dots       prisoners: dim while held, bright once freed
+//   blue and gold   Rama and Lakshmana, the one you are playing ringed in white
+// It makes its own elements and carries its own styles, like the dialogue box
+const MINI = { W: 252, shown: false, n: 0 };
+{
+  const XL = X0,
+    XR = EX + 5,
+    W = MINI.W,
+    H = Math.round((W * (ZS - ZN)) / (XR - XL)),
+    k = W / (XR - XL),
+    mx = (x) => (x - XL) * k,
+    my = (z) => (z - ZN) * k,
+    box = document.createElement('div'),
+    cv = document.createElement('canvas'),
+    bg = document.createElement('canvas');
+  box.style.cssText =
+    'position:fixed;right:16px;bottom:16px;padding:3px;background:#170d22;border:2px solid #e9c07a;border-radius:6px;' +
+    'box-shadow:0 0 0 1px #170d22,0 0 0 4px rgba(233,192,122,.25),0 10px 30px rgba(0,0,0,.5);opacity:0;transition:opacity .8s;pointer-events:none;z-index:15;line-height:0';
+  for (const c of [cv, bg]) {
+    c.width = W * 2;
+    c.height = H * 2;
+  }
+  // (the page's own rule for canvases pins them to the top left corner at full size; this one must not take it)
+  cv.style.cssText = `position:static;inset:auto;width:${W}px;height:${H}px;border-radius:3px;display:block`;
+  box.append(cv);
+  document.body.append(box);
+  // what never changes
+  const g = bg.getContext('2d');
+  g.scale(2, 2);
+  g.fillStyle = '#74904f';
+  g.fillRect(0, 0, W, H);
+  g.fillStyle = 'rgba(58,104,52,.75)';
+  for (const t of WOODS) {
+    g.beginPath();
+    g.arc(mx(t.x), my(t.z), 1.1 + t.s * 0.9, 0, 7);
+    g.fill();
+  }
+  const stroke = (pts, col, w) => {
+    g.strokeStyle = col;
+    g.lineWidth = w;
+    g.lineJoin = g.lineCap = 'round';
+    g.beginPath();
+    pts.forEach(([x, z], i) => (i ? g.lineTo(mx(x), my(z)) : g.moveTo(mx(x), my(z))));
+    g.stroke();
+  };
+  const course = (c, z0) => {
+    const pts = [];
+    for (let z = z0; z <= ZS; z += 2) pts.push([riverX(z, c), z]);
+    return pts;
+  };
+  stroke(
+    [
+      [WX, ZN],
+      [WX, RIVER_FROM],
+    ],
+    '#8a8f96',
+    3,
+  );
+  stroke(course(WX, RIVER_FROM), '#4a9fd0', 3.4);
+  stroke(course(EX, ZN), '#4a9fd0', 3.4);
+  {
+    const pts = [];
+    for (let x = CLIFF_FROM; x <= CLIFF_END; x += 2) pts.push([x, cliffZ(x)]);
+    stroke(pts, '#6a6258', 4);
+    stroke(pts, '#9a948a', 1.6);
+  }
+  // (the crossing: the road's own colour laid over the first river)
+  stroke(
+    ROADLINE.map((p) => [p.x, p.z]),
+    '#c9ad7a',
+    2.4,
+  );
+  g.fillStyle = '#4a9fd0';
+  g.beginPath();
+  g.arc(mx(POND[0]), my(POND[1]), 3.8 * k, 0, 7);
+  g.fill();
+  for (const [q, r] of [
+    [SAGE_HOUSE, 4.4],
+    [HALL, 5.4],
+    [LONG, 4.4],
+  ]) {
+    g.fillStyle = '#b9ad90';
+    g.strokeStyle = '#5a4a36';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.arc(mx(q[0]), my(q[1]), (r + 1.6) * k, 0, 7);
+    g.fill();
+    g.stroke();
+  }
+  // the altar: a small flame-coloured diamond with a pale edge
+  g.save();
+  g.translate(mx(0), my(0));
+  g.rotate(Math.PI / 4);
+  g.fillStyle = '#ff9a30';
+  g.strokeStyle = '#fff3df';
+  g.lineWidth = 1.2;
+  g.fillRect(-4, -4, 8, 8);
+  g.strokeRect(-4, -4, 8, 8);
+  g.restore();
+  const d = cv.getContext('2d');
+  d.scale(2, 2);
+  const dot = (x, z, r, fill, edge) => {
+    d.beginPath();
+    d.arc(mx(x), my(z), r, 0, 7);
+    d.fillStyle = fill;
+    d.fill();
+    if (edge) {
+      d.lineWidth = 1.3;
+      d.strokeStyle = edge;
+      d.stroke();
+    }
+  };
+  MINI.draw = () => {
+    if (!MINI.shown) {
+      if (ARR.step !== 'done') return;
+      MINI.shown = true;
+      box.style.opacity = 1;
+    }
+    d.drawImage(bg, 0, 0, W, H);
+    for (const c of CAMPS) {
+      const live = c.guards.filter((e) => grunts.includes(e) && !e.dead);
+      for (const p of c.prisoners) dot(p.g.position.x, p.g.position.z, 1.6, p.free ? '#fff8e6' : 'rgba(255,248,230,.45)');
+      if (live.length) {
+        // a pennant on a short staff
+        const x = mx(c.x),
+          y = my(c.z);
+        d.fillStyle = '#2a1414';
+        d.fillRect(x - 0.6, y - 8, 1.2, 9);
+        d.fillStyle = '#e03a2a';
+        d.beginPath();
+        d.moveTo(x + 0.6, y - 8);
+        d.lineTo(x + 7, y - 5.5);
+        d.lineTo(x + 0.6, y - 3);
+        d.fill();
+      }
+      for (const e of live) if (!e.asleep && c.roused) dot(e.g.position.x, e.g.position.z, e.br ? 2.6 : 1.9, '#ff4a36', '#3a0c08');
+    }
+    for (const h of HEROES) {
+      const P = h.group.position;
+      if (h === SEL) dot(P.x, P.z, 5.4, 'rgba(255,255,255,.28)');
+      dot(P.x, P.z, 3.2, h.name === 'rama' ? '#4a8cf0' : '#e8a53c', '#ffffff');
+    }
+  };
 }
 
 // ---------- the edge of the level ----------
@@ -812,6 +1879,20 @@ const EDGE = new THREE.InstancedMesh(
   EDGE.visible = false;
   scene.add(EDGE);
 }
+// the line that holds the brothers at the camp: the same dashes, across the map from the far limit to the near one
+const HOLD = new THREE.InstancedMesh(EDGE.geometry, EDGE.material.clone(), Math.floor((ZS - ZN) / 1.5));
+{
+  const o = new THREE.Object3D();
+  o.rotation.set(-Math.PI / 2, Math.PI / 2, 0, 'YXZ');
+  for (let i = 0; i < HOLD.count; i++) {
+    o.position.set(HOLD_X + 0.45, 0.05, ZN + i * 1.5);
+    o.updateMatrix();
+    HOLD.setMatrixAt(i, o.matrix);
+  }
+  HOLD.frustumCulled = false;
+  HOLD.visible = false;
+  scene.add(HOLD);
+}
 // each frame: the water's clock runs on, foam flies up at the foot of the fall, the edge line shows or hides, the camp is run,
 // and the sky and sun keep the camera at their centre, since on a map this wide it would otherwise walk out from under them
 const SUN0 = SUN.position.clone();
@@ -823,11 +1904,17 @@ function sceneryUpdate(dt) {
       m = EDGE.material;
     m.opacity += (near * 0.85 - m.opacity) * Math.min(1, dt * 6);
     EDGE.visible = m.opacity > 0.01;
+    // the holding line shows the same way while it is in force, and fades out for good once the prisoners are free
+    const hm = HOLD.material,
+      hn = captive() ? Math.max(0, Math.min(1, 1 - (HOLD_X - P.x) / 3)) : 0;
+    hm.opacity += (hn * 0.85 - hm.opacity) * Math.min(1, dt * 6);
+    HOLD.visible = hm.opacity > 0.01;
   }
   if (Math.abs(P.x - FALL.x) < 60 && Math.random() < dt * 40)
     puff(tmpA.set(FALL.x + R(-1.8, 1.8), 0.2 - DEEP, FALL.z + R(-0.2, 0.8)), 0xeaf6ff, 1, 1.4, 0.7, 2);
   campUpdate(dt);
   arriveUpdate(dt);
+  if (++MINI.n % 5 === 0) MINI.draw();
   talkUpdate(dt);
   SKY.position.copy(cam.position);
   SUN.position.copy(cam.position).add(SUN0);

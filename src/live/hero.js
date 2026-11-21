@@ -123,7 +123,7 @@ const tgt = V3(0, 1, 0),
   ndc = new THREE.Vector2(0.3, 0.1);
 rama.position.set(Math.sin(0.6) * 4, 0, Math.cos(0.6) * 4);
 let aimLock = null;
-const bodyPt = (d, out) => out.set(d.g.position.x, d.def.aimY, d.g.position.z); // where on an enemy a shot is aimed: chest of a rakshasa, back of a crawling pishacha, the body of a flying defiler
+const bodyPt = (d, out) => out.set(d.g.position.x, d.g.position.y + d.def.aimY, d.g.position.z); // where on an enemy a shot is aimed: chest of a rakshasa, back of a crawling pishacha, the body of a flying defiler
 let keyDir = V3(),
   aimPt = V3(0, 1.15, 9);
 const ray = new THREE.Raycaster(),
@@ -550,7 +550,8 @@ const IN = { x: 0, z: 0, walk: false, fire: false, at: null, quick: 1 };
 // for a level's scenes: LOCK shuts out firing and switching brothers; DIRECT(h, dt), if it returns true, has given that hero his orders
 // for this frame by filling IN (and may set move, namaste and firing, which are his at that moment)
 let LOCK = false,
-  DIRECT = null;
+  DIRECT = null,
+  CAM = null;
 // keeps a walker on the ground anyone may walk on: a circle round the fire, unless a level gives the ground another shape
 let hem = (P) => {
   const r = Math.hypot(P.x, P.z);
@@ -705,6 +706,8 @@ function heroUpdate(dt) {
     } else if (auto) brain(h, dt);
     else keysIn();
     heroStep(dt);
+    // his feet are on the ground, whatever its height where he now stands
+    h.group.position.y = groundY(h.group.position.x, h.group.position.z);
     saveHero(h);
   };
   for (const h of HEROES) if (h !== SEL) one(h, true);
@@ -792,6 +795,10 @@ function heroStep(dt) {
     }
   } else {
     ray.setFromCamera(ndc, cam);
+    // where the pointer's line meets chest height above the ground. On uneven ground that height is found in a few steps:
+    // try the hero's own level, see how high the land is where that lands, and try again at that level
+    plane.constant = -(rama.position.y + 1.15);
+    for (let i = 0; i < 3; i++) if (ray.ray.intersectPlane(plane, tmp)) plane.constant = -(groundY(tmp.x, tmp.z) + 1.15);
     if (ray.ray.intersectPlane(plane, tmp)) {
       let best = null,
         bd = 2.5;
@@ -945,7 +952,7 @@ function heroStep(dt) {
     bz.copy(UP);
     bx.crossVectors(by, bz).normalize();
     bow.quaternion.setFromRotationMatrix(mB.makeBasis(bx, by, bz));
-    bow.position.set(rama.position.x + Math.cos(facing) * 0.6, 0.05, rama.position.z - Math.sin(facing) * 0.6);
+    bow.position.set(rama.position.x + Math.cos(facing) * 0.6, rama.position.y + 0.05, rama.position.z - Math.sin(facing) * 0.6);
   }
   const drawn = wAim > 0.8 && fireT >= 0,
     sp2 = strGeo.attributes.position;
@@ -980,7 +987,7 @@ function heroStep(dt) {
     if (wd && Math.random() < 0.9) {
       const a = Math.random() * 6.283,
         r = 0.9 + Math.random() * 0.9;
-      tmp.set(rama.position.x + Math.cos(a) * r, 0.1 + Math.random() * 0.5, rama.position.z + Math.sin(a) * r);
+      tmp.set(rama.position.x + Math.cos(a) * r, rama.position.y + 0.1 + Math.random() * 0.5, rama.position.z + Math.sin(a) * r);
       spray(
         tmp,
         tmp2
@@ -1107,7 +1114,7 @@ function heroStep(dt) {
     const ch = drawn && !!K.charge;
     chargeA.visible = chargeB.visible = chargeC.visible = ch;
     if (ch) {
-      chargeC.position.set(rama.position.x, 0.06, rama.position.z);
+      chargeC.position.set(rama.position.x, rama.position.y + 0.06, rama.position.z);
       chargeC.scale.setScalar(0.5 + draw * 6);
       chargeC.rotation.y = T * 1.5;
       chargeC.material.opacity = draw * 0.9;
@@ -1125,7 +1132,7 @@ function heroStep(dt) {
   if (invoking && Math.random() < 0.9) {
     const a = Math.random() * 6.283,
       r = 0.5 + Math.random() * 2.4;
-    puff(tmp2.set(rama.position.x + Math.cos(a) * r, 0.1, rama.position.z + Math.sin(a) * r), KINDS[kind].color, 1, 0.3, 1.1, -2.2 - invP * 2);
+    puff(tmp2.set(rama.position.x + Math.cos(a) * r, rama.position.y + 0.1, rama.position.z + Math.sin(a) * r), KINDS[kind].color, 1, 0.3, 1.1, -2.2 - invP * 2);
   }
   reticle.visible = firing;
   reticle.position.copy(aimPt);
@@ -1203,7 +1210,7 @@ function shotsUpdate(dt) {
     if (!hitP && !s.lock)
       for (const d of dummies) {
         const q = s.g.position;
-        if (!d.flung && !d.dead && Math.hypot(q.x - d.g.position.x, q.z - d.g.position.z) < 0.42 && q.y < 1.85) {
+        if (!d.flung && !d.dead && Math.hypot(q.x - d.g.position.x, q.z - d.g.position.z) < 0.42 && q.y - d.g.position.y < 1.85 && q.y - d.g.position.y > -0.5) {
           hitP = q.clone();
           d.wob = 1;
           d.pw = -1;
@@ -1211,7 +1218,7 @@ function shotsUpdate(dt) {
           break;
         }
       }
-    if (!hitP && (s.g.position.y < 0.02 || s.g.position.distanceTo(s.from) > 70)) hitP = s.g.position.clone();
+    if (!hitP && (s.g.position.y < groundY(s.g.position.x, s.g.position.z) + 0.02 || s.g.position.distanceTo(s.from) > 70)) hitP = s.g.position.clone();
     if (hitP) {
       s.live = false;
       s.g.position.copy(hitP).addScaledVector(tmp2, -0.45);
@@ -1246,7 +1253,7 @@ function worldUpdate(dt) {
   sageUpdate(dt);
   collide();
   if (shadowFollow) {
-    key.target.position.set(Math.round(tgt.x), 0, Math.round(tgt.z));
+    key.target.position.set(Math.round(tgt.x), groundY(tgt.x, tgt.z), Math.round(tgt.z));
     key.position.copy(key.target.position).add(shadowOff);
   }
   fxUpdate(dt);
@@ -1268,7 +1275,11 @@ function worldUpdate(dt) {
 }
 function cameraUpdate(dt) {
   // camera: one orbiting view from above, never cutting in close
-  tgt.lerp(tmp.copy(who === 'sage' ? V.group.position : rama.position).add(V3(0, 0.9, 0)), camInit ? Math.min(1, dt * 4) : (camInit = 1));
+  // a level's scene may point the camera at something else for a while (CAM, a position that may move): it drifts across, unhurried
+  tgt.lerp(
+    tmp.copy(CAM || (who === 'sage' ? V.group.position : rama.position)).add(V3(0, 0.9, 0)),
+    camInit ? Math.min(1, dt * (CAM ? 1.4 : 4)) : (camInit = 1),
+  );
   cam.position.set(
     tgt.x + Math.sin(yaw) * Math.cos(pitch) * dist + (Math.random() - 0.5) * shake * 0.5,
     tgt.y + Math.sin(pitch) * dist + (Math.random() - 0.5) * shake * 0.5,
