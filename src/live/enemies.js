@@ -379,13 +379,15 @@ const FOES = {
   pish: { hp: 2, speed: 3.0, reach: 4.8, swing: 1.4, radius: 0.34, mass: 1, aimY: 0.45, barY: 1.15 },
   defiler: { hp: 2, speed: 3.2, reach: 2.5, swing: 2.6, radius: 0, mass: 0, aimY: 1.55, barY: 2.35 },
 };
-function spawn(a, kind) {
+// a level may name the spot (at) instead of the angle; the enemy then simply stands there, with no flash of arrival
+function spawn(a, kind, at) {
   const pi = kind === 'pish',
     br = kind === 'brute';
   if (grunts.length >= 16) return;
   const r = 11 + Math.random() * 2.5,
     g = new THREE.Group();
-  g.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
+  if (at) g.position.copy(at);
+  else g.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
   g.rotation.y = Math.atan2(-g.position.x, -g.position.z);
   scene.add(g);
   const d = {
@@ -405,11 +407,13 @@ function spawn(a, kind) {
   };
   dummies.push(d);
   (pi ? makePish : kind === 'defiler' ? makeDefiler : makeGrunt)(d, Math.random() * 9);
+  if (at) return d;
   const c = pi ? 0x6fd09a : 0x9a5ad0;
   tmpA.copy(g.position).setY(1);
   puff(tmpA, c, pi ? 14 : 30, 3, 0.7, -1);
   ring(tmpA.setY(0.06), pi ? 0.8 : 1.3, c, 0.6);
   flash(tmpA.setY(1), c, pi ? 6 : 14);
+  return d;
 }
 function summon(kind) {
   spawn(Math.random() * 6.283, kind);
@@ -848,14 +852,18 @@ function gruntUpdate(dt) {
       d.barV += (Math.max(0, d.hp) / d.hp0 - d.barV) * Math.min(1, dt * 7);
       b.fg.scale.set(0.7 * d.barV, 0.07, 1);
     } else if (d.bar) d.bar.g.visible = false;
-    const r = Math.hypot(g.position.x, g.position.z) || 1,
-      stag = (!d.br && d.wob > 0.6) || d.hold > 0 || d.flung || d.dead > 0,
+    // what he is making for: the altar fire, unless a level has given him something else (d.to, a point that may move).
+    // d.wait keeps him standing where he is, doing nothing, until the level lets him go
+    const ox = d.to ? d.to.x : 0,
+      oz = d.to ? d.to.z : 0,
+      r = Math.hypot(g.position.x - ox, g.position.z - oz) || 1,
+      stag = (!d.br && d.wob > 0.6) || d.hold > 0 || d.flung || d.dead > 0 || d.wait,
       walking = !stag && r > d.rng,
       attacking = !stag && !walking;
     // he comes in at a run, weaving from side to side, and turns to face wherever he is heading; once in range he squares up to the fire, bouncing on his feet
     {
-      const nx = -g.position.x / r,
-        nz = -g.position.z / r,
+      const nx = (ox - g.position.x) / r,
+        nz = (oz - g.position.z) / r,
         sp = d.pi && d.cr ? 2.6 : d.def.speed,
         bm = d.pi && !d.cr ? 1 + 0.4 * Math.sin(d.ph - 0.3) : 1,
         lat = !walking
@@ -926,6 +934,8 @@ function gruntUpdate(dt) {
       puff(tmpA, 0xffe2b0, 16, 3.2, 0.3, 2);
       flash(tmpA, 0xffc890, 10);
       shake = Math.max(shake, d.br ? 0.14 : 0.05);
+      // the moment the blow lands: a level that wants it to hurt someone says how
+      if (d.onHit) d.onHit();
       if (d.sk === 2) {
         tmpA.y = 0.08;
         puff(tmpA, 0xffd9a0, d.br ? 40 : 14, d.br ? 4 : 2.4, d.br ? 0.6 : 0.4, 3);

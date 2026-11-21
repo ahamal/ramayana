@@ -97,21 +97,23 @@ let dandaHand, gripG, dandaRest; // fingers closed round the shaft; the carried 
     saffron,
   );
   V.skin(
-    torsoOnly(weigh(
-      strip(
-        dense([
-          [0.17, 1.47],
-          [0.1, 1.38],
-          [0, 1.25],
-          [-0.09, 1.12],
-          [-0.14, 1.04],
-        ]),
-        0.17,
-        0.014,
-        7,
+    torsoOnly(
+      weigh(
+        strip(
+          dense([
+            [0.17, 1.47],
+            [0.1, 1.38],
+            [0, 1.25],
+            [-0.09, 1.12],
+            [-0.14, 1.04],
+          ]),
+          0.17,
+          0.014,
+          7,
+        ),
+        maroon,
       ),
-      maroon,
-    )),
+    ),
     maroon,
   );
   for (const ry of [0.16, 0.3]) {
@@ -466,6 +468,8 @@ function sageUpdate(dt) {
   S.pathA += (sp * dt) / 2.0;
   S.phase += dt * ((S.wWalk * 1.1) / 0.36 + S.wRun * 9) * still;
   g.position.set(Math.sin(S.pathA) * 2.0, 0, Math.cos(S.pathA) * 2.0);
+  // a level's scene may lead him off his circle: S.at is then where he stands, and S.yaw (if set) the way he faces
+  if (S.at) g.position.copy(S.at);
   if (S.move !== 'sit' && S.namaste) {
     S.namaste = false;
     ui();
@@ -477,7 +481,13 @@ function sageUpdate(dt) {
     aimYaw = Math.atan2(aimPt.x - g.position.x, aimPt.z - g.position.z),
     wrapA = (v) => Math.atan2(Math.sin(v), Math.cos(v));
   const want =
-    S.move === 'sit' ? Math.atan2(-g.position.x, -g.position.z) : S.firing && Math.max(S.wWalk, S.wRun) < 0.3 ? aimYaw : S.pathA + Math.PI / 2;
+    S.yaw != null
+      ? S.yaw
+      : S.move === 'sit'
+        ? Math.atan2(-g.position.x, -g.position.z)
+        : S.firing && Math.max(S.wWalk, S.wRun) < 0.3
+          ? aimYaw
+          : S.pathA + Math.PI / 2;
   S.twist += (Math.max(-1.5, Math.min(1.5, wrapA(aimYaw - S.facing))) * S.wFire - S.twist) * Math.min(1, dt * 12);
   let dy = want - S.facing;
   dy = Math.atan2(Math.sin(dy), Math.cos(dy));

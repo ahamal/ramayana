@@ -44,7 +44,8 @@ function kolam() {
   return t;
 }
 add(scene, new THREE.CylinderGeometry(4.6, 4.75, 0.3, 64), [STONE, toon(0xb8b0a8, { map: kolam(), rim: 0.06 }), STONE], [0, -0.15, 0]);
-add(scene, new THREE.CircleGeometry(120, 64), toon(0x4a3a38, { rim: 0 }), [0, -0.02, 0], [-Math.PI / 2, 0, 0]);
+const GROUND = toon(0x4a3a38, { rim: 0 });
+add(scene, new THREE.CircleGeometry(120, 64), GROUND, [0, -0.02, 0], [-Math.PI / 2, 0, 0]);
 const fire = new THREE.Group();
 scene.add(fire);
 [
@@ -108,49 +109,62 @@ function butt() {
 const straw = toon(0xc9a45a),
   face = toon(0xffffff, { map: butt(), rim: 0.05 }),
   targets = [];
+// every tree is kept on a list with its parts and the circle its trunk blocks, so a level can clear a path through the forest
+const TREES = [],
+  TREE_MATS = { trunk: toon(0x2e1e30, { rim: 0.1 }), leaf: toon(0x3a2848, { rim: 0.25 }), leaf2: toon(0x4a3458, { rim: 0.25 }) },
+  HILL_MATS = [];
+function addTree(x, z, s, i = TREES.length) {
+  const { trunk, leaf, leaf2 } = TREE_MATS,
+    solid = { x, z, r: 0.3 * s },
+    parts = [
+      cyl(scene, 0.18 * s, 0.26 * s, 3 * s, trunk, [x, 1.5 * s - 0.3, z]),
+      add(scene, new THREE.IcosahedronGeometry(1.7 * s, 1), i % 2 ? leaf : leaf2, [x, 3.8 * s, z], [0, x * 7.3, 0], [1, 0.85, 1]),
+      add(scene, new THREE.IcosahedronGeometry(1.1 * s, 1), i % 2 ? leaf2 : leaf, [x + 0.5 * s, 5 * s, z - 0.3 * s]),
+    ];
+  SOLIDS.push(solid);
+  TREES.push({ x, z, s, parts, solid });
+}
 {
-  const trunk = toon(0x2e1e30, { rim: 0.1 }),
-    leaf = toon(0x3a2848, { rim: 0.25 }),
-    leaf2 = toon(0x4a3458, { rim: 0.25 });
   for (let i = 0; i < 70; i++) {
     const a = Math.random() * 6.3,
-      r = 19 + Math.random() * 30,
-      s = 0.8 + Math.random() * 1.4,
-      x = Math.cos(a) * r,
-      z = Math.sin(a) * r;
-    cyl(scene, 0.18 * s, 0.26 * s, 3 * s, trunk, [x, 1.5 * s - 0.3, z]);
-    add(scene, new THREE.IcosahedronGeometry(1.7 * s, 1), i % 2 ? leaf : leaf2, [x, 3.8 * s, z], [0, a, 0], [1, 0.85, 1]);
-    add(scene, new THREE.IcosahedronGeometry(1.1 * s, 1), i % 2 ? leaf2 : leaf, [x + 0.5 * s, 5 * s, z - 0.3 * s]);
+      r = 19 + Math.random() * 30;
+    addTree(Math.cos(a) * r, Math.sin(a) * r, 0.8 + Math.random() * 1.4, i);
   }
   for (let i = 0; i < 9; i++)
     add(
       scene,
       new THREE.ConeGeometry(14 + Math.random() * 10, 10 + Math.random() * 12, 5),
-      toon(0x38203e, { rim: 0 }),
+      (HILL_MATS[i] = toon(0x38203e, { rim: 0 })),
       [-70 + i * 17 + Math.random() * 6, 3, -62 - Math.random() * 20],
       [0, Math.random() * 3, 0],
     );
 }
-scene.add(
-  new THREE.Mesh(
-    new THREE.SphereGeometry(200, 32, 16),
-    new THREE.ShaderMaterial({
-      side: THREE.BackSide,
-      depthWrite: false,
-      fog: false,
-      vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader:
-        'varying vec3 vP; void main(){ vec3 d = normalize(vP); vec3 c = mix(vec3(0.99,0.66,0.36), vec3(0.66,0.28,0.42), smoothstep(-0.04,0.26,d.y)); c = mix(c, vec3(0.13,0.09,0.28), smoothstep(0.18,0.75,d.y)); float s = max(dot(d, normalize(vec3(-0.34,0.13,-1.0))), 0.0); c += vec3(1.0,0.72,0.42) * (pow(s, 40.0) * 0.9 + pow(s, 6.0) * 0.25); gl_FragColor = vec4(pow(c, vec3(2.2)), 1.0); }',
-    }),
-  ),
+// the sky: three colours from horizon to zenith and a glow round the sun, all changeable so a level can set the time of day
+const SKY = new THREE.Mesh(
+  new THREE.SphereGeometry(200, 32, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false,
+    uniforms: {
+      uA: { value: new THREE.Vector3(0.99, 0.66, 0.36) },
+      uB: { value: new THREE.Vector3(0.66, 0.28, 0.42) },
+      uC: { value: new THREE.Vector3(0.13, 0.09, 0.28) },
+      uSun: { value: new THREE.Vector3(-0.34, 0.13, -1).normalize() },
+      uGlow: { value: new THREE.Vector3(1.0, 0.72, 0.42) },
+    },
+    vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader:
+      'uniform vec3 uA, uB, uC, uSun, uGlow; varying vec3 vP; void main(){ vec3 d = normalize(vP); vec3 c = mix(uA, uB, smoothstep(-0.04,0.26,d.y)); c = mix(c, uC, smoothstep(0.18,0.75,d.y)); float s = max(dot(d, uSun), 0.0); c += uGlow * (pow(s, 40.0) * 0.9 + pow(s, 6.0) * 0.25); gl_FragColor = vec4(pow(c, vec3(2.2)), 1.0); }',
+  }),
 );
+scene.add(SKY);
 const sunDir = V3(-0.34, 0.2, -1).normalize();
-{
-  const s = glow(0xffd9a0, 30);
-  s.position.copy(sunDir).multiplyScalar(150);
-  scene.add(s);
-}
-scene.add(new THREE.HemisphereLight(0xffb48a, 0x2a1c3a, 1.5));
+const SUN = glow(0xffd9a0, 30);
+SUN.position.copy(sunDir).multiplyScalar(150);
+scene.add(SUN);
+const HEMI = new THREE.HemisphereLight(0xffb48a, 0x2a1c3a, 1.5);
+scene.add(HEMI);
 const key = new THREE.DirectionalLight(0xffa868, 3.2);
 key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
@@ -161,7 +175,45 @@ Object.assign(key.shadow.camera, { left: -17, right: 17, top: 11, bottom: -8, ne
 key.position.copy(sunDir).multiplyScalar(16).add(V3(0, 4, 0)).multiplyScalar(2.6);
 key.shadow.mapSize.set(4096, 2304);
 scene.add(key, key.target);
+// in the sandbox the shadow map sits still over the clearing. A level that roams sets shadowFollow, and the map then moves with the camera's target, in whole steps
+let shadowFollow = false;
+const shadowOff = key.position.clone();
 const fill = new THREE.DirectionalLight(0xc8d0ff, 1.5);
+// ---------- time of day ----------
+// the scene is built at dusk. setDay() turns it to a clear morning: blue sky, a high white sun, green forest and grass
+function setDay() {
+  const U = SKY.material.uniforms,
+    sun = V3(-0.45, 0.85, -0.4).normalize();
+  U.uA.value.set(0.78, 0.88, 0.96);
+  U.uB.value.set(0.45, 0.68, 0.93);
+  U.uC.value.set(0.2, 0.42, 0.82);
+  U.uSun.value.copy(sun);
+  U.uGlow.value.set(1.0, 0.95, 0.8);
+  SUN.position.copy(sun).multiplyScalar(150);
+  SUN.material.color.set(0xfff6dc);
+  scene.fog.color.set(0xbcd6e8);
+  scene.fog.density = 0.006;
+  HEMI.color.set(0xdcecff);
+  HEMI.groundColor.set(0x6a6048);
+  HEMI.intensity = 1.5;
+  key.color.set(0xfff0d8);
+  key.intensity = 3.0;
+  // the shadow map covers everything the camera can see round the hero, not just the ground near him, so no shadow is cut off in view
+  shadowOff.copy(sun).multiplyScalar(80);
+  key.position.copy(shadowOff);
+  Object.assign(key.shadow.camera, { left: -48, right: 48, top: 40, bottom: -40, near: 1, far: 200 });
+  key.shadow.camera.updateProjectionMatrix();
+  fill.intensity = 0.7;
+  GROUND.color.set(0x6f7f45);
+  TREE_MATS.trunk.color.set(0x5a3c28);
+  TREE_MATS.leaf.color.set(0x3f7a3c);
+  TREE_MATS.leaf2.color.set(0x57903f);
+  HILL_MATS.forEach((m) => m.color.set(0x7088a0));
+  bloom.threshold = 0.96;
+  bloom.strength = 0.3;
+  // against bright grass a faint streak vanishes: in daylight an arrow's trail is white, three times as wide and twice as long
+  Object.assign(STREAK, { color: 0xffffff, tw: 0.075, hl: 9 });
+}
 fill.position.set(4, 5, 7);
 scene.add(fill);
 const DN = 500,

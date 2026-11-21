@@ -164,6 +164,7 @@ const keys = {},
   held = () => (AUTO ? IN.fire : latch || mDown || kDown);
 // fire is held: the mouse button, Space or F, or the Rapid fire button latched on. A short press still gets one full shot; holding keeps them coming
 function press() {
+  if (LOCK) return;
   if (who !== 'sage') {
     namaste = false;
     if (move === 'sit') move = 'idle';
@@ -186,7 +187,7 @@ addEventListener('keydown', (e) => {
   const m = { Digit1: 'idle', Digit2: 'walk', Digit3: 'run', Digit4: 'sit' }[e.code];
   if (m) setMove(m);
   else if (e.code === 'KeyV' || e.code === 'Tab') {
-    selectHero({ rama: 'lak', lak: 'sage', sage: 'rama' }[who]);
+    selectHero(PLAYABLE[(PLAYABLE.indexOf(who) + 1) % PLAYABLE.length]);
     e.preventDefault();
   } else if (e.code === 'KeyF' || e.code === 'Space') {
     if (!e.repeat) {
@@ -267,8 +268,21 @@ const tmp = V3(),
   pre = {},
   UP = V3(0, 1, 0);
 function loose() {
-  const K = KINDS[kind],
-    n = K.fan || 1;
+  let K = KINDS[kind];
+  // a hero with stamina spends some on every quick shot. When it runs out he is tired, and shoots at Rama's pace until half of it is back
+  if (CUR.st !== undefined && !CUR.tired) {
+    CUR.st -= 10;
+    if (CUR.st <= 0) {
+      CUR.st = 0;
+      CUR.tired = true;
+    }
+  }
+  // where heroes have mana, an astra costs some; without enough, the shot leaves as a plain arrow
+  if (CUR.mp !== undefined && K.cost) {
+    if (CUR.mp >= K.cost) CUR.mp -= K.cost;
+    else K = KINDS[0];
+  }
+  const n = K.fan || 1;
   if (K.wind) return windGust(hL, aimDir);
   if (K.manava) return manavaFire(hL, aimDir);
   for (let i = 0; i < n; i++) {
@@ -293,6 +307,8 @@ function loose() {
       t: Math.random() * 6,
       side: V3().crossVectors(UP, d).normalize(),
     };
+    // where it left the bow, so its flight can be limited from there
+    sh.from = sh.g.position.clone();
     shots.push(sh);
     if (aimLock && i === (n - 1) >> 1) sh.lock = aimLock;
     if (!K.charge && !K.naga && !K.agni) armStreak(sh);
@@ -353,13 +369,69 @@ function setPose(delta) {
 // Each brother keeps his own copy of those in a record; before one is updated his copy is loaded into the variables, and saved back after.
 // The one the player holds is always loaded last, so between frames the variables are his, and the buttons and keys act on him.
 function heroState() {
-  return { namaste, wNam, wSit, invoking, wInv, invP, haltW, mKick, twist, move, firing, wWalk, wRun, wAim, phase, mface, keyed, orbit, back, wBk, facing, draw, fireT, aimLock, shotQ, holdT, kind };
+  return {
+    namaste,
+    wNam,
+    wSit,
+    invoking,
+    wInv,
+    invP,
+    haltW,
+    mKick,
+    twist,
+    move,
+    firing,
+    wWalk,
+    wRun,
+    wAim,
+    phase,
+    mface,
+    keyed,
+    orbit,
+    back,
+    wBk,
+    facing,
+    draw,
+    fireT,
+    aimLock,
+    shotQ,
+    holdT,
+    kind,
+  };
 }
 function saveHero(h) {
   h.s = heroState();
 }
 function loadHero(h) {
-  ({ namaste, wNam, wSit, invoking, wInv, invP, haltW, mKick, twist, move, firing, wWalk, wRun, wAim, phase, mface, keyed, orbit, back, wBk, facing, draw, fireT, aimLock, shotQ, holdT, kind } = h.s);
+  ({
+    namaste,
+    wNam,
+    wSit,
+    invoking,
+    wInv,
+    invP,
+    haltW,
+    mKick,
+    twist,
+    move,
+    firing,
+    wWalk,
+    wRun,
+    wAim,
+    phase,
+    mface,
+    keyed,
+    orbit,
+    back,
+    wBk,
+    facing,
+    draw,
+    fireT,
+    aimLock,
+    shotQ,
+    holdT,
+    kind,
+  } = h.s);
   ({ group: rama, bone, lids, eyeBits, bow, strGeo, nock, solver, aimPt, aimDir, poseDir, front, keyDir, hL, hR } = h);
   CUR = h;
 }
@@ -369,7 +441,29 @@ const IKS = [
 ];
 // pace: how long each shot takes compared with Rama's. Lakshmana draws and looses in a little over half the time
 // range: how far he can hit when he is on his own. keep: how close he lets an enemy come before backing away
-const RAMA = { name: 'rama', pace: 1, range: 13, keep: 4.5, group: rama, bone, lids, eyeBits, bow, strGeo, nock, solver, aimPt, aimDir, poseDir, front, keyDir, hL, hR, post: rama.position.clone(), s: heroState() };
+const RAMA = {
+  name: 'rama',
+  pace: 1,
+  range: 13,
+  keep: 4.5,
+  group: rama,
+  bone,
+  lids,
+  eyeBits,
+  bow,
+  strGeo,
+  nock,
+  solver,
+  aimPt,
+  aimDir,
+  poseDir,
+  front,
+  keyDir,
+  hL,
+  hR,
+  post: rama.position.clone(),
+  s: heroState(),
+};
 // Lakshmana: Rama's own body and gear copied, on a skeleton of his own, fair-skinned and dressed in blue. He carries no astras, only plain arrows
 function cloneHero(src, name, at, tint) {
   lids.forEach((o) => (o.userData.lid = 1));
@@ -392,7 +486,29 @@ function cloneHero(src, name, at, tint) {
   g.position.copy(at);
   scene.add(g, bw);
   const mesh = g.children.find((o) => o.isSkinnedMesh);
-  return { name, pace: 0.55, range: 14, keep: 3.5, group: g, bone: bn, lids: l2, eyeBits: e2, bow: bw, strGeo: sg, nock: makeArrow(), solver: new CCDIKSolver(mesh, IKS), aimPt: V3(0, 1.15, -9), aimDir: V3(-1, 0, 0), poseDir: V3(-1, 0, 0), front: V3(), keyDir: V3(), hL: V3(), hR: V3(), post: at.clone(), s: { ...src.s, mface: Math.atan2(-at.x, -at.z) + Math.PI / 2, facing: 0, kind: 0 } };
+  return {
+    name,
+    pace: 0.68,
+    range: 14,
+    keep: 3.5,
+    group: g,
+    bone: bn,
+    lids: l2,
+    eyeBits: e2,
+    bow: bw,
+    strGeo: sg,
+    nock: makeArrow(),
+    solver: new CCDIKSolver(mesh, IKS),
+    aimPt: V3(0, 1.15, -9),
+    aimDir: V3(-1, 0, 0),
+    poseDir: V3(-1, 0, 0),
+    front: V3(),
+    keyDir: V3(),
+    hL: V3(),
+    hR: V3(),
+    post: at.clone(),
+    s: { ...src.s, mface: Math.atan2(-at.x, -at.z) + Math.PI / 2, facing: 0, kind: 0 },
+  };
 }
 const LAK = cloneHero(
   RAMA,
@@ -407,9 +523,11 @@ const LAK = cloneHero(
 // his head: Rama's cap of short hair with no knot and nothing down the neck, no earrings and nothing on the brow
 {
   const head = LAK.bone.head.children.find((o) => o.isGroup);
-  for (const o of [...head.children]) if (Math.abs(o.position.x) < 0.01 && o.position.y > 0.05 && o.position.z !== 0) if (o.position.y > 0.12 || o.position.z > 0.11) head.remove(o);
+  for (const o of [...head.children])
+    if (Math.abs(o.position.x) < 0.01 && o.position.y > 0.05 && o.position.z !== 0) if (o.position.y > 0.12 || o.position.z > 0.11) head.remove(o);
   // Rama's lips are violet to suit blue skin; on brown skin that reads as paint, so his are a plain darker brown
-  for (const o of head.children) if (o.isMesh && Math.abs(o.position.x) < 0.001 && o.position.y < -0.07 && o.position.y > -0.1 && o.position.z > 0.09) o.material = toon(0x8a4a30);
+  for (const o of head.children)
+    if (o.isMesh && Math.abs(o.position.x) < 0.001 && o.position.y < -0.07 && o.position.y > -0.1 && o.position.z > 0.09) o.material = toon(0x8a4a30);
   // no earrings, and no hair down the back of the neck: only the cap of hair on the crown
   for (const o of [...head.children]) {
     const earring = Math.abs(Math.abs(o.position.x) - 0.122) < 0.002 && o.position.y < -0.04,
@@ -418,14 +536,29 @@ const LAK = cloneHero(
   }
 }
 // everyone the player can take control of; collision treats each as a walker
-const HEROES = [RAMA, LAK];
+const HEROES = [RAMA, LAK],
+  // how long his reload takes next to Rama's: his own quick pace, or Rama's while he is tired
+  pace = (h) => (h.tired ? 1 : h.pace);
 let SEL = RAMA,
   CUR = RAMA,
   AUTO = false,
-  FOLLOW = false;
-const IN = { x: 0, z: 0, walk: false, fire: false, at: null };
+  FOLLOW = false,
+  // how far from the fire anyone may walk, and who Tab cycles through: a level may change both
+  BOUND = 13,
+  PLAYABLE = ['rama', 'lak', 'sage'];
+const IN = { x: 0, z: 0, walk: false, fire: false, at: null, quick: 1 };
+// for a level's scenes: LOCK shuts out firing and switching brothers; DIRECT(h, dt), if it returns true, has given that hero his orders
+// for this frame by filling IN (and may set move, namaste and firing, which are his at that moment)
+let LOCK = false,
+  DIRECT = null;
+// keeps a walker on the ground anyone may walk on: a circle round the fire, unless a level gives the ground another shape
+let hem = (P) => {
+  const r = Math.hypot(P.x, P.z);
+  if (r > BOUND) P.multiplyScalar(BOUND / r);
+};
 // taking control of a brother, or of the sage. The brother you leave holds the spot where you left him
 function selectHero(w) {
+  if (LOCK) return;
   who = w;
   const h = HEROES.find((x) => x.name === w);
   if (h && h !== SEL) {
@@ -453,6 +586,8 @@ function brain(h, dt) {
   for (const d of grunts) {
     if (d.dead || d.flung) continue;
     const l = Math.hypot(d.g.position.x - P.x, d.g.position.z - P.z);
+    // on a big map, enemies too far off to matter are not his concern
+    if (l > h.range + 12) continue;
     if (l < bd) {
       bd = l;
       best = d;
@@ -510,7 +645,7 @@ function brain(h, dt) {
       // at the edge of the ground he cannot back off any further outwards: he slides round the edge instead
       const r = Math.hypot(P.x, P.z) || 1,
         out = (dx * P.x + dz * P.z) / r;
-      if (r > 11.5 && out > 0) {
+      if (r > BOUND - 1.5 && out > 0) {
         dx -= (out * P.x) / r;
         dz -= (out * P.z) / r;
         if (Math.hypot(dx, dz) < 0.2) {
@@ -562,8 +697,12 @@ function heroUpdate(dt) {
   saveHero(SEL);
   const one = (h, auto) => {
     loadHero(h);
-    AUTO = auto;
-    if (auto) brain(h, dt);
+    // a level's scene may take a hero over for a while: it then gives the orders, and neither the player nor his own wits do
+    IN.quick = 1;
+    const scripted = !!(DIRECT && DIRECT(h, dt));
+    AUTO = auto || scripted;
+    if (scripted) {
+    } else if (auto) brain(h, dt);
     else keysIn();
     heroStep(dt);
     saveHero(h);
@@ -571,6 +710,13 @@ function heroUpdate(dt) {
   for (const h of HEROES) if (h !== SEL) one(h, true);
   one(SEL, who === 'sage');
   AUTO = false;
+  for (const h of HEROES) {
+    if (h.mp !== undefined) h.mp = Math.min(h.mpMax, h.mp + dt * 4);
+    if (h.st !== undefined) {
+      h.st = Math.min(h.stMax, h.st + dt * 4);
+      if (h.st >= h.stMax * 0.5) h.tired = false;
+    }
+  }
 }
 // ---------- one frame, in the pieces a page calls in order: tick, heroUpdate, shotsUpdate, worldUpdate, cameraUpdate, then it renders ----------
 let prev = performance.now();
@@ -613,15 +759,15 @@ function heroStep(dt) {
   // going backwards he keeps his speed and the stride runs in reverse
   haltW = KINDS[kind].halt ? wInv : 0;
   const still = (1 - haltW) * (1 - wSit),
-    sp = (1.3 * wWalk + 5.0 * wRun) * still;
-  phase += dt * ((wWalk * 1.3) / 0.36 + wRun * 10) * still * (1 - 2 * wBk);
+    // IN.quick is a scene's brisker walk: the same stride, taken faster
+    sp = (1.3 * IN.quick * wWalk + 5.0 * wRun) * still;
+  phase += dt * ((wWalk * 1.3 * IN.quick) / 0.36 + wRun * 10) * still * (1 - 2 * wBk);
   {
     const P = rama.position;
     if (!orbit) {
       if (keyed) {
         P.addScaledVector(keyDir, sp * dt);
-        const r = Math.hypot(P.x, P.z);
-        if (r > 13) P.multiplyScalar(13 / r);
+        hem(P);
         mface = Math.atan2(keyDir.x, keyDir.z);
       }
     } else if (sp > 0.001) {
@@ -689,7 +835,7 @@ function heroStep(dt) {
   front.set(Math.sin(facing + twist), 0, Math.cos(facing + twist));
   // rapid fire: draw, loose, recover
   const INVT = KINDS[kind].invoke || 0,
-    RATE = (INVT ? 0.32 : KINDS[kind].rate) * CUR.pace;
+    RATE = (INVT ? 0.32 : KINDS[kind].rate) * pace(CUR);
   if (!firing) fireT = shotQ = 0;
   else if (wAim > 0.85 && (held() || shotQ)) {
     // a new draw only starts while fire is held, or to finish the one shot a short press is owed.
@@ -697,7 +843,7 @@ function heroStep(dt) {
     fireT += dt;
     if (fireT > INVT + RATE) {
       loose();
-      fireT = -0.15 * CUR.pace;
+      fireT = -0.15 * pace(CUR);
       shotQ = 0;
       if (!held()) holdT = 0.3;
     }
@@ -1065,7 +1211,7 @@ function shotsUpdate(dt) {
           break;
         }
       }
-    if (!hitP && (s.g.position.y < 0.02 || s.g.position.length() > 70)) hitP = s.g.position.clone();
+    if (!hitP && (s.g.position.y < 0.02 || s.g.position.distanceTo(s.from) > 70)) hitP = s.g.position.clone();
     if (hitP) {
       s.live = false;
       s.g.position.copy(hitP).addScaledVector(tmp2, -0.45);
@@ -1099,6 +1245,10 @@ function worldUpdate(dt) {
   gruntUpdate(dt);
   sageUpdate(dt);
   collide();
+  if (shadowFollow) {
+    key.target.position.set(Math.round(tgt.x), 0, Math.round(tgt.z));
+    key.position.copy(key.target.position).add(shadowOff);
+  }
   fxUpdate(dt);
   for (const t of targets) {
     if (t.wob > 0) {

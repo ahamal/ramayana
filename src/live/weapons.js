@@ -245,6 +245,8 @@ function armBrahma(s) {
   s.trail.frustumCulled = false;
   scene.add(s.trail);
 }
+// the streak behind a plain arrow: its colour, half-width and length (in frames of travel). Faint at dusk; a level in daylight makes it stronger
+const STREAK = { color: 0x8a7a62, tw: 0.025, hl: 4 };
 function armStreak(s) {
   const N = 28,
     g = new THREE.BufferGeometry(),
@@ -258,13 +260,13 @@ function armStreak(s) {
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 6), 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx);
-  s.trail = new THREE.Mesh(g, addMat(streakT, 0x8a7a62));
+  s.trail = new THREE.Mesh(g, addMat(streakT, STREAK.color));
   s.trail.frustumCulled = false;
   scene.add(s.trail);
   s.hist = [];
   s.ribbon = true;
-  s.tw = 0.025;
-  s.hl = 4;
+  s.tw = STREAK.tw;
+  s.hl = STREAK.hl;
 } // a short faint streak behind a plain arrow, tapering to nothing
 function trailUpdate(s) {
   const N = 28,
