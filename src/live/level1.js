@@ -16,22 +16,94 @@ FOLLOW = true;
 // That river comes down from a waterfall on the far side and runs toward the camera in a channel below the ground;
 // where the road meets it the land simply carries on across. The second river has no crossing at all.
 const WX = -90,
-  EX = 90,
-  ZN = -60,
-  ZS = 60,
+  EX = 120,
+  ZN = -90,
+  ZS = 90,
   START_X = WX - 16,
   X0 = START_X - 14,
   R = (a, b) => a + Math.random() * (b - a),
-  riverX = (z, c = WX) => c + 1.6 * Math.sin(z * 0.16 + (c > 0 ? 1.7 : 0)),
   // the road's line from the river as far as the hermitage: level with the crossing, wandering a little
-  roadZ = (x) => 0.5 * Math.sin(x * 0.21),
+  roadZ = (x) => 0.5 * Math.sin(x * 0.21) + (x > 92 ? (x - 92) * 0.36 : 0),
   RIVER_FROM = -18,
+  // The rivers make a Y. The west arm comes down from its waterfall, passes under the road, then bends away east across the
+  // south of the map; the east arm comes down from the north on the other side; they meet below the hermitage, and the
+  // joined river runs on south. The hermitage lies in the fork. Each is the list of points its course is drawn through
+  COURSES = [
+    [
+      [-90, -18],
+      [-90.6, -8],
+      [-90, 0],
+      [-88.4, 9],
+      [-82, 19],
+      [-68, 28],
+      [-48, 34.5],
+      [-24, 38.5],
+      [-2, 41.6],
+      [24, 44],
+      [46, 45],
+      [62, 45.2],
+      [73.5, 41.5],
+    ],
+    // the east river, the bigger of the two, which the west arm runs into: down from the north, under the road as far east of
+    // the altar as the west crossing is west of it, then away south-west and off the map
+    [
+      [92, -126],
+      [91, -74],
+      [90, -40],
+      [90.6, -15],
+      [90, 0],
+      [87, 16],
+      [80, 30],
+      [71, 43],
+      [63, 57],
+      [55, 90],
+      [47, 124],
+    ],
+    // above the fall: the west arm's upper reach, coming down from the north on the high ground and ending at the lip
+    [
+      [-92, -126],
+      [-93, -100],
+      [-90.5, -76],
+      [-92, -52],
+      [-89.6, -33],
+      [-90, -19.6],
+    ],
+  ],
+  // the three crossings, where the land carries on over the water: the road's on the west arm, the road's on the east arm,
+  // and the south road's, on the west arm just above where the rivers meet
+  FORDS = [
+    [-90, 0],
+    [90, 0],
+    [0.4, 41.9],
+  ],
+  FORD_R = 4.6,
+  // half the width of a river, bank to bank
+  RW = 4.4,
+  // how much wider than that each river is on either side: the east one is the bigger
+  WIDER = [0, 1.2, 0],
+  // the road that comes up from the south beside the joined river, over the third crossing and on to the altar
+  SOUTH_ROAD = [
+    [0, 122],
+    [1.5, 86],
+    [3.2, 74],
+    [4.4, 64],
+    [5.4, 54],
+    [2.6, 47],
+    [0.4, 41.9],
+    [0, 34],
+    [0.5, 24],
+    [0, 13.5],
+  ],
+  southWay = (x, z, pad) => z > 11 && Math.abs(x - (z < 42 ? 0.3 : z < 54 ? 0.4 + (z - 42) * 0.42 : 5.4 - (z - 54) * 0.12)) < pad,
   // the demons' camp is a little way past the river and off the road, on its far side
   CAMP = V3(-66, 0, -3.5),
   // until the prisoners are freed nobody may go further east than this: a dotted line across the map, just beyond the camp
   HOLD_X = -66 + 12,
+  // and no further north or south than these: with the far limit in the west, a box round the camp and the first crossing
+  HOLD_N = -3.5 - 16,
+  HOLD_S = -3.5 + 16,
   // on the road (which ends at the clearing), in the demons' camp, or in or beside either river or the ridge the first one falls from
-  onRoad = (x, z, pad) => x < -33 && Math.abs(z - roadZ(x)) < pad,
+  onRoad = (x, z, pad) => ((x < -33 || x > 24) && Math.abs(z - roadZ(x)) < pad) || southWay(x, z, pad),
   // The hermitage is laid out evenly about the line that runs north through the altar. The road comes in from the river on the
   // west, sweeps round the far side of the altar in a half ring (its middle is YARD, a little north of the fire), and comes back
   // down on the east, where it rounds the end of the cliff and goes on south into the low country.
@@ -48,89 +120,110 @@ const WX = -90,
   POND = [38, -10, 0],
   JARS = [-9, -48, 0],
   SHED = [9.5, -49, 0],
-  // South of the altar the ground breaks in a cliff: a wall of rock that runs from the first river east to CLIFF_END. Nobody
-  // can cross it, so whoever comes up from the south must go round its end, where the road is. cliffZ is its line
-  CLIFF_FROM = WX + 3.6,
-  CLIFF_END = 30,
-  cliffZ = (x) => 15.5 + 1.5 * Math.sin(x * 0.09),
-  // (the stretch of road that runs on south past the cliff's end, for keeping trees off it before the road itself is drawn)
-  southRoad = (x, z, pad) => x > 31 - pad && x < 46 + pad && z > 8 && z < 38 + pad,
-  nearCliff = (x, z, pad) => x > CLIFF_FROM - 3 && x < CLIFF_END + 3 + pad && Math.abs(z - cliffZ(x)) < 3.4 + pad,
   // every point of the road as drawn, filled in below: for keeping things off it
   ROADLINE = [],
+  ROADS = [],
   nearRoad = (x, z, pad) => ROADLINE.some((p) => Math.abs(p.x - x) < pad && Math.abs(p.z - z) < pad && Math.hypot(p.x - x, p.z - z) < pad),
-  // the hermitage's ground: nothing wild grows here. It is everything within the half ring and a good way outside it, north of the cliff
-  inHut = (x, z, pad) => Math.hypot(x - YARD[0], z - YARD[1]) < 48 + pad && z < cliffZ(x) - 2 + pad,
-  // the four camps where prisoners are kept at work, away from the road
+  // the hermitage's ground: nothing wild grows here. It is everything within the half ring and a good way outside it, on its near side as far as a little beyond the altar
+  inHut = (x, z, pad) => Math.hypot(x - YARD[0], z - YARD[1]) < 48 + pad && z < 16 + pad,
+  // the two camps where prisoners are kept at work, each outside the fork: one beyond the east crossing, one beyond the south
   WORK = [
-    [-36, 38],
-    [18, 44],
-    [62, 18],
-    [64, -40],
+    [30, -72],
+    [-26, 51],
   ],
   inCamp = (x, z, pad) => [[CAMP.x, CAMP.z], ...WORK].some((q) => Math.abs(x - q[0]) < pad && Math.abs(z - q[1]) < pad),
-  nearRiver = (x, z, pad) =>
-    (z > RIVER_FROM - 4 ? Math.abs(x - riverX(z)) < 2.6 + pad : Math.abs(x - WX) < 5 + pad) || Math.abs(x - riverX(z, EX)) < 2.6 + pad;
-// the ground anyone may walk on is a rectangle here, not a circle round the fire
-// (once both brothers are over the first river there is no going back: its near bank becomes the western limit)
-let crossed = false;
+  // near water, or the ridge of rock the west arm falls from
+  nearRiver = (x, z, pad) => riverDist(x, z) < RW - 0.4 + pad;
+// The courses themselves: each arm as a smooth line of points half a metre apart. And, worked out once from them, how far
+// every spot on the map is from the nearest water. A crossing counts as land: the water under it is left out, so the
+// distance there is to where the river begins again on either side
+const RIV = COURSES.map((pts) => {
+    const c = new THREE.CatmullRomCurve3(
+      pts.map(([x, z]) => V3(x, 0, z)),
+      false,
+      'centripetal',
+    );
+    return c.getSpacedPoints(Math.ceil(c.getLength() / 0.5));
+  }),
+  atFord = (p, pad) => FORDS.some((f) => Math.hypot(p.x - f[0], p.z - f[1]) < FORD_R + pad),
+  RF = { x0: -150, z0: -130, w: 306, h: 262 };
+RF.d = new Float32Array(RF.w * RF.h).fill(99);
+// (a wider river counts every spot as that much nearer its water, so its channel and banks are wider all along)
+RIV.forEach((line, r) => {
+  for (const p of line) {
+    // (left out for some way either side of a crossing, so the land is level across the whole width of the way over)
+    if (atFord(p, 3)) continue;
+    const cx = Math.round(p.x - RF.x0),
+      cz = Math.round(p.z - RF.z0);
+    for (let iz = Math.max(0, cz - 12); iz <= Math.min(RF.h - 1, cz + 12); iz++)
+      for (let ix = Math.max(0, cx - 12); ix <= Math.min(RF.w - 1, cx + 12); ix++) {
+        const d = Math.hypot(ix + RF.x0 - p.x, iz + RF.z0 - p.z) - WIDER[r];
+        if (d < RF.d[iz * RF.w + ix]) RF.d[iz * RF.w + ix] = d;
+      }
+  }
+});
+function riverDist(x, z) {
+  const fx = Math.max(0, Math.min(RF.w - 1.001, x - RF.x0)),
+    fz = Math.max(0, Math.min(RF.h - 1.001, z - RF.z0)),
+    ix = Math.floor(fx),
+    iz = Math.floor(fz),
+    tx = fx - ix,
+    tz = fz - iz,
+    i = iz * RF.w + ix,
+    D = RF.d;
+  return (D[i] * (1 - tx) + D[i + 1] * tx) * (1 - tz) + (D[i + RF.w] * (1 - tx) + D[i + RF.w + 1] * tx) * tz;
+}
+// the ground anyone may walk on is a rectangle here, not a circle round the fire. Until the first camp's prisoners are freed
+// it is only the box round that camp; after that the whole of it, back over the first crossing as well
 hem = (P) => {
-  if (!crossed && HEROES.every((h) => h.group.position.x > WX + 7)) crossed = true;
-  P.x = Math.max(crossed ? riverX(P.z) + 3.4 : X0, Math.min(captive() ? HOLD_X : EX - 3.5, P.x));
-  P.z = Math.max(ZN, Math.min(ZS, P.z));
+  const held = captive();
+  P.x = Math.max(X0, Math.min(held ? HOLD_X : EX - 3.5, P.x));
+  P.z = Math.max(held ? HOLD_N : ZN, Math.min(held ? HOLD_S : ZS, P.z));
 };
 // true while any prisoner of the first camp, the one by the road, is still bound
 const captive = () => CAMPS[0].prisoners.some((p) => !p.free);
 // ---------- the lie of the land ----------
-// The ground is not flat. Everything north of the cliff's line is high ground, at the level the altar stands on; south of
-// it is low country, five metres down. As far east as the cliff's end the fall between them is a cliff, almost sheer; beyond
-// that it opens out into a long easy hillside, which is the way up and down, and the road takes it.
-// On top of that the land rolls a little everywhere, except where it has to be level: by the rivers, along the road, round the
-// hermitage, under each camp and along the cliff itself.
-const DROP = 5,
-  ease = (t) => ((t = Math.max(0, Math.min(1, t))), t * t * (3 - 2 * t)),
-  // how wide the fall from the high ground to the low is at a given x: a cliff's width, then widening into the hillside
-  fallW = (x) => 2.4 + 26 * ease((x - (CLIFF_END - 4)) / 16),
-  // the height of the land without its small ups and downs
-  landBase = (x, z) => -DROP * ease((z - cliffZ(x)) / fallW(x) + 0.5),
-  // each camp stands on a level pad at whatever height the land has at its middle
-  PADS = [[CAMP.x, CAMP.z], ...WORK].map(([x, z]) => [x, z, landBase(x, z)]);
+// The ground is not flat. It rolls gently everywhere, except where it has to be level: along the roads, round the hermitage
+// and under each camp. And each river runs in a channel that the land itself dips into: full depth along the water's middle,
+// rising in a bank on either side. At a crossing there is no channel; the land carries straight on.
+const ease = (t) => ((t = Math.max(0, Math.min(1, t))), t * t * (3 - 2 * t)),
+  CHANNEL = 1.7,
+  PADS = [[CAMP.x, CAMP.z], ...WORK],
+  // North of the waterfall the land stands higher, by HIGH. Right beside the river it drops at once, in the short steep face the
+  // water falls over; further off to either side the drop eases into a long slope, and well east of the river there is none
+  HIGH = 4,
+  lift = (x, z) => {
+    const a = Math.abs(x - WX),
+      w = 1.5 + 12 * ease((a - RW - 3) / 10);
+    return HIGH * ease((RIVER_FROM - z) / w) * ease(1 - (a - 22) / 24);
+  };
 groundY = (x, z) => {
-  let h = landBase(x, z),
-    // how far this spot is from anything that must be level: at nothing or less the land does not roll at all
-    calm = Math.min(
-      Math.abs(x - riverX(z)) - 6,
-      Math.abs(x - riverX(z, EX)) - 6,
-      x < -28 ? Math.abs(z - roadZ(x)) - 5 : 1e9,
-      Math.hypot(x - YARD[0], z - YARD[1]) - 50,
-      x < CLIFF_END + 6 ? Math.abs(z - cliffZ(x)) - 5 : 1e9,
-      southRoad(x, z, 3) || x < WX ? -1 : 1e9,
-    );
-  for (const q of PADS) {
-    const d = Math.max(Math.abs(x - q[0]), Math.abs(z - q[1]));
-    if (d < 15) h += (q[2] - h) * (1 - ease((d - 10) / 5));
-    calm = Math.min(calm, d - 13);
-  }
-  return h + (0.5 * Math.sin(x * 0.11 + 1.3) * Math.cos(z * 0.09) + 0.3 * Math.sin(x * 0.23 - z * 0.17)) * ease(calm / 9);
+  const d = riverDist(x, z);
+  // how far this spot is from anything that must be level: at nothing or less the land does not roll at all
+  let calm = Math.min(d - RW - 4.6, Math.abs(z - roadZ(x)) - 6, southWay(x, z, 8) ? -1 : 1e9, Math.hypot(x - YARD[0], z - YARD[1]) - 50, x < WX ? -1 : 1e9);
+  for (const q of PADS) calm = Math.min(calm, Math.max(Math.abs(x - q[0]), Math.abs(z - q[1])) - 13);
+  return (
+    (0.5 * Math.sin(x * 0.11 + 1.3) * Math.cos(z * 0.09) + 0.3 * Math.sin(x * 0.23 - z * 0.17)) * ease(calm / 9) - CHANNEL * ease(1 - (d - RW + 1.8) / 3) + lift(x, z)
+  );
 };
-// The ground itself is a sheet of small squares pulled to that shape, grass-coloured except where it is too steep for
-// anything to grow, where it shows as bare rock. The scene's own flat ground is kept, sunk well below everything and spread
+// The ground itself is a sheet of small squares pulled to that shape, grass-coloured except where it is steep, on the
+// riverbanks, where it shows as bare earth. The scene's own flat ground is kept, sunk well below everything and spread
 // wide, as the land seen in the far distance beyond the sheet's edge
 {
   const far = scene.children.find((m) => m.material === GROUND);
   far.scale.setScalar(2.6);
-  far.position.y = -DROP - 1.6;
+  far.position.y = -3;
   far.geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(far.geometry.attributes.position.count * 3).fill(1), 3));
   const xa = -150,
-    za = -112,
-    st = 1.5,
-    nx = 184,
-    nz = 139,
+    za = -126,
+    st = 1,
+    nx = 300,
+    nz = 252,
     pos = [],
     col = [],
     idx = [],
-    // (the tint that turns the ground's own green to the grey-brown of rock)
-    rockTint = [1.22, 1.02, 1.8];
+    // (the tint that turns the ground's own green to the brown of a bank of earth)
+    rockTint = [0.96, 0.65, 0.81];
   for (let j = 0; j <= nz; j++)
     for (let i = 0; i <= nx; i++) {
       const x = xa + i * st,
@@ -355,8 +448,7 @@ for (let i = 0; i < 420; i++) {
     z = R(ZN - 30, ZS + 4),
     c = Math.hypot(x, z),
     grove = Math.sin(x * 0.045 + 1.3) * Math.cos(z * 0.06 - 0.7) + 0.35 * Math.sin(x * 0.11 + z * 0.09);
-  if (grove < 0.1 || nearRiver(x, z, 1.5) || onRoad(x, z, 5) || inCamp(x, z, 12) || inHut(x, z, 3) || nearCliff(x, z, 2) || southRoad(x, z, 3))
-    continue;
+  if (grove < 0.1 || nearRiver(x, z, 1.5) || onRoad(x, z, 5) || inCamp(x, z, 12) || inHut(x, z, 3)) continue;
   if (c < 52 && (z < 9 || c < 14)) continue;
   const small = c < 52 || (x < 2 && z > roadZ(x) && z < roadZ(x) + 16);
   // which kind grows here. Palms like the riverbanks; elsewhere round and spreading trees are commonest, tall ones fewer
@@ -368,7 +460,7 @@ for (let i = 0; i < 420; i++) {
 // bushes: few, and never scattered singly. One clump sits at the foot of about every third tree, as undergrowth,
 // and some more stand in small groups a little back from the road
 function bush(x, z, r) {
-  if (nearRiver(x, z, 0.6) || onRoad(x, z, 3.4) || inCamp(x, z, 7) || inHut(x, z, 0) || nearCliff(x, z, 0.5) || southRoad(x, z, 1)) return;
+  if (nearRiver(x, z, 0.6) || onRoad(x, z, 3.4) || inCamp(x, z, 7) || inHut(x, z, 0)) return;
   for (let k = 0; k < 3; k++) {
     const q = r * R(0.6, 1);
     BUSH[(Math.random() * 3) | 0].push([x + R(-0.5, 0.5) * r, r * 0.45, z + R(-0.5, 0.5) * r, 0, R(0, 6), 0, q, q * 0.7, q]);
@@ -382,62 +474,79 @@ for (let i = 0; i < 22; i++) {
     z = roadZ(x) + (i % 2 ? 1 : -1) * R(4.5, 7.5);
   for (let k = 0; k < 3; k++) bush(x + R(-1.4, 1.4), z + R(-1, 1), R(0.4, 0.75));
 }
-// the road: one strip of bare trodden earth. It comes from the start along the river road, turns north and goes round the far
-// side of the altar in a half ring past the three houses, comes back down, rounds the end of the cliff and stops in the low country
+// The roads: strips of bare trodden earth. The main one comes from the start over the first crossing, turns north and goes
+// round the far side of the altar in a half ring past the three houses, comes back down, and runs on east over the second
+// crossing to the camp beyond. The other comes up from the south beside the joined river, over the third crossing, to the altar
 {
   const line = [];
   for (let x = START_X - 10; x < -34; x += 1.5) line.push(V3(x, 0, roadZ(x)));
   // from there on it is one smooth curve: it turns north to the foot of the half ring, goes round it, comes down the far side
-  // the same way, and then bears off round the end of the cliff and away south
+  // the same way, and then heads east
   const through = [V3(-34, 0, roadZ(-34)), V3(-27, 0, 0.6), V3(-22.4, 0, -1.6)];
   for (let t = -1.45; t <= 1.46; t += 0.145) through.push(V3(YARD[0] + RING * Math.sin(t), 0, YARD[1] - RING * Math.cos(t)));
   for (const [x, z] of [
     [22.4, -1.6],
-    [26.5, 6],
-    [36, 14.5],
-    [41, 23],
-    [41.5, 34],
+    [30, -0.4],
+    [45, 0.5],
+    [60, 0.3],
+    [75, 0.2],
+    [90, 0],
+    [100, 2.6],
+    [108, 5.2],
+    [120, 9.2],
+    [134, 14],
   ])
     through.push(V3(x, 0, z));
   const curve = new THREE.CatmullRomCurve3(through, false, 'centripetal');
   line.push(...curve.getSpacedPoints(Math.ceil(curve.getLength() / 0.6)));
-  // how far along the road each point is, and the whole length
-  const along = [0];
-  for (let i = 1; i < line.length; i++) along.push(along[i - 1] + line[i].distanceTo(line[i - 1]));
-  ROADLINE.push(...line);
-  const LEN = along[along.length - 1],
-    pos = [],
-    uv = [],
-    idx = [];
-  line.forEach((p, i) => {
-    const a = line[Math.max(0, i - 1)],
-      b = line[Math.min(line.length - 1, i + 1)],
-      l = Math.hypot(b.x - a.x, b.z - a.z) || 1,
-      nx = -(b.z - a.z) / l,
-      nz = (b.x - a.x) / l,
-      s = along[i],
-      // it keeps its width to the very end and stops in a blunt, rounded tip
-      e = Math.min(1, (LEN - s) / 1.5),
-      end = Math.sqrt(1 - (1 - e) * (1 - e)),
-      // (the strip is cut a little wider than the road looks, because the picture laid on it fades out toward both edges)
-      w = (1.85 + 0.25 * Math.sin(s * 0.7)) * end,
-      w2 = w * (0.9 + 0.15 * Math.sin(s * 0.31 + 1));
-    // (it lies on the ground, just clear of it, whatever the ground's height)
-    {
-      const ax = p.x - nx * w,
-        az = p.z - nz * w,
-        bx = p.x + nx * w2,
-        bz = p.z + nz * w2;
-      pos.push(ax, groundY(ax, az) + 0.05, az, bx, groundY(bx, bz) + 0.05, bz);
-    }
-    uv.push(0, s / 9, 1, s / 9);
-    if (i) idx.push(i * 2 - 2, i * 2 - 1, i * 2, i * 2 - 1, i * 2 + 1, i * 2);
-  });
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  g.setIndex(idx);
-  g.computeVertexNormals();
+  const curve2 = new THREE.CatmullRomCurve3(
+      SOUTH_ROAD.map(([x, z]) => V3(x, 0, z)),
+      false,
+      'centripetal',
+    ),
+    line2 = curve2.getSpacedPoints(Math.ceil(curve2.getLength() / 0.6));
+  ROADS.push(line, line2);
+  ROADLINE.push(...line, ...line2);
+  // a road's strip, from the line of points down its middle
+  const strip = (line) => {
+    // how far along the road each point is, and the whole length
+    const along = [0];
+    for (let i = 1; i < line.length; i++) along.push(along[i - 1] + line[i].distanceTo(line[i - 1]));
+    const LEN = along[along.length - 1],
+      pos = [],
+      uv = [],
+      idx = [];
+    line.forEach((p, i) => {
+      const a = line[Math.max(0, i - 1)],
+        b = line[Math.min(line.length - 1, i + 1)],
+        l = Math.hypot(b.x - a.x, b.z - a.z) || 1,
+        nx = -(b.z - a.z) / l,
+        nz = (b.x - a.x) / l,
+        s = along[i],
+        // it keeps its width to the very end and stops in a blunt, rounded tip
+        e = Math.min(1, (LEN - s) / 1.5),
+        end = Math.sqrt(1 - (1 - e) * (1 - e)),
+        // (the strip is cut a little wider than the road looks, because the picture laid on it fades out toward both edges)
+        w = (1.85 + 0.25 * Math.sin(s * 0.7)) * end,
+        w2 = w * (0.9 + 0.15 * Math.sin(s * 0.31 + 1));
+      // (it lies on the ground, just clear of it, whatever the ground's height)
+      {
+        const ax = p.x - nx * w,
+          az = p.z - nz * w,
+          bx = p.x + nx * w2,
+          bz = p.z + nz * w2;
+        pos.push(ax, groundY(ax, az) + 0.05, az, bx, groundY(bx, bz) + 0.05, bz);
+      }
+      uv.push(0, s / 9, 1, s / 9);
+      if (i) idx.push(i * 2 - 2, i * 2 - 1, i * 2, i * 2 - 1, i * 2 + 1, i * 2);
+    });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    return g;
+  };
   // The road is the plain flat earth colour it always was. The only thing the picture laid along it adds is the edge:
   // instead of a hard line, each side wanders a little and melts into the grass. The picture repeats every nine paces, and joins itself without a seam
   const W = 128,
@@ -475,10 +584,13 @@ for (let i = 0; i < 22; i++) {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapT = THREE.RepeatWrapping;
   tex.anisotropy = 8;
-  const m = new THREE.Mesh(g, toon(0xffffff, { map: tex, transparent: true, depthWrite: false, rim: 0 }));
-  m.receiveShadow = true;
-  m.renderOrder = -1;
-  scene.add(m);
+  const roadM = toon(0xffffff, { map: tex, transparent: true, depthWrite: false, rim: 0 });
+  for (const l of ROADS) {
+    const m = new THREE.Mesh(strip(l), roadM);
+    m.receiveShadow = true;
+    m.renderOrder = -1;
+    scene.add(m);
+  }
 }
 // rocks: small ones anywhere, and a few boulders nobody can walk through
 function rock(x, z, r, solid) {
@@ -489,8 +601,7 @@ for (let i = 0; i < 170; i++) {
   const x = R(X0 - 10, EX + 20),
     z = R(ZN - 10, ZS),
     big = i % 7 === 0;
-  if (onRoad(x, z, 3.4) || inCamp(x, z, 8) || inHut(x, z, 0) || nearCliff(x, z, 0.5) || nearRoad(x, z, 3.2) || nearRiver(x, z, big ? 1 : -1.6))
-    continue;
+  if (onRoad(x, z, 3.4) || inCamp(x, z, 8) || inHut(x, z, 0) || nearRoad(x, z, 3.2) || nearRiver(x, z, big ? 1 : -1.6)) continue;
   rock(x, z, big ? R(0.8, 1.4) : R(0.15, 0.45), big);
 }
 
@@ -547,7 +658,7 @@ for (let i = 0; i < 170; i++) {
     // may something grow here?
     open = (x, z) => {
       if (x < X0 || x > EX - 4 || z < ZN || z > ZS) return false;
-      if (nearRiver(x, z, 0.4) || nearCliff(x, z, 0) || Math.hypot(x, z) < 5.2) return false;
+      if (nearRiver(x, z, 0.4) || Math.hypot(x, z) < 5.2) return false;
       if (HOUSES.some(([q, r]) => Math.hypot(x - q[0], z - q[1]) < r)) return false;
       if (nearRoad(x, z, 2.4)) return false;
       return true;
@@ -589,11 +700,18 @@ for (let i = 0; i < 170; i++) {
         patch(p.x - ((q.z - p.z) / l) * off, p.z + ((q.x - p.x) / l) * off, 3 + ((Math.random() * 3) | 0), 0.7, Math.random() < 0.3 ? 2 : 0);
       }
   }
-  // on the banks of both rivers;
-  for (const c of [WX, EX])
-    for (let z = c === WX ? RIVER_FROM + 2 : ZN; z < ZS; z += 2.5)
+  // on the banks of the rivers;
+  for (const line of RIV)
+    for (let i = 4; i < line.length - 4; i += 5) {
+      const p = line[i],
+        q = line[i + 1],
+        l = Math.hypot(q.x - p.x, q.z - p.z) || 1;
       for (const side of [-1, 1])
-        if (Math.random() < 0.5) patch(riverX(z, c) + side * R(3.3, 4.6), z, 3 + ((Math.random() * 3) | 0), 0.7, Math.random() < 0.25 ? 2 : 0);
+        if (Math.random() < 0.5) {
+          const off = side * R(RW + 1.4, RW + 2.8);
+          patch(p.x - ((q.z - p.z) / l) * off, p.z + ((q.x - p.x) / l) * off, 3 + ((Math.random() * 3) | 0), 0.7, Math.random() < 0.25 ? 2 : 0);
+        }
+    }
   // and round the pond
   for (let i = 0; i < 14; i++) {
     const a = R(0, 6.283),
@@ -606,7 +724,7 @@ for (let i = 0; i < 170; i++) {
 // Water is drawn by its own small shader, kept plain: one blue, a little paler toward the banks, with broad soft bands drifting from the
 // fall toward the camera, a thin white line along each bank and white where the fall lands. The same shader, told it is falling, draws the waterfall.
 const WATER_T = { value: 0 };
-function waterMat(fall, head = RIVER_FROM) {
+function waterMat(fall, head = 0) {
   return new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: !fall,
@@ -631,7 +749,7 @@ function waterMat(fall, head = RIVER_FROM) {
       void main(){
         bool falling = uFall > 0.5;
         float edge = abs(vUv.x - 0.5) * 2.0;
-        float flow = falling ? vUv.y * 6.4 + uT * 4.0 : vZ - uT * 1.4;
+        float flow = falling ? vUv.y * 6.4 + uT * 4.0 : vUv.y - uT * 1.4;
         // plain water: one colour, a little paler toward the banks, with broad soft bands drifting along it
         float band = fbm(vec2(vUv.x * 3.0, flow * 0.3));
         vec3 col = mix(uDeep, uShallow, smoothstep(0.3, 1.0, edge) * 0.6);
@@ -639,7 +757,7 @@ function waterMat(fall, head = RIVER_FROM) {
         // a thin clean line of white along each bank, and white where the fall comes down
         float foam = smoothstep(0.9, 0.97, edge);
         if (falling) foam = max(foam, 0.35 + smoothstep(0.4, 0.7, band) * 0.35);
-        else foam = max(foam, (1.0 - smoothstep(0.0, 3.0, vZ - uHead)) * 0.8);
+        else foam = max(foam, (1.0 - smoothstep(0.0, 3.0, vUv.y - uHead)) * 0.8);
         col = mix(col, uFoam, clamp(foam, 0.0, 1.0));
         float fogF = 1.0 - exp(-uFogD * uFogD * vDepth * vDepth);
         float alpha = falling ? 0.9 * smoothstep(1.0, 0.85, edge) : 0.95;
@@ -647,119 +765,100 @@ function waterMat(fall, head = RIVER_FROM) {
       }`,
   });
 }
-// Each river runs in a channel cut below the ground. The ground itself is not drawn where a channel is; inside the gap are sloping earth
-// banks and the water, well down. Where the road crosses the first river the gap is simply not cut: the crossing is the land itself.
-const DEEP = 0.9,
-  CROSS = 4.5;
-{
-  // the ground leaves two river-shaped holes, the first one broken at the crossing
-  const base = GROUND.onBeforeCompile;
-  GROUND.onBeforeCompile = (sh) => {
-    base(sh);
-    sh.vertexShader =
-      'varying vec3 vWP;\n' +
-      sh.vertexShader.replace('#include <fog_vertex>', '#include <fog_vertex>\nvWP = (modelMatrix * vec4(position, 1.0)).xyz;');
-    sh.fragmentShader =
-      'varying vec3 vWP;\n' +
-      sh.fragmentShader.replace(
-        'void main() {',
-        `void main() {
-float wR = abs(vWP.x - (${WX.toFixed(1)} + 1.6 * sin(vWP.z * 0.16)));
-float eR = abs(vWP.x - (${EX.toFixed(1)} + 1.6 * sin(vWP.z * 0.16 + 1.7)));
-if ((vWP.z > ${RIVER_FROM.toFixed(1)} && abs(vWP.z) > ${CROSS.toFixed(1)} && wR < 2.5) || eR < 2.5) discard;`,
-      );
-  };
-  GROUND.customProgramCacheKey = () => 'ground-with-rivers';
-  GROUND.needsUpdate = true;
-  // one stretch of channel: the water down the middle, a sloping bank on each side
-  const bankMat = toon(0x5c4833, { rim: 0 });
-  const stretch = (z0, z1, c = WX, head = RIVER_FROM) => {
-    const wp = [],
-      wuv = [],
-      bp = [],
-      wi = [],
-      bi = [];
-    let n = 0;
-    for (let z = z0; ; z = Math.min(z1, z + 1), n++) {
-      const cx = riverX(z, c);
-      // (the river follows the land: where the land drops at the cliff, so does the water, in a fall)
-      const gy = landBase(cx, z);
-      wp.push(cx - 2.05, gy - DEEP, z, cx + 2.05, gy - DEEP, z);
-      wuv.push(0, z, 1, z);
-      bp.push(cx - 2.5, gy, z, cx - 2.0, gy - DEEP - 0.05, z, cx + 2.0, gy - DEEP - 0.05, z, cx + 2.5, gy, z);
-      if (n) {
-        const a = n * 2 - 2,
-          q = n * 4 - 4;
-        wi.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
-        bi.push(q, q + 4, q + 1, q + 1, q + 4, q + 5, q + 2, q + 6, q + 3, q + 3, q + 6, q + 7);
-      }
-      if (z >= z1) break;
+// Each river runs in the channel the land dips into (see the lie of the land). The water is a ribbon laid along its course, a
+// little below the level of the ground; the banks are the land itself. Where a crossing is, the ribbon stops and begins again
+// on the far side. Down the picture laid on it, across is from bank to bank and along is the distance downstream, so the bands
+// in the water drift the way it flows.
+const DEEP = 0.9;
+RIV.forEach((line, r) => {
+  const pos = [],
+    uv = [],
+    idx = [];
+  let s = 0,
+    last = -2;
+  line.forEach((p, i) => {
+    const a = line[Math.max(0, i - 1)],
+      b = line[Math.min(line.length - 1, i + 1)],
+      l = Math.hypot(b.x - a.x, b.z - a.z) || 1,
+      nx = -(b.z - a.z) / l,
+      nz = (b.x - a.x) / l;
+    if (i) s += p.distanceTo(line[i - 1]);
+    // (the three ribbons overlap where the rivers meet, so each lies a hair below the last and they do not fight)
+    const y = lift(p.x, p.z) - DEEP - r * 0.006;
+    const hw = RW + WIDER[r];
+    pos.push(p.x - nx * hw, y, p.z - nz * hw, p.x + nx * hw, y, p.z + nz * hw);
+    uv.push(0, s, 1, s);
+    // joined to the point before, unless a crossing lies between
+    if (!atFord(p, 0)) {
+      if (last === i - 1) idx.push(i * 2 - 2, i * 2, i * 2 - 1, i * 2 - 1, i * 2, i * 2 + 1);
+      last = i;
     }
-    const wg = new THREE.BufferGeometry();
-    wg.setAttribute('position', new THREE.Float32BufferAttribute(wp, 3));
-    wg.setAttribute('uv', new THREE.Float32BufferAttribute(wuv, 2));
-    wg.setIndex(wi);
-    scene.add(new THREE.Mesh(wg, waterMat(false, head)));
-    const bg = new THREE.BufferGeometry();
-    bg.setAttribute('position', new THREE.Float32BufferAttribute(bp, 3));
-    bg.setIndex(bi);
-    bg.computeVertexNormals();
-    const bm = new THREE.Mesh(bg, bankMat);
-    bm.receiveShadow = true;
-    scene.add(bm);
-  };
-  stretch(RIVER_FROM, -CROSS);
-  stretch(CROSS, ZS + 30);
-  // the second river has no fall in sight: it comes out of the distance, so there is no foam at its head
-  stretch(ZN - 40, ZS + 30, EX, -999);
-  // the two faces of the crossing, where the land drops to the water on either side of the road
-  for (const sz of [-1, 1]) {
-    const cx = riverX(sz * CROSS),
-      wall = add(scene, new THREE.PlaneGeometry(5, DEEP + 0.1), bankMat, [cx, -(DEEP + 0.1) / 2, sz * CROSS]);
-    wall.castShadow = false;
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  // only the west arm has a fall at its head, and so foam there
+  scene.add(new THREE.Mesh(g, waterMat(false, r ? -999 : 0)));
+  // nobody walks through water: a row of blocking circles down the middle of each river, left open at the crossings
+  for (let i = 0; i < line.length; i += 3) if (!atFord(line[i], RW - 0.8 + WIDER[r])) SOLIDS.push({ x: line[i].x, z: line[i].z, r: RW - 0.8 + WIDER[r] });
+  // Near a crossing the circles down the middle stop short, and alone they would leave the water by either bank open to anyone
+  // coming off the crossing at an angle. So for ten paces either side of each crossing, two more rows stand in the water, one
+  // toward each bank, starting right where the dry way over ends
+  for (let i = 0; i < line.length; i += 2) {
+    const p = line[i];
+    if (atFord(p, 0.6) || !FORDS.some((f) => Math.hypot(p.x - f[0], p.z - f[1]) < FORD_R + 10)) continue;
+    const a = line[Math.max(0, i - 1)],
+      b = line[Math.min(line.length - 1, i + 1)],
+      l = Math.hypot(b.x - a.x, b.z - a.z) || 1,
+      hw = RW + WIDER[r];
+    for (const k of [-0.62, 0.62]) SOLIDS.push({ x: p.x - ((b.z - a.z) / l) * hw * k, z: p.z + ((b.x - a.x) / l) * hw * k, r: hw * 0.45 });
   }
-  // nobody walks through water: two rows of blocking circles down each river, the first left open at the crossing
-  for (let z = RIVER_FROM; z <= ZS + 6; z += 1.2)
-    if (Math.abs(z) > CROSS + 0.9) for (const o of [-1.2, 1.2]) SOLIDS.push({ x: riverX(z) + o, z, r: 1.5 });
-  for (let z = ZN - 6; z <= ZS + 6; z += 1.2) for (const o of [-1.2, 1.2]) SOLIDS.push({ x: riverX(z, EX) + o, z, r: 1.5 });
-}
+});
 
 // ---------- waterfall ----------
 // a wall of rock on the far side, the water coming over it in a sheet and breaking into foam where it lands
-const FALL = V3(riverX(RIVER_FROM), 0, RIVER_FROM);
+const FALL = V3(WX, 0, RIVER_FROM);
 {
-  for (let i = 0; i < 16; i++) {
-    const x = FALL.x + R(-6, 6),
-      r = R(1.6, 3.2);
-    add(
-      scene,
-      new THREE.DodecahedronGeometry(r, 0),
-      ROCKM[i % 2],
-      [x, R(0.5, 4.5), FALL.z - R(1.2, 4.5)],
-      [R(0, 6), R(0, 6), R(0, 6)],
-      [1.2, 1.3, 1],
-    );
-  }
+  // rocks along both edges of the drop, smaller and flatter toward the top, so the face the water goes over reads as stone
   for (const sx of [-1, 1])
-    for (let i = 0; i < 3; i++)
+    for (let i = 0; i < 9; i++) {
+      const up = i / 8,
+        r = R(0.7, 1.4) * (1.25 - up * 0.5);
       add(
         scene,
-        new THREE.DodecahedronGeometry(R(1.2, 2), 0),
+        new THREE.DodecahedronGeometry(r, 0),
         ROCKM[i % 2],
-        [FALL.x + sx * R(3, 4.4), R(0.6, 3.6), FALL.z - R(0, 1.2)],
+        [FALL.x + sx * (RW - 0.2 + R(0, 2.2)), -0.6 + up * HIGH, FALL.z + 0.4 - up * 2.2 + R(-0.4, 0.4)],
         [R(0, 6), R(0, 6), R(0, 6)],
+        [1.3, 0.75, 1.1],
       );
+    }
   for (let x = -7; x <= 7; x += 1.6) SOLIDS.push({ x: FALL.x + x, z: FALL.z - 2.2, r: 2 });
-  const sheet = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 6.4 + DEEP), waterMat(true));
-  sheet.position.set(FALL.x, 3.2 - DEEP / 2, FALL.z - 0.7);
-  sheet.rotation.x = -0.09;
-  scene.add(sheet);
-  // beyond the fall the river's line carries on as a ridge of rock to the far limit, so the first river shuts the whole west side
-  for (let z = RIVER_FROM - 6; z > ZN - 8; z -= 3) {
-    const r = R(2, 3.2);
-    ROCK[(Math.random() * 2) | 0].push([WX + R(-1.5, 1.5), R(0.4, 1.6), z, R(0, 6), R(0, 6), R(0, 6), r * 1.2, r * 1.3, r]);
-    SOLIDS.push({ x: WX, z, r: 2.6 });
+  // the falling water: a sheet that leaves the end of the upper river at the lip, bows a little outward as it drops, and lands
+  // in the start of the lower one, so the three are one piece of water
+  const pos = [],
+    uv = [],
+    idx = [],
+    N = 12,
+    top = HIGH - DEEP,
+    lip = FALL.z - 1.6;
+  for (let j = 0; j <= N; j++) {
+    const t = j / N,
+      y = top - (top + DEEP + 0.05) * t * t,
+      z = lip + 2 * Math.sqrt(t),
+      // a touch wider where it lands, where it spreads
+      w = RW - 0.3 + 0.4 * t;
+    pos.push(FALL.x - w, y, z, FALL.x + w, y, z);
+    uv.push(0, 1 - t, 1, 1 - t);
+    if (j) idx.push(j * 2 - 2, j * 2, j * 2 - 1, j * 2 - 1, j * 2, j * 2 + 1);
   }
+  const sg = new THREE.BufferGeometry();
+  sg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  sg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  sg.setIndex(idx);
+  const sheet = new THREE.Mesh(sg, waterMat(true));
+  scene.add(sheet);
 }
 // ---------- the compound ----------
 {
@@ -795,16 +894,6 @@ const FALL = V3(riverX(RIVER_FROM), 0, RIVER_FROM);
       SOLIDS.push({ x, z, r: 0.4 });
     }
 }
-// ---------- the cliff ----------
-// The cliff is the land itself (see the lie of the land, above): a steep face of bare rock. It needs little dressing: only
-// here and there a crag standing out of the face, and a scatter of fallen stones along its foot.
-// A line of blocking circles down the middle of the face keeps everyone from walking up or down it
-for (let x = CLIFF_FROM; x <= CLIFF_END + 1; x += 2.1) SOLIDS.push({ x, z: cliffZ(x), r: 1.5 });
-for (let x = CLIFF_FROM + 3; x <= CLIFF_END - 3; x += R(7, 12)) {
-  const r = R(0.9, 1.5);
-  ROCK[(Math.random() * 2) | 0].push([x, 0.1 * r, cliffZ(x) + 0.5 + R(-0.3, 0.3), R(0, 6), R(0, 6), R(0, 6), r * 1.2, r * 1.2, r]);
-}
-for (let x = CLIFF_FROM + 1; x <= CLIFF_END; x += R(2.5, 6)) rock(x, cliffZ(x) + R(2.4, 4.6), R(0.25, 0.75), false);
 // every lot is now complete: each becomes one batch
 for (const l of LOTS) {
   const m = new THREE.InstancedMesh(l.geo, l.mat, l.length),
@@ -1315,8 +1404,8 @@ function prisoner(x, z, i, job, ends) {
   return p;
 }
 // ---------- the camps ----------
-// There are five. The first is the one by the road, where the prisoners sit bound. In the other four, scattered over the map,
-// the demons have their prisoners at work, hoeing or hauling sacks, under a ragged red banner by a fire.
+// There are three. The first is the one by the road, where the prisoners sit bound. In the other two, each outside the fork
+// of the rivers and beyond a crossing, the demons have their prisoners at work, hoeing or hauling sacks, under a ragged red banner by a fire.
 // Every camp works the same way: its demons stand idle until a brother comes near or one of them is hurt, then all go for whichever
 // brother is closest; once they are dead its prisoners can be freed, and those bow and walk to the hermitage to sit before the houses.
 SPAWN_MAX = 40;
@@ -1329,29 +1418,16 @@ const CAMPS = [],
   });
 // (the first three are taken by the men from the camp by the road)
 let seatsTaken = 3;
-// the way from where a man stands to his seat: straight there, unless the cliff is in the way, when he goes round its end,
-// or it would take him across the altar, when he goes round that
+// the way from where a man stands to his seat: straight there, unless that would take him across the altar, when he goes round it.
+// A camp outside the fork gives the first part of the way itself: to its crossing, over it, and in
 function route(P, seat) {
-  const way = [];
-  let ax = P.x,
-    az = P.z;
-  // from the low country south of the cliff he must first go round its end and up the road
-  if (az > cliffZ(ax) && ax < CLIFF_END + 4) {
-    way.push([38, 19], [25, 4]);
-    [ax, az] = [25, 4];
-  } else if (az > 12 && ax >= CLIFF_END + 4) {
-    way.push([25, 4]);
-    [ax, az] = [25, 4];
-  }
-  const dx = seat[0] - ax,
-    dz = seat[1] - az,
-    t = Math.max(0, Math.min(1, -(ax * dx + az * dz) / (dx * dx + dz * dz))),
-    cx = ax + dx * t,
-    cz = az + dz * t,
+  const dx = seat[0] - P.x,
+    dz = seat[1] - P.z,
+    t = Math.max(0, Math.min(1, -(P.x * dx + P.z * dz) / (dx * dx + dz * dz))),
+    cx = P.x + dx * t,
+    cz = P.z + dz * t,
     d = Math.hypot(cx, cz);
-  if (d < 9) way.push(d > 0.5 ? [(cx / d) * 11.5, (cz / d) * 11.5] : [-dz > 0 ? 11.5 : -11.5, 0]);
-  way.push(seat);
-  return way;
+  return d < 9 ? [d > 0.5 ? [(cx / d) * 11.5, (cz / d) * 11.5] : [-dz > 0 ? 11.5 : -11.5, 0], seat] : [seat];
 }
 // a camp: where it is, which demons [kind, dx, dz] guard it, and its prisoners, already made
 function camp(x, z, guards, prisoners, watch) {
@@ -1366,7 +1442,8 @@ function camp(x, z, guards, prisoners, watch) {
       if (!h) return;
       const hp = h.group.position;
       if (Math.hypot(hp.x - d.g.position.x, hp.z - d.g.position.z) > d.rng + 0.8) return;
-      h.hp = Math.max(0, h.hp - (d.br ? 18 : d.pi ? 4 : 6));
+      const [lo, hi] = d.def.dmg;
+      h.hp = Math.max(0, h.hp - Math.round(lo + Math.random() * (hi - lo)));
       puff(tmpA.set(hp.x, 1.2, hp.z), 0xff6a50, 12, 2.6, 0.3, 2);
     };
     return d;
@@ -1427,26 +1504,9 @@ function workCamp(x, z, guards, jobs) {
   men.forEach((m) => m.job === 'dig' && (m.g.rotation.y = Math.PI));
   return camp(x, z, guards, men, V3(x, 0, z - 4));
 }
+// up north, beyond the hall and the cow's shelter, off any road
 workCamp(
   ...WORK[0],
-  [
-    ['grunt', -3.5, 1.5],
-    ['grunt', 3, -2],
-    ['pish', 1, 3],
-  ],
-  ['dig', 'dig', 'carry'],
-);
-workCamp(
-  ...WORK[1],
-  [
-    ['brute', 4, 1],
-    ['grunt', -3.5, -1],
-    ['grunt', 0.5, 3.4],
-  ],
-  ['carry', 'dig', 'carry'],
-);
-workCamp(
-  ...WORK[2],
   [
     ['brute', -4, 0.5],
     ['grunt', 3.5, 2],
@@ -1454,17 +1514,27 @@ workCamp(
     ['pish', -1.5, 3.2],
   ],
   ['dig', 'carry', 'dig'],
-);
+).via = [
+  [48, -50],
+  [50, -10],
+  [31, -0.5],
+];
+// beyond the south crossing, down the far bank of the west arm: the furthest, and the most strongly held
 workCamp(
-  ...WORK[3],
+  ...WORK[1],
   [
-    ['grunt', -3.6, 1],
-    ['grunt', 3.4, 1.6],
-    ['pish', 0, 3.4],
-    ['pish', -2, -2.4],
+    ['brute', 4, 1],
+    ['grunt', -3.5, -1],
+    ['grunt', 0.5, 3.4],
+    ['pish', -2, 3],
+    ['pish', 2.6, -2.6],
   ],
-  ['carry', 'dig', 'dig'],
-);
+  ['carry', 'dig', 'carry'],
+).via = [
+  [-9, 47.5],
+  [0.4, 41.9],
+  [0.2, 31],
+];
 function campUpdate(dt) {
   const me = SEL.group.position;
   for (const c of CAMPS) {
@@ -1472,7 +1542,10 @@ function campUpdate(dt) {
       far = apart(me, c) > 62;
     if (!c.roused)
       c.roused =
-        live.length < c.guards.length || live.some((d) => d.hp < d.hp0 || d.wob > 0.2) || HEROES.some((h) => apart(h.group.position, c) < 16);
+        live.length < c.guards.length ||
+        live.some((d) => d.hp < d.hp0 || d.wob > 0.2) ||
+        // (at the first camp, the guards do not notice the brothers until the prisoners' cry has been heard out)
+        ((!c.first || c.seen) && HEROES.some((h) => apart(h.group.position, c) < 16));
     for (const d of live) {
       // far off and still idle, a guard is put to sleep and hidden: he costs nothing until someone comes
       d.asleep = far && !c.roused;
@@ -1486,6 +1559,26 @@ function campUpdate(dt) {
       // near enough to club or claw a man, not the long reach they keep from the altar fire
       d.rng = d.br ? 2.3 : d.pi ? 1.3 : 1.5;
     }
+    // at the first camp, the moment the brothers come in sight of it, the prisoners cry out and a guard answers them; only after
+    // that does rescuing them become an objective
+    if (c.first && !c.cried && !talking() && HEROES.some((h) => apart(h.group.position, c) < 15)) {
+      c.cried = true;
+      // (nobody moves while it is said)
+      LOCK = true;
+      const g = live.find((d) => !d.br) || live[0],
+        p = c.prisoners;
+      say(
+        [
+          { who: 'Villager', face: snap(p[0].rig.bone.head, p[0].g.rotation.y, null), text: 'Please, let us go!' },
+          { who: 'Rakshasa', face: g && g.rig.bone.head ? snap(g.rig.bone.head, g.g.rotation.y, null) : '', text: 'Shut up, dinner!' },
+          { who: 'Villager', face: snap(p[p.length - 1].rig.bone.head, p[p.length - 1].g.rotation.y, null), text: 'Help!' },
+        ],
+        () => {
+          c.seen = true;
+          LOCK = false;
+        },
+      );
+    }
     const allUp = c.prisoners.every((p) => p.free && p.up >= 1);
     // at the first camp, the moment the last of them is on his feet they thank the brothers. Nobody moves until it has been said
     if (c.first && allUp && !c.thanked) {
@@ -1496,9 +1589,12 @@ function campUpdate(dt) {
         [
           { who: 'Villager', face: f[0], text: 'You came! We thought no one would.' },
           { who: 'Elder', face: f[1], text: 'They dragged us from the hermitage at dawn, to spill our blood on the sage’s altar. Bless you both.' },
-          { who: 'Rama', face: RAMA.face, text: 'Go to Vishwamitra. You will be safe by his fire.' },
+          { who: 'Rama', face: photo(RAMA), text: 'Go to Vishwamitra. You will be safe by his fire.' },
         ],
-        () => (LOCK = false),
+        () => {
+          LOCK = false;
+          c.rescued = true;
+        },
       );
     }
     // with the demons dead, the bound ones are freed one by one as a brother reaches each; the workers all at once, as soon as one comes near
@@ -1549,7 +1645,12 @@ function campUpdate(dt) {
         if (allUp) p.nam = Math.min(1, p.nam + dt / 0.7);
         if (p.nam >= 1 && !talking() && (p.hold += dt) > (c.first ? 0.8 : 1.6) + p.wait) {
           p.go = true;
-          if (!p.path.length) p.path = route(P, VSEATS[Math.min(VSEATS.length - 1, seatsTaken++)]);
+          if (!p.path.length) {
+            // (out by the camp's own way to its crossing and in, then on to his seat)
+            const via = c.via || [],
+              from = via.length ? { x: via[via.length - 1][0], z: via[via.length - 1][1] } : P;
+            p.path = [...via, ...route(from, VSEATS[Math.min(VSEATS.length - 1, seatsTaken++)])];
+          }
         }
         // on his feet he turns to whoever freed him
         const q = p.by.group.position;
@@ -1560,7 +1661,10 @@ function campUpdate(dt) {
           dx = w ? w[0] - P.x : -P.x,
           dz = w ? w[1] - P.z : -P.z,
           l = Math.hypot(dx, dz) || 1,
-          moving = w && p.nam <= 0;
+          // (nobody walks on while someone is speaking)
+          moving = w && p.nam <= 0 && p.sit <= 0 && !talking();
+        // one given somewhere new to go while sitting gets up first
+        if (w) p.sit = Math.max(0, p.sit - dt / 0.6);
         // he walks the way he is facing and turns gradually toward the next point, so a corner is a curve, not a pivot.
         // A point on the way counts as reached from three paces off, which starts the turn early; only the last is walked right up to,
         // and he slows over the final stretch so he does not circle it
@@ -1586,15 +1690,62 @@ function campUpdate(dt) {
   }
 }
 
+// ---------- the men's orders ----------
+// After Vishwamitra's talk, the men freed from the first camp are sitting by the fire. Walk up to them and Rama sets them to
+// gathering wood for the night; they get up and go to the wood store. Before they go they tell him of the two other camps, north
+// and south, and that there is time to reach only one before dark. The player chooses by going: the first camp a brother comes
+// near becomes the objective
+const ORDER = { done: false, pick: null };
+function orderUpdate() {
+  // the choice is made by going: whichever of the two camps a brother comes near first is the one he has chosen
+  if (ORDER.done && !ORDER.pick) {
+    const near = (c) => HEROES.some((h) => apart(h.group.position, c) < 30);
+    if (near(CAMPS[1])) ORDER.pick = 'north';
+    else if (near(CAMPS[2])) ORDER.pick = 'south';
+  }
+  if (ORDER.asked || !ARR.talked || LOCK || talking()) return;
+  const men = CAMPS[0].prisoners,
+    P = SEL.group.position;
+  if (!men.some((p) => p.sit >= 1 && apart(P, p.g.position) < 5)) return;
+  ORDER.asked = true;
+  LOCK = true;
+  const f = men.map((p) => snap(p.rig.bone.head, p.g.rotation.y, null)),
+    elder = f[1] || f[0];
+  say(
+    [
+      { who: 'Rama', face: photo(RAMA), text: 'Rest is over, friends. The fire must burn through the night. Gather all the wood you can.' },
+      { who: 'Elder', face: elder, text: 'Gladly, prince. But hear this first: they hold two more camps, with our people in both.' },
+      { who: 'Villager', face: f[0], text: 'One north, past the hall. One south, over the river. They move them at dusk.' },
+      { who: 'Elder', face: elder, text: 'You will not reach both before dark. Choose well, prince.' },
+    ],
+    () => {
+      LOCK = false;
+      ORDER.done = true;
+      // off they go to the wood store, each to his own place beside it
+      men.forEach((p, i) => {
+        p.path = route(p.g.position, [WOODSHED[0] + 2.2 - i * 1.4, WOODSHED[1] + 2.6 + i * 0.6]);
+        p.wait = 0;
+      });
+    },
+  );
+}
+
 // ---------- arriving at the hermitage ----------
 // When the brother you are playing comes near the altar with no enemy about, the scene takes over:
-//   seat   both walk to their places before the fire, sit and bow
-//   pause  a moment after both are down...
-//   om     ...Vishwamitra, eyes shut, makes them wait through one long Om
-//   come   then he rises and walks over to them
-//   talk   he tells them why they are here
-//   back   he returns to his seat by the fire and sits
-//   up     the brothers rise, and the level is the player's again
+// Each step is named for who is doing what, so no two can be mistaken for each other:
+//   wait           (before it starts) until a brother comes near the altar
+//   brothersSit    both walk to their places before the fire, sit and bow
+//   hush           a moment after both are down...
+//   sageOm         ...Vishwamitra, eyes shut, makes them wait through one long Om
+//   sageRises      he gets to his feet, unhurried
+//   sageComes      and walks round the fire to them
+//   sageGreets     he stops before them and begins
+//   sageTalks      he tells them why they are here
+//   sageReturns    he goes back to his seat by the fire and sits
+//   sageOffers     seated, eyes shut, he makes an offering to the fire: it flares, and the astra passes from it to Rama
+//   ramaReceives   Rama sits still while he receives it
+//   brothersRise   the brothers get up, and the level is the player's again
+//   done           (after it) nothing more happens
 // the brothers sit off the road, to the near left of the fire. Vishwamitra goes round the fire to them by way of SAGE_VIA, not through it
 const SEATS = { rama: V3(-4.3, 0, 4.5), lak: V3(-5.3, 0, 3.5) },
   SAGE_HOME = V3(0, 0, -2),
@@ -1626,7 +1777,8 @@ DIRECT = (h) => {
   IN.walk = IN.fire = false;
   IN.at = null;
   firing = false;
-  if (ARR.step === 'up') {
+  if (ARR.talked) {
+    // (after the talk: up off the ground, standing)
     move = 'idle';
     namaste = false;
   } else if (ARR.step !== 'wait' && ARR.step !== 'done') {
@@ -1689,38 +1841,38 @@ function arriveUpdate(dt) {
     const clear = !grunts.some((d) => !d.dead && Math.hypot(d.g.position.x - P.x, d.g.position.z - P.z) < 25);
     if (!LOCK && !talking() && clear && Math.hypot(P.x, P.z) < 9) {
       LOCK = true;
-      to('seat');
+      to('brothersSit');
     }
-  } else if (A.step === 'seat') {
+  } else if (A.step === 'brothersSit') {
     // once both are seated the camera passes over to Vishwamitra at the altar, and stays with him as he comes across and goes back
     if (HEROES.every((h) => h.sat && h.s.wSit > 0.9)) {
       CAM = V.group.position;
-      to('pause');
+      to('hush');
     }
-  } else if (A.step === 'pause') {
+  } else if (A.step === 'hush') {
     // then he keeps them waiting. His eyes close, and he says one long Om before anything else happens: patience.
     // The brothers hold their bow all through it, and until he has come over and begins to speak
     if (A.t > 1.5) {
       sageEyes(true);
-      say([{ who: 'Vishwamitra', face: snap(V.bone.head, V.group.rotation.y, null), text: 'Om…' }], () => to('rise'));
-      to('om');
+      say([{ who: 'Vishwamitra', face: snap(V.bone.head, V.group.rotation.y, null), text: 'Om…' }], () => to('sageRises'));
+      to('sageOm');
     }
-  } else if (A.step === 'rise') {
+  } else if (A.step === 'sageRises') {
     // three more seconds of stillness after the Om. His eyes open near the end of it, and then he gets up
     if (A.t > 2.3) sageEyes(false);
     if (A.t > 3) {
       SG.at = V.group.position.clone();
-      to('come');
+      to('sageComes');
     }
-  } else if (A.step === 'come') {
+  } else if (A.step === 'sageComes') {
     if (!A.via) A.via = sageWalk(SAGE_VIA, dt, true);
     else if (sageWalk(SAGE_MEET, dt)) {
       SG.move = 'idle';
       // he turns to face them, unhurriedly (see the top of this function)
       A.face = Math.atan2(-4.8 - SAGE_MEET.x, 4 - SAGE_MEET.z);
-      to('greet');
+      to('sageGreets');
     }
-  } else if (A.step === 'greet') {
+  } else if (A.step === 'sageGreets') {
     if (A.t > 0.6) {
       A.bow = false;
       const f = snap(V.bone.head, V.group.rotation.y, null);
@@ -1734,43 +1886,61 @@ function arriveUpdate(dt) {
           },
           { who: 'Vishwamitra', face: f, text: 'The rakshasas know it. Maricha and Subahu send their kind to foul the altar with blood and filth.' },
           { who: 'Vishwamitra', face: f, text: 'You met some on the road. More will come with the dark, and from every side.' },
-          { who: 'Rama', face: RAMA.face, text: 'Then tend your fire, Gurudev. Nothing will reach it while we stand.' },
+          { who: 'Rama', face: photo(RAMA), text: 'Then tend your fire, Gurudev. Nothing will reach it while we stand.' },
           { who: 'Vishwamitra', face: f, text: 'Guard the fire. That is all I ask of you.' },
+          { who: 'Vishwamitra', face: f, text: 'And take this, Rama. The Agneyastra: Agni himself, bound to an arrow.' },
+          { who: 'Vishwamitra', face: f, text: 'Call on it when the bow alone will not do. It asks for your strength each time.' },
         ],
         () => {
           A.via = false;
           A.face = null;
-          to('back');
+          // the talk is over: the camera goes straight back to the brother being played, and does not follow the sage home.
+          // The brothers stay as they are, seated and still, until he has given the astra from his own seat (see 'sageOffers')
+          CAM = null;
+          to('sageReturns');
         },
       );
-      to('talk');
+      to('sageTalks');
     }
-  } else if (A.step === 'back') {
+  } else if (A.step === 'sageReturns') {
     if (!A.via) A.via = sageWalk(SAGE_VIA, dt, true);
     else if (sageWalk(SAGE_HOME, dt)) {
-      // he sits; over the next moment he is eased the last hand's breadth onto his own spot (see 'up')
+      // he sits; over the next moment he is eased the last hand's breadth onto his own spot (see 'sageOffers')
       SG.yaw = null;
       SG.pathA = Math.PI;
       SG.move = 'sit';
-      // the camera drifts back to the brother being played
-      CAM = SEL.group.position;
-      to('up');
+      to('sageOffers');
     }
-  } else if (A.step === 'up') {
+  } else if (A.step === 'sageOffers') {
     if (SG.at) SG.at.lerp(SAGE_HOME, Math.min(1, dt * 6));
-    if (A.t > 0.6) {
-      SG.at = null;
-      LOCK = false;
+    if (A.t > 0.6) SG.at = null;
+    // Seated again, he shuts his eyes. The astra is given at the moment his hand next goes out to the fire with an offering
+    // (he makes one every 3.4 seconds while he sits: see the sage's own file), so the fire flares under his hand and the
+    // flames that cross to Rama are plainly his doing
+    if (A.t > 0.8) sageEyes(true);
+    const cyc = (T % 3.4) / 3.4;
+    if (A.t > 1.2 && SG.wSit > 0.95 && cyc > 0.27 && cyc < 0.36) {
+      giveAstra(1);
+      to('ramaReceives');
     }
-    if (A.t > 1.8) {
-      CAM = null;
+  } else if (A.step === 'ramaReceives') {
+    // Rama sits through it without moving. When the last of it has gone into him the sage opens his eyes, and the brothers rise
+    if (!(ASTRA.fx > 0) && A.t > 0.5) {
+      sageEyes(false);
+      A.talked = true;
+      HEROES.forEach((h) => (h.sat = false));
+      to('brothersRise');
+    }
+  } else if (A.step === 'brothersRise') {
+    if (A.t > 0.7) {
+      LOCK = false;
       to('done');
     }
   }
 }
 
 // ---------- the minimap ----------
-// A small map of the whole level in the bottom right corner, north at the top, in the manner of the old strategy games.
+// A small map of the level in the bottom right corner, north at the top, in the manner of the old strategy games.
 // It appears once Vishwamitra has had his say. The ground, trees, rivers, road, pond, houses and altar are painted once;
 // over them, a few times a second, go the things that move or change:
 //   a red pennant   a camp whose demons are still alive
@@ -1778,11 +1948,13 @@ function arriveUpdate(dt) {
 //   pale dots       prisoners: dim while held, bright once freed
 //   blue and gold   Rama and Lakshmana, the one you are playing ringed in white
 // It makes its own elements and carries its own styles, like the dialogue box
-const MINI = { W: 252, shown: false, n: 0 };
+const MINI = { W: 200, shown: false, n: 0 };
+const VIEW = new THREE.Vector3();
 {
-  // (it shows the land between the two rivers and no more: they are the limits, and each runs down one edge of it)
-  const XL = WX - 3.5,
-    XR = EX + 3.5,
+  // (it shows exactly the land you can walk on: from the west limit, past the first river's left bank, to the east limit,
+  // and the north and south limits, so its edges are the edges of the playing ground)
+  const XL = X0,
+    XR = EX - 3.5,
     W = MINI.W,
     H = Math.round((W * (ZS - ZN)) / (XR - XL)),
     k = W / (XR - XL),
@@ -1807,15 +1979,6 @@ const MINI = { W: 252, shown: false, n: 0 };
   g.scale(2, 2);
   g.fillStyle = '#74904f';
   g.fillRect(0, 0, W, H);
-  // the low country is a shade darker, by how far down it is, so the cliff and the hillside show
-  for (let py = 0; py < H; py += 2)
-    for (let px = 0; px < W; px += 2) {
-      const low = -landBase(XL + px / k, ZN + py / k) / DROP;
-      if (low > 0.02) {
-        g.fillStyle = `rgba(30,48,28,${(0.34 * low).toFixed(3)})`;
-        g.fillRect(px, py, 2, 2);
-      }
-    }
   g.fillStyle = 'rgba(58,104,52,.75)';
   for (const t of WOODS) {
     g.beginPath();
@@ -1830,33 +1993,19 @@ const MINI = { W: 252, shown: false, n: 0 };
     pts.forEach(([x, z], i) => (i ? g.lineTo(mx(x), my(z)) : g.moveTo(mx(x), my(z))));
     g.stroke();
   };
-  const course = (c, z0) => {
-    const pts = [];
-    for (let z = z0; z <= ZS; z += 2) pts.push([riverX(z, c), z]);
-    return pts;
-  };
-  stroke(
-    [
-      [WX, ZN],
-      [WX, RIVER_FROM],
-    ],
-    '#8a8f96',
-    3,
-  );
-  stroke(course(WX, RIVER_FROM), '#4a9fd0', 3.4);
-  stroke(course(EX, ZN), '#4a9fd0', 3.4);
-  {
-    const pts = [];
-    for (let x = CLIFF_FROM; x <= CLIFF_END; x += 2) pts.push([x, cliffZ(x)]);
-    stroke(pts, '#6a6258', 4);
-    stroke(pts, '#9a948a', 1.6);
-  }
-  // (the crossing: the road's own colour laid over the first river)
-  stroke(
-    ROADLINE.map((p) => [p.x, p.z]),
-    '#c9ad7a',
-    2.4,
-  );
+  for (const line of RIV)
+    stroke(
+      line.filter((_, i) => i % 4 === 0).map((p) => [p.x, p.z]),
+      '#4a9fd0',
+      5.4,
+    );
+  // (the roads go on over the rivers: those are the crossings)
+  for (const line of ROADS)
+    stroke(
+      line.filter((_, i) => i % 3 === 0).map((p) => [p.x, p.z]),
+      '#c9ad7a',
+      2.4,
+    );
   g.fillStyle = '#4a9fd0';
   g.beginPath();
   g.arc(mx(POND[0]), my(POND[1]), 3.8 * k, 0, 7);
@@ -1899,7 +2048,7 @@ const MINI = { W: 252, shown: false, n: 0 };
   };
   MINI.draw = () => {
     if (!MINI.shown) {
-      if (ARR.step !== 'done') return;
+      // (for now it shows from the start; it used to wait for the sage's talk to end: ARR.step === 'done')
       MINI.shown = true;
       box.style.opacity = 1;
     }
@@ -1922,10 +2071,46 @@ const MINI = { W: 252, shown: false, n: 0 };
       }
       for (const e of live) if (!e.asleep && c.roused) dot(e.g.position.x, e.g.position.z, e.br ? 2.6 : 1.9, '#ff4a36', '#3a0c08');
     }
+    // what is on screen: where the corners of the view meet the ground. The map outside it is shaded a little darker, so the
+    // part in view stands out as a lighter green, with no line drawn round it
+    d.beginPath();
+    d.rect(0, 0, W, H);
+    [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+    ].forEach(([sx, sy], i) => {
+      const v = VIEW.set(sx, sy, 0.5).unproject(cam).sub(cam.position),
+        t = v.y < -1e-4 ? Math.min(-cam.position.y / v.y, 400) : 400,
+        x = mx(cam.position.x + v.x * t),
+        y = my(cam.position.z + v.z * t);
+      i ? d.lineTo(x, y) : d.moveTo(x, y);
+    });
+    d.closePath();
+    d.fillStyle = 'rgba(20,30,12,.2)';
+    d.fill('evenodd');
+    // each brother as a small arrow pointing the way he faces; the one you are playing larger and ringed
     for (const h of HEROES) {
-      const P = h.group.position;
-      if (h === SEL) dot(P.x, P.z, 5.4, 'rgba(255,255,255,.28)');
-      dot(P.x, P.z, 3.2, h.name === 'rama' ? '#4a8cf0' : '#e8a53c', '#ffffff');
+      const P = h.group.position,
+        f = h === SEL ? facing : h.s ? h.s.facing : 0,
+        fx = Math.sin(f),
+        fy = Math.cos(f),
+        k = h === SEL ? 1.25 : 1,
+        x = mx(P.x),
+        y = my(P.z);
+      if (h === SEL) dot(P.x, P.z, 6.4, 'rgba(255,255,255,.28)');
+      d.beginPath();
+      d.moveTo(x + fx * 6 * k, y + fy * 6 * k);
+      d.lineTo(x - fx * 3.5 * k + fy * 4 * k, y - fy * 3.5 * k - fx * 4 * k);
+      d.lineTo(x - fx * 1.5 * k, y - fy * 1.5 * k);
+      d.lineTo(x - fx * 3.5 * k - fy * 4 * k, y - fy * 3.5 * k + fx * 4 * k);
+      d.closePath();
+      d.fillStyle = h.name === 'rama' ? '#4a8cf0' : '#e8a53c';
+      d.fill();
+      d.lineWidth = 1.2;
+      d.strokeStyle = '#ffffff';
+      d.stroke();
     }
   };
 }
@@ -1960,16 +2145,25 @@ const EDGE = new THREE.InstancedMesh(
   EDGE.visible = false;
   scene.add(EDGE);
 }
-// the line that holds the brothers at the camp: the same dashes, across the map from the far limit to the near one
-const HOLD = new THREE.InstancedMesh(EDGE.geometry, EDGE.material.clone(), Math.floor((ZS - ZN) / 1.5));
+// the box that holds the brothers at the first camp: the same dashes, on its north, east and south sides
+const HOLD_DASH = [];
+for (const [x0, z0, x1, z1] of [
+  [HOLD_X + 0.45, HOLD_N, HOLD_X + 0.45, HOLD_S],
+  [X0, HOLD_N - 0.45, HOLD_X, HOLD_N - 0.45],
+  [X0, HOLD_S + 0.45, HOLD_X, HOLD_S + 0.45],
+]) {
+  const len = Math.hypot(x1 - x0, z1 - z0);
+  for (let t = 0; t < len; t += 1.5) HOLD_DASH.push([x0 + ((x1 - x0) * t) / len, z0 + ((z1 - z0) * t) / len, x0 === x1 ? Math.PI / 2 : 0]);
+}
+const HOLD = new THREE.InstancedMesh(EDGE.geometry, EDGE.material.clone(), HOLD_DASH.length);
 {
   const o = new THREE.Object3D();
-  o.rotation.set(-Math.PI / 2, Math.PI / 2, 0, 'YXZ');
-  for (let i = 0; i < HOLD.count; i++) {
-    o.position.set(HOLD_X + 0.45, groundY(HOLD_X + 0.45, ZN + i * 1.5) + 0.06, ZN + i * 1.5);
+  HOLD_DASH.forEach(([x, z, a], i) => {
+    o.position.set(x, groundY(x, z) + 0.06, z);
+    o.rotation.set(-Math.PI / 2, a, 0, 'YXZ');
     o.updateMatrix();
     HOLD.setMatrixAt(i, o.matrix);
-  }
+  });
   HOLD.frustumCulled = false;
   HOLD.visible = false;
   scene.add(HOLD);
@@ -1987,14 +2181,16 @@ function sceneryUpdate(dt) {
     EDGE.visible = m.opacity > 0.01;
     // the holding line shows the same way while it is in force, and fades out for good once the prisoners are free
     const hm = HOLD.material,
-      hn = captive() ? Math.max(0, Math.min(1, 1 - (HOLD_X - P.x) / 3)) : 0;
+      hn = captive() ? Math.max(0, Math.min(1, 1 - Math.min(HOLD_X - P.x, P.z - HOLD_N, HOLD_S - P.z) / 3)) : 0;
     hm.opacity += (hn * 0.85 - hm.opacity) * Math.min(1, dt * 6);
     HOLD.visible = hm.opacity > 0.01;
   }
-  if (Math.abs(P.x - FALL.x) < 60 && Math.random() < dt * 40)
-    puff(tmpA.set(FALL.x + R(-1.8, 1.8), 0.2 - DEEP, FALL.z + R(-0.2, 0.8)), 0xeaf6ff, 1, 1.4, 0.7, 2);
+  if (Math.abs(P.x - FALL.x) < 60 && Math.random() < dt * 70)
+    puff(tmpA.set(FALL.x + R(-RW + 0.6, RW - 0.6), 0.1 - DEEP, FALL.z + R(0.2, 1.2)), 0xeaf6ff, 1, 1.4, 0.7, 2);
   campUpdate(dt);
   arriveUpdate(dt);
+  orderUpdate();
+  astraFx(dt);
   if (++MINI.n % 5 === 0) MINI.draw();
   talkUpdate(dt);
   SKY.position.copy(cam.position);
@@ -2009,25 +2205,103 @@ LAK.group.position.set(START_X - 1.6, 0, 1.5);
 LAK.post.copy(LAK.group.position);
 LAK.s.mface = LAK.s.facing = Math.PI / 2;
 yaw = 0;
-dist = 20;
+dist = 28;
+// the camera stays on the near side, looking north: it turns no more than about 35 degrees either way, tilts only between a
+// low and a high view, and zooms only so far in and out
+CAMLIM.yaw = [-0.6, 0.6];
+CAMLIM.pitch = [0.5, 1.2];
+CAMLIM.dist = [12, 30];
 
 // ---------- health and mana ----------
 // the camp's demons can hurt the brothers, but nothing yet happens at zero. Rama's astras draw on his mana, which comes back slowly
-for (const h of HEROES) h.hp = h.hpMax = 100;
+RAMA.hp = RAMA.hpMax = 640;
+LAK.hp = LAK.hpMax = 560;
 RAMA.mp = RAMA.mpMax = 100;
 // Lakshmana has stamina instead: every quick shot spends some, and with none left he reloads only as fast as Rama until it comes back
 LAK.st = LAK.stMax = 100;
-const COST = { 'Agneyastra · fire': 15, 'Vayavyastra · wind': 10, Manavastra: 20, 'Nagastra · serpent': 25, Brahmastra: 60 };
+const COST = { 'Agneyastra · fire': 33, 'Vayavyastra · wind': 10, Manavastra: 20, 'Nagastra · serpent': 25, Brahmastra: 60 };
 for (const k of KINDS) k.cost = COST[k.name] || 0;
+
+// ---------- objectives ----------
+// what to do next, in the top right corner below the menu button: each line is ticked and dimmed once it is done
+const OBJ = [
+  { text: 'Reach Vishwamitra’s camp', done: () => ARR.step !== 'wait' },
+  // (ticked once they have thanked the brothers, not the moment the last rope falls)
+  { text: 'Rescue the villagers', done: () => !!CAMPS[0].rescued, show: () => CAMPS[0].seen },
+  { text: 'Order the men to gather wood', done: () => ORDER.done, show: () => !!ARR.talked },
+  { text: 'Free the north or the south camp', done: () => false, show: () => ORDER.done && !ORDER.pick },
+  { text: 'Free the north camp', done: () => CAMPS[1].prisoners.every((p) => p.free), show: () => ORDER.pick === 'north' },
+  { text: 'Free the south camp', done: () => CAMPS[2].prisoners.every((p) => p.free), show: () => ORDER.pick === 'south' },
+];
+{
+  const box = document.createElement('div');
+  box.style.cssText =
+    'position:fixed;right:16px;top:66px;z-index:14;min-width:210px;padding:10px 14px 11px;background:rgba(24,12,28,.55);' +
+    'border:1px solid rgba(255,210,150,.3);border-radius:6px;backdrop-filter:blur(5px);font:14px Marcellus,serif;color:#fff3df;user-select:none';
+  box.innerHTML =
+    '<div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#ffd08a;margin-bottom:4px">Objectives</div>' +
+    OBJ.map(
+      (o) =>
+        `<div style="display:flex;gap:8px;align-items:center;margin-top:4px"><i style="flex:none;width:11px;height:11px;border:1.5px solid #ffd08a;border-radius:2px;display:grid;place-items:center;font:700 10px/1 sans-serif;font-style:normal;color:#2a1220"></i><span>${o.text}</span></div>`,
+    ).join('');
+  document.body.append(box);
+  // a button beside the menu button, with a scroll for an icon, shows and hides the list
+  const btn = document.createElement('button');
+  btn.setAttribute('aria-label', 'Objectives');
+  btn.style.cssText =
+    'position:fixed;right:64px;top:16px;z-index:30;width:40px;height:40px;padding:0;display:grid;place-items:center;background:rgba(24,12,28,.6);' +
+    'border:1px solid rgba(255,210,150,.45);border-radius:6px;backdrop-filter:blur(5px)';
+  btn.innerHTML =
+    '<svg viewBox="0 0 16 16" width="19" height="19" fill="none" stroke="#ffd08a" stroke-width="1.3" stroke-linejoin="round"><rect x="1.8" y="1.6" width="12.4" height="3" rx="1.5"/><rect x="1.8" y="11.4" width="12.4" height="3" rx="1.5"/><path d="M3.4 4.6v6.8M12.6 4.6v6.8M5.8 7h4.4M5.8 9.2h4.4" stroke-linecap="round"/></svg>';
+  btn.onclick = () => {
+    OBJ.open = !OBJ.open;
+    box.style.display = OBJ.open ? '' : 'none';
+  };
+  document.body.append(btn);
+  OBJ.open = true;
+  OBJ.forEach((o, i) => {
+    o.row = box.children[i + 1];
+    o.tick = o.row.querySelector('i');
+  });
+}
+function objectives() {
+  for (const o of OBJ) {
+    // (a line not yet given, such as the rescue before the camp has been seen, stays hidden)
+    o.row.style.display = !o.show || o.show() ? 'flex' : 'none';
+    const d = o.done();
+    if (d === o.was) continue;
+    o.was = d;
+    o.row.style.opacity = d ? 0.55 : 1;
+    o.row.querySelector('span').style.textDecoration = d ? 'line-through' : 'none';
+    o.tick.style.background = d ? '#ffd08a' : 'none';
+    o.tick.textContent = d ? '✓' : '';
+  }
+}
 
 // ---------- the party: a card for each brother, to switch between them and to show how they are ----------
 const NAMES = { rama: 'Rama', lak: 'Lakshmana' },
-  cards = {};
+  cards = {},
+  // a sword for the damage of one arrow, and a clock for attack speed
+  ICON_ATK =
+    '<svg viewBox="0 0 16 16"><path d="M14 2 L 13.6 5 L 7.4 11.2 L 4.8 8.6 L 11 2.4 Z" fill="#ffd08a"/><path d="M3.4 7.6 L 8.4 12.6" stroke="#ffd08a" stroke-width="1.8" stroke-linecap="round"/><path d="M5.2 10.8 L 2.4 13.6" stroke="#c9902e" stroke-width="2" stroke-linecap="round"/><circle cx="2" cy="14" r="1.2" fill="#ffd08a"/></svg>',
+  ICON_SPD =
+    '<svg viewBox="0 0 16 16" fill="none" stroke="#ffd08a" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="8.5" r="5.5"/><path d="M8 5.5v3l2 1.5M6.5 1.8h3"/></svg>';
+// (on this page they sit in the bottom left corner; set here, since the stylesheet may be an old cached one)
+$('party').style.cssText = 'top:auto;bottom:16px;left:16px';
 for (const h of HEROES) {
   const c = document.createElement('button');
   c.className = 'card';
   c.dataset.w = h.name;
-  c.innerHTML = `<img alt=""><span><b>${NAMES[h.name]}</b><i class="hp"><s></s></i>${h.mp !== undefined ? '<i class="mp"><s></s></i>' : ''}${h.st !== undefined ? '<i class="st"><s></s></i>' : ''}</span>`;
+  c.innerHTML = `<img alt=""><span><b>${NAMES[h.name]}</b><i class="hp"><s></s></i>${h.mp !== undefined ? '<i class="mp"><s></s></i>' : ''}${h.st !== undefined ? '<i class="st"><s></s></i>' : ''}<em>${ICON_ATK}<u class="atk"></u>${ICON_SPD}<u class="spd"></u></em></span>`;
+  // (styled here rather than in the stylesheet, which the browser may have kept from before)
+  const em = c.querySelector('em');
+  em.style.cssText = 'display:flex;align-items:center;gap:5px;font:12px Marcellus,serif;font-style:normal;color:#f3dcb4;letter-spacing:.04em';
+  for (const u of em.querySelectorAll('u')) u.style.cssText = 'text-decoration:none;margin-right:8px';
+  for (const v of em.querySelectorAll('svg')) v.style.cssText = 'width:13px;height:13px;flex:none';
+  // (the picture square and without its gold border, not cut to a circle; set here, as the stylesheet may be an old cached one)
+  c.querySelector('img').style.border = 'none';
+  c.querySelector('img').style.borderRadius = '0';
+  c.querySelector('img').style.background = 'none';
   c.onclick = () => selectHero(h.name);
   $('party').append(c);
   cards[h.name] = c;
@@ -2071,14 +2345,290 @@ function snap(head, yaw, own) {
   return cv2.toDataURL();
 }
 // each brother's goes on his card, and is kept for when he speaks
+// The brothers' own portraits are drawn rather than photographed, in the Firelight manner of the art studies: lit by one
+// source, the sacred fire low on the left, and every form shaded in three tones from it — a dark body, a lit band pushed
+// toward the fire, and a thin warm rim along the edge that faces it. A god's halo glows behind each head, and nothing else: the picture is cut out, like a sticker, with no background or frame.
+// They face right: everything is drawn facing left, then the whole picture is turned over (so the fire's light falls from the right).
+// Both are seen in profile, facing the fire: boys still, with no crowns, their hair tied up in a student's knot. Both have the same
+// face; what tells them apart is the skin (Rama's blue, Lakshmana's fair) and the cloth over the shoulder
+function drawnFace(o) {
+  // toward the light (left and a little below), how far the lit band is pushed, and how wide the rim is
+  const LX = -0.94,
+    LY = 0.34,
+    RIM = '#ffdca8';
+  let n = 0;
+  // one form in three tones: its outline is d (a path), its colours [dark, lit]
+  const shade = (d, [dk, md], s = 3.2, r = 0.9) => {
+    const id = 'f' + n++;
+    return `<clipPath id="${id}"><path d="${d}"/></clipPath><g clip-path="url(#${id})"><path d="${d}" fill="${dk}"/><g transform="translate(${LX * s} ${LY * s})"><g clip-path="url(#${id})"><path d="${d}" fill="${RIM}"/><path d="${d}" fill="${md}" transform="translate(${-LX * (s + r)} ${-LY * (s + r)})"/></g></g></g>`;
+  };
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<defs>
+  <radialGradient id="halo"><stop offset="0" stop-color="#fff0b8" stop-opacity=".9"/><stop offset=".6" stop-color="#ffc860" stop-opacity=".55"/><stop offset=".86" stop-color="#ff9a40" stop-opacity=".35"/><stop offset="1" stop-color="#ff9a40" stop-opacity="0"/></radialGradient>
+</defs>
+<g transform="translate(100 0) scale(-1 1)">
+<g opacity=".42">
+<circle cx="53" cy="42" r="31" fill="url(#halo)"/>
+<circle cx="53" cy="42" r="27" fill="none" stroke="#ffd98a" stroke-width="1.2" opacity=".9"/>
+<circle cx="53" cy="42" r="30.2" fill="none" stroke="#ffd98a" stroke-width=".6" opacity=".6"/>
+${Array.from({ length: 24 }, (_, i) => {
+  const a = (i / 24) * Math.PI * 2;
+  return `<circle cx="${(53 + Math.cos(a) * 28.6).toFixed(2)}" cy="${(42 + Math.sin(a) * 28.6).toFixed(2)}" r=".75" fill="#fff0c0"/>`;
+}).join('')}
+</g>
+${shade('M10 100 C 13 84, 28 77, 42 75 L 60 75 C 74 77, 88 84, 91 100 Z', o.skinT, 10)}
+${shade('M42 74 C 41.5 68, 43.5 63, 45 60 L 56 58 C 57 64, 58 70, 59.5 76 C 53 78.5, 47 78, 42 74 Z', o.skinT, 5)}
+${shade('M10 100 C 14 88, 24 81, 36 78 L 62 100 Z', o.clothT, 7)}
+<path d="M17 92 C 25 85, 31 81, 37 79" stroke="${o.clothEdge}" stroke-width="1.8" fill="none"/>
+<path d="M40 76.5 C 43 88, 57 88, 61 76" stroke="#8a5a18" stroke-width="3.4" fill="none"/>
+<path d="M40 76.5 C 43 88, 57 88, 61 76" stroke="#f0b93a" stroke-width="1.8" fill="none" transform="translate(-0.4 -0.3)"/>
+<circle cx="49" cy="86.4" r="3" fill="#a8202a" stroke="#f0b93a" stroke-width="1.2"/>
+${shade('M44 31 C 38.5 33, 36.6 38, 37 42.6 C 36.8 44.5, 36.2 45.6, 35.6 46.8 C 34.2 49, 32.3 51.6, 32.8 53 C 33.4 54.2, 35.4 54.4, 36.9 54.6 C 36.4 55.6, 36.3 56.5, 36.9 57.1 C 36.4 57.9, 36.6 59, 37.5 59.8 C 37.2 61.6, 37.8 63.6, 39.8 64.7 C 43.5 66.6, 48.5 66.8, 52.5 64.2 C 56.5 61.6, 59.5 57.5, 61 52.5 C 63.5 45, 63.5 36.5, 58 32 C 54 29.4, 48.5 29.4, 44 31 Z', o.skinT, 7, 1.1)}
+<path d="M39.8 64.7 C 43.5 66.6, 48.5 66.8, 52.5 64.2 L 53 66 C 48.5 68.6, 43 68.2, 40.5 66.6 Z" fill="${o.skinT[0]}" opacity=".9"/>
+${shade('M40 37.5 C 40.5 30.5, 48 27, 56 28.3 C 66 30.2, 70.5 39.5, 69.6 51.5 C 69 61.5, 70.5 71.5, 74.5 81.5 C 68.5 84, 62.5 80.5, 60.5 74.5 C 58.8 67, 58.2 60.5, 58.8 55 C 58.4 50, 56 46, 52.5 44 C 48.5 41.5, 44 39.5, 40 37.5 Z', ['#0c0814', '#2e1f38'], 4)}
+${shade('M54.2 49 C 54.6 45.8, 58.6 45.8, 59 49.4 L 59 54.6 C 58.6 57.6, 55 57.8, 54.6 55 Z', o.skinT, 1.6, 0.7)}
+<path d="M55.6 50 C 56.6 49.4, 57.6 50.5, 57.2 52.5" stroke="${o.skinT[0]}" stroke-width=".9" fill="none"/>
+${shade('M50.5 30 C 48.5 25, 51 19.5, 56 19.5 C 61 19.5, 63.5 24.5, 61.5 29 C 59 31.5, 53 31.5, 50.5 30 Z', ['#0c0814', '#2e1f38'], 2.6)}
+<path d="M50.8 29.2 C 54 31.4, 58.5 31.4, 61.3 28.6" stroke="#8a5a18" stroke-width="2.2" fill="none"/>
+<path d="M50.8 28.8 C 54 31, 58.5 31, 61.3 28.2" stroke="#f0b93a" stroke-width="1" fill="none"/>
+<circle cx="56.6" cy="59.6" r="2" fill="none" stroke="#8a5a18" stroke-width="1.8"/><circle cx="56.3" cy="59.4" r="2" fill="none" stroke="#f0b93a" stroke-width=".9"/>
+<path d="M37 45.6 Q 40.6 42.9 44.6 45 Q 40.8 44.2 37 45.6 Z" fill="#120a18"/>
+<path d="M38 48.5 Q 40.9 46 43.8 48 Q 41 50.4 38 48.5 Z" fill="#f4ecdc"/><circle cx="39.9" cy="48.3" r="1.45" fill="#120a18"/><circle cx="39.4" cy="47.8" r=".45" fill="#fff"/>
+<path d="M37.9 48.4 Q 40.9 45.8 43.8 48 L 45 47.2" stroke="#120a18" stroke-width="1.1" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M36.8 57.3 Q 38.4 58.4 40.2 57.4" stroke="#5a1424" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+<path d="M35.6 53.6 Q 37 54.2 37.9 53" stroke="${o.skinT[0]}" stroke-width="1" fill="none" stroke-linecap="round"/>
+<path d="M38 36.6 L 38.6 43.4 M41 36.4 L 41 43.2" stroke="#fff3df" stroke-width="1" stroke-linecap="round"/>
+<path d="M39.6 37.4 L 39.7 43" stroke="#d4313a" stroke-width="1.2" stroke-linecap="round"/>
+</g>
+</svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+const FACES = {
+  rama: drawnFace({ skinT: ['#2a4a86', '#5d97da'], clothT: ['#b0661a', '#f2b632'], clothEdge: '#c9461e' }),
+  lak: drawnFace({ skinT: ['#94603e', '#e6b583'], clothT: ['#1f3a76', '#4a7ccc'], clothEdge: '#f0c050' }),
+};
+// ---------- Rama's astras ----------
+// Rama carries one kind of arrow at a time, and it stays chosen until he changes it: plain arrows, or an astra once it has been
+// given (Agni, from Vishwamitra, after his talk). Everything he looses is of the chosen kind, with the ordinary fire buttons.
+//   choosing   1 for plain arrows, 2 for the first astra, and so on; Q swaps between plain arrows and the astra last used;
+//              or click a slot. The slots are a row in the top left corner, and exactly one is always lit: the one in use
+//   the cost   an astra is dear: each one takes a third of his strength (mana), so a full measure is three. The lights under
+//              its slot show how many he can loose right now. With too little for even one, the slot is dark and will not
+//              be chosen (it shakes its head); and when the last one he can afford has gone, the astra puts itself away and
+//              he is back on plain arrows, without the player having to do anything
+//   seeing it  besides the slot, the choice shows where the player is looking: the arrow on the string and the aiming mark
+//              take the astra's colour (the shared code does that), and a puff of that colour bursts at the bow as he changes
+const ASTRA = { have: [0], armed: 0, last: 0, slots: [] },
+  ASTRA_ICON = {
+    0: '<svg viewBox="0 0 20 20" fill="#f0dcb4"><path d="M17.8 2.2 L 15.9 8.9 L 13.9 7.5 L 12.5 6.1 L 11.1 4.1 Z"/><path d="M4 16 L 13.2 6.8" stroke="#f0dcb4" stroke-width="1.2" stroke-linecap="round" fill="none"/><path d="M8.6 11.4 L 5.2 11 L 2.2 14 L 5.2 14.2 Z"/><path d="M8.6 11.4 L 9 14.8 L 6 17.8 L 5.8 14.8 Z"/></svg>',
+    1: '<svg viewBox="0 0 20 20"><path fill="#f0dcb4" fill-rule="evenodd" d="M10.6 1.6 C 11 5.2, 15.8 7.6, 15.8 12.2 C 15.8 15.8, 13.2 18.4, 10 18.4 C 6.8 18.4, 4.2 15.8, 4.2 12.4 C 4.2 10, 5.4 8.4, 6.6 7 C 6.8 8.6, 7.4 9.6, 8.4 10.2 C 8 7, 8.8 3.8, 10.6 1.6 Z M10.2 10.4 C 10.2 12.4, 12.6 13.2, 12.6 15 C 12.6 16.3, 11.5 17.2, 10 17.2 C 8.5 17.2, 7.4 16.3, 7.4 15 C 7.4 14, 8 13.4, 8.6 12.8 C 8.8 13.4, 9.2 13.8, 9.6 13.9 C 9.4 12.6, 9.6 11.4, 10.2 10.4 Z"/></svg>',
+  },
+  ASTRA_NAME = { 0: 'Arrow', 1: 'Agneyastra' },
+  astraCol = (k) => '#' + KINDS[k].color.toString(16).padStart(6, '0');
+{
+  const bar = document.createElement('div');
+  bar.style.cssText = 'position:fixed;left:16px;top:16px;z-index:14;display:flex;gap:8px;align-items:flex-start;transition:opacity .3s';
+  document.body.append(bar);
+  ASTRA.bar = bar;
+}
+// Rama's kind of arrow: the global while he is the one being played, otherwise kept in his saved state
+function setRamaKind(k) {
+  if (SEL === RAMA) kind = k;
+  else RAMA.s.kind = k;
+}
+// choose a kind. why: 'spent' when an astra has put itself away. Returns false if it could not be chosen
+function armAstra(k, why) {
+  const b = ASTRA.slots.find((o) => o.k === k);
+  if (!b || k === ASTRA.armed) return false;
+  if (KINDS[k].cost > RAMA.mp) {
+    b.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'translateX(0)' }], { duration: 220 });
+    return false;
+  }
+  ASTRA.armed = k;
+  if (k) ASTRA.last = k;
+  setRamaKind(k);
+  // seen at the bow: a burst in the new colour, or a wisp of grey smoke when an astra has gone out
+  if (SEL === RAMA) puff(tmpA.copy(RAMA.hL), why === 'spent' ? 0x9a9088 : KINDS[k].color, why === 'spent' ? 10 : 18, 1.6, 0.45, why === 'spent' ? -1.5 : 0, 0.15);
+  b.animate([{ transform: 'scale(1.18)' }, { transform: 'scale(1)' }], { duration: 180, easing: 'ease-out' });
+  astraDraw();
+  return true;
+}
+function astraSlot(k) {
+  const b = document.createElement('i'),
+    n = ASTRA.slots.length + 1,
+    max = KINDS[k].cost ? Math.floor(RAMA.mpMax / KINDS[k].cost) : 0;
+  b.style.cssText =
+    'position:relative;flex:none;width:44px;height:44px;display:grid;place-items:center;font-style:normal;border-radius:6px;cursor:pointer;' +
+    'background:rgba(24,12,28,.7);border:1.5px solid rgba(255,210,150,.35);backdrop-filter:blur(5px);transition:box-shadow .15s,border-color .15s,background .15s';
+  b.innerHTML =
+    `<span style="width:28px;height:28px;display:block;transition:opacity .15s">${ASTRA_ICON[k]}</span>` +
+    `<b style="position:absolute;left:4px;top:2px;font:600 10px/1 sans-serif;color:#fff3df;opacity:.8">${n}</b>` +
+    // one light for each he could loose on a full measure, lit for each he can loose now
+    `<u style="position:absolute;left:0;right:0;bottom:-9px;display:flex;justify-content:center;gap:3px;text-decoration:none">${'<s style="width:8px;height:4px;border-radius:2px;background:#3a2a44;transition:background .2s"></s>'.repeat(max)}</u>`;
+  b.addEventListener('click', () => who === 'rama' && !LOCK && armAstra(k));
+  b.k = k;
+  b.icon = b.firstChild;
+  b.pips = [...b.querySelectorAll('s')];
+  ASTRA.bar.append(b);
+  ASTRA.slots.push(b);
+  return b;
+}
+function astraDraw() {
+  // (only the brother being played chooses; left to himself Rama keeps to plain arrows)
+  if (SEL !== RAMA && ASTRA.armed) {
+    ASTRA.armed = 0;
+    RAMA.s.kind = 0;
+  }
+  ASTRA.bar.style.opacity = SEL === RAMA ? 1 : 0.4;
+  for (const b of ASTRA.slots) {
+    const on = b.k === ASTRA.armed,
+      col = astraCol(b.k),
+      cost = KINDS[b.k].cost,
+      can = cost ? Math.floor(RAMA.mp / cost) : 1;
+    b.style.borderColor = on ? col : 'rgba(255,210,150,.35)';
+    b.style.boxShadow = on ? `0 0 0 1px ${col}, 0 0 14px ${col}` : 'none';
+    b.style.background = on ? `linear-gradient(${col}55, rgba(24,12,28,.8))` : 'rgba(24,12,28,.7)';
+    b.icon.style.opacity = can ? (on ? 1 : 0.8) : 0.3;
+    b.pips.forEach((s, i) => (s.style.background = i < can ? col : '#3a2a44'));
+  }
+}
+astraSlot(0);
+astraDraw();
+// an astra given: its slot appears with a flash, and the power is seen entering Rama
+function giveAstra(k) {
+  if (ASTRA.have.includes(k)) return;
+  ASTRA.have.push(k);
+  const b = astraSlot(k);
+  b.animate([{ transform: 'scale(2)', boxShadow: '0 0 24px #ffb050' }, { transform: 'scale(1)', boxShadow: '0 0 0 transparent' }], { duration: 700, easing: 'ease-out' });
+  // and the gift shows on Rama himself (see astraFx)
+  ASTRA.fx = GIFT.T;
+  ASTRA.fxCol = KINDS[k].color;
+  ASTRA.fxK = k;
+  astraDraw();
+}
+// The gift, shown as something passing to Rama, not just happening near him:
+//   first   four tongues of flame leave the altar fire one after another and arc across to his chest, each leaving a trail
+//   then    a ring of light on the ground closes in on him from five paces out, and a soft column of light stands over him
+//   last    a small burst at his chest, and a line of words at the top of the screen says what he has received and its key
+const GIFT = { T: 2.6 };
+{
+  const m = (o) => new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, ...o });
+  GIFT.beam = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 10, 24, 1, true), m());
+  GIFT.ring = new THREE.Mesh(new THREE.RingGeometry(0.88, 1, 64), m());
+  GIFT.ring.rotation.x = -Math.PI / 2;
+  GIFT.all = [GIFT.beam, GIFT.ring];
+  GIFT.all.forEach((o) => {
+    o.visible = false;
+    o.frustumCulled = false;
+    scene.add(o);
+  });
+}
+function astraFx(dt) {
+  if (!(ASTRA.fx > 0)) return;
+  const P = RAMA.group.position,
+    first = ASTRA.fx === GIFT.T,
+    t = GIFT.T - ASTRA.fx,
+    col = ASTRA.fxCol,
+    // (his chest is lower while he sits)
+    ch = RAMA.sat ? 0.75 : 1.3;
+  ASTRA.fx -= dt;
+  if (first) {
+    GIFT.all.forEach((o) => (o.visible = true));
+    GIFT.all.forEach((o) => o.material.color.set(col));
+    // (the altar fire flares as the flames leave it)
+    flash(tmpA.set(0, 1.4, 0), col, 14);
+    puff(tmpA, col, 30, 2.5, 0.6, -2, 0.6);
+  }
+  // the tongues of flame: each takes 0.9 s to cross from the fire to his chest, rising in an arc on the way
+  for (let j = 0; j < 4; j++) {
+    const u = (t - j * 0.22) / 0.9;
+    if (u < 0 || u > 1) continue;
+    const e = u * u * (3 - 2 * u),
+      side = (j % 2 ? 1 : -1) * Math.sin(Math.PI * u) * 0.9,
+      dx = P.x,
+      dz = P.z,
+      l = Math.hypot(dx, dz) || 1;
+    tmpA.set(dx * e - (dz / l) * side, 1.4 + (P.y + ch - 1.4) * e + Math.sin(Math.PI * u) * 2.2, dz * e + (dx / l) * side);
+    puff(tmpA, col, 5, 0.5, 0.55, -0.6, 0.25);
+    puff(tmpA, 0xfff0c0, 1, 0.2, 0.3, 0, 0.1);
+    // as each arrives it flares at his chest
+    if (u + dt / 0.9 > 1) {
+      flash(tmpA.set(P.x, P.y + ch, P.z), col, 8);
+      puff(tmpA, col, 14, 1.6, 0.4, 0, 0.2);
+    }
+  }
+  // the ring closing in, and the column over him, from when the first flame lands
+  const v = Math.max(0, Math.min(1, (t - 0.9) / 1.2)),
+    k = Math.min(1, Math.max(0, t - 0.9) / 0.3) * Math.min(1, ASTRA.fx / 0.5);
+  GIFT.ring.position.set(P.x, P.y + 0.12, P.z);
+  GIFT.ring.scale.setScalar(5 - 4.5 * v * v);
+  GIFT.ring.material.opacity = v > 0 && v < 1 ? 0.2 + 0.6 * v : 0;
+  GIFT.beam.position.set(P.x, P.y + 5, P.z);
+  GIFT.beam.scale.set(0.75, 1, 0.75);
+  GIFT.beam.material.opacity = 0.25 * k;
+  if (ASTRA.fx <= 0) {
+    GIFT.all.forEach((o) => (o.visible = false));
+    puff(tmpA.set(P.x, P.y + ch, P.z), col, 30, 2.6, 0.7, 1, 0.3);
+    astraSaid(ASTRA.fxK);
+  }
+}
+// the words: a short line near the top of the screen, there for a few seconds
+function astraSaid(k) {
+  const n = ASTRA.slots.findIndex((b) => b.k === k) + 1,
+    el = document.createElement('div');
+  el.style.cssText =
+    'position:fixed;left:50%;top:84px;transform:translateX(-50%);z-index:25;display:flex;align-items:center;gap:12px;padding:9px 18px 9px 12px;pointer-events:none;' +
+    'background:rgba(24,12,28,.7);border:1px solid rgba(255,210,150,.5);border-radius:6px;backdrop-filter:blur(5px);color:#fff3df;font:17px Marcellus,serif;' +
+    'opacity:0;transition:opacity .4s';
+  el.innerHTML =
+    `<span style="width:30px;height:30px;flex:none">${ASTRA_ICON[k]}</span>` +
+    `<span>Rama has received the <b style="font-weight:400;color:#ffd08a">${ASTRA_NAME[k]}</b>` +
+    `<br><small style="font-size:13px;opacity:.8">Press ${n} to take it up · 1 for plain arrows · Q swaps</small></span>`;
+  document.body.append(el);
+  requestAnimationFrame(() => (el.style.opacity = 1));
+  setTimeout(() => (el.style.opacity = 0), 4500);
+  setTimeout(() => el.remove(), 5000);
+}
+// when he can no longer afford another of the astra he is using, it puts itself away and he is back on plain arrows
+AFTER_SHOT = (h) => {
+  if (h === RAMA && ASTRA.armed && RAMA.mp < KINDS[ASTRA.armed].cost) armAstra(0, 'spent');
+  else if (h === RAMA) astraDraw();
+};
+// The number keys choose Rama's arrow (1 plain, 2 the first astra, …) and Q swaps between plain and the astra last used.
+// These are caught first, before the shared controls see them (which use the numbers for his walk and Q and E to run through
+// every astra there is); while someone is speaking the keys are left to the dialogue box
+addEventListener(
+  'keydown',
+  (e) => {
+    if (talking()) return;
+    const m = /^Digit([1-9])$/.exec(e.code);
+    if (!m && e.code !== 'KeyQ' && e.code !== 'KeyE') return;
+    e.stopImmediatePropagation();
+    if (e.repeat || who !== 'rama' || LOCK) return;
+    if (m) {
+      const b = ASTRA.slots[+m[1] - 1];
+      if (b) armAstra(b.k);
+    } else if (e.code === 'KeyQ') armAstra(ASTRA.armed ? 0 : ASTRA.last || (ASTRA.slots[1] ? ASTRA.slots[1].k : 0));
+  },
+  true,
+);
+
+// in the dialogue box everyone is shown the same way, by a photograph taken by the game's own camera at the moment they speak,
+// so the brothers' pictures there match Vishwamitra's and the villagers' (the drawn portraits are for the cards)
+const photo = (h) => snap(h.bone.head, h.group.rotation.y, h.group);
 function portrait(h) {
-  cards[h.name].querySelector('img').src = h.face = snap(h.bone.head, h.group.rotation.y, h.group);
+  cards[h.name].querySelector('img').src = h.face = FACES[h.name] || snap(h.bone.head, h.group.rotation.y, h.group);
 }
 function meters() {
   for (const h of HEROES) {
     const c = cards[h.name];
     c.querySelector('.hp s').style.width = (100 * h.hp) / h.hpMax + '%';
+    // the damage of one arrow, and attack speed as Dota counts it: bigger is faster, with Rama's own pace counted as 120
+    // (Lakshmana's drops to Rama's while he is tired)
+    c.querySelector('.atk').textContent = h.dmg[0] + '–' + h.dmg[1];
+    c.querySelector('.spd').textContent = Math.round(120 / (h.tired ? 1 : h.pace));
     if (h.mp !== undefined) c.querySelector('.mp s').style.width = (100 * h.mp) / h.mpMax + '%';
+    if (h === RAMA) astraDraw();
     if (h.st !== undefined) {
       const bar = c.querySelector('.st s');
       bar.style.width = (100 * h.st) / h.stMax + '%';
@@ -2102,6 +2652,8 @@ let shown = 0,
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = tick(now);
+  // while anyone is speaking the enemies stand frozen, just as the brothers do
+  HOLD_FOES = talking();
   heroUpdate(dt);
   shotsUpdate(dt);
   worldUpdate(dt);
@@ -2112,7 +2664,10 @@ function frame(now) {
     HEROES.forEach(portrait);
   }
   composer.render();
-  if (++fr % 6 === 0) meters();
+  if (++fr % 6 === 0) {
+    meters();
+    objectives();
+  }
   // the curtain lifts only once the scene has run for a moment
   if (!shown && T > 0.8) {
     shown = 1;

@@ -1003,6 +1003,8 @@ function fling(d, dir, sp, up) {
   d.vel.set(dir.x * sp, up, dir.z * sp);
 }
 function dummyUpdate(dt) {
+  // (enemies being knocked about stay where they are while a level holds them still: see HOLD_FOES)
+  if (typeof HOLD_FOES !== 'undefined' && HOLD_FOES) return;
   for (let i = zones.length - 1; i >= 0; i--) if (T > zones[i].end) zones.splice(i, 1);
   for (const d of dummies) {
     const g = d.g;

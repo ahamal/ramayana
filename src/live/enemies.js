@@ -371,13 +371,13 @@ function makeDefiler(d, seed) {
   grunts.push(d);
 }
 // summoning, one button per kind: each press brings one, from a random point round the clearing. All of them are gone for good when they die
-// what each kind of enemy is, in numbers: hit points, speed over the ground, how far from the fire it stops to attack, seconds per attack,
+// what each kind of enemy is, in numbers: hit points, the damage of one blow (lowest to highest), speed over the ground, how far from the fire it stops to attack, seconds per attack,
 // how wide and heavy it is for collision, how high on it a shot lands, and how high its health bar floats
 const FOES = {
-  grunt: { hp: 3, speed: 2.6, reach: 5.4, swing: 1.05, radius: 0.4, mass: 1, aimY: 1.1, barY: 2.15 },
-  brute: { hp: 12, speed: 1.3, reach: 6.0, swing: 1.7, radius: 0.75, mass: 12, aimY: 1.82, barY: 3.55 },
-  pish: { hp: 2, speed: 3.0, reach: 4.8, swing: 1.4, radius: 0.34, mass: 1, aimY: 0.45, barY: 1.15 },
-  defiler: { hp: 2, speed: 3.2, reach: 2.5, swing: 2.6, radius: 0, mass: 0, aimY: 1.55, barY: 2.35 },
+  grunt: { hp: 150, dmg: [34, 42], speed: 2.6, reach: 5.4, swing: 1.05, radius: 0.4, mass: 1, aimY: 1.1, barY: 2.15 },
+  brute: { hp: 1000, dmg: [100, 120], speed: 2.2, reach: 6.0, swing: 1.7, radius: 0.75, mass: 12, aimY: 1.82, barY: 3.55 },
+  pish: { hp: 100, dmg: [20, 26], speed: 3.0, reach: 4.8, swing: 1.4, radius: 0.34, mass: 1, aimY: 0.45, barY: 1.15 },
+  defiler: { hp: 100, dmg: [20, 26], speed: 3.2, reach: 2.5, swing: 2.6, radius: 0, mass: 0, aimY: 1.55, barY: 2.35 },
 };
 // a level may name the spot (at) instead of the angle; the enemy then simply stands there, with no flash of arrival
 // how many enemies may be about at once: a level with several camps raises it
@@ -767,7 +767,17 @@ const BSTR = [
     };
   },
 ];
+// a brute loses his temper: for two to three and a half seconds he runs at two and a half times his pace (5.5, a little quicker
+// than the brothers' 5), weaving, swinging his club again and
+// again as he comes (see the attack); then he cannot lose it again for a few seconds more
+function rageOn(d) {
+  d.rage = 1.8 + Math.random() * 1.6;
+  d.rageCd = d.rage + 3 + Math.random() * 3;
+}
+// a level may hold every enemy still for a while (HOLD_FOES), as it does while someone is speaking
+let HOLD_FOES = false;
 function gruntUpdate(dt) {
+  if (HOLD_FOES) return;
   for (const d of grunts) {
     // one that a level has put to sleep (far off, standing idle, out of sight) costs nothing until it is woken
     if (d.asleep) continue;
@@ -797,11 +807,19 @@ function gruntUpdate(dt) {
     }
     if (!d.dead && !d.flung) {
       if (d.wob > d.pw + 0.25) {
-        d.hp -= d.vel.length() > 6 ? 3 : 1;
+        // an arrow brings the damage of the brother who loosed it; any other blow (an astra's blast, being thrown) a set amount
+        d.hp -= d.dmg != null ? d.dmg : d.vel.length() > 6 ? 150 : 50;
+        d.dmg = null;
+        // a brute that is hurt may lose his temper (see rageOn)
+        if (d.br && !d.rage && !d.rageCd && Math.random() < 0.3) rageOn(d);
         const fl = Math.floor(d.at),
           uu = d.at - fl;
-        if (uu < 0.48) d.at = fl + Math.max(0, uu - 0.16);
-        d.hitch = 0.22;
+        // (only early in the wind-up; once the swing is well under way a hit no longer stops it. A brute is checked only half
+        // as much, or two archers shooting in turn would hold his club back for ever; and in a rage he is not checked at all)
+        if (uu < 0.35 && !(d.rage > 0)) {
+          d.at = fl + Math.max(0, uu - (d.br ? 0.04 : 0.08));
+          d.hitch = d.br ? 0.06 : 0.12;
+        }
       }
       if (d.char > 0.7) d.hp = 0;
       if (d.hp <= 0) {
@@ -858,19 +876,27 @@ function gruntUpdate(dt) {
       d.barV += (Math.max(0, d.hp) / d.hp0 - d.barV) * Math.min(1, dt * 7);
       b.fg.scale.set(0.7 * d.barV, 0.07, 1);
     } else if (d.bar) d.bar.g.visible = false;
+    // a brute's temper: it runs out, and he cannot lose it again straight away. Once hurt he may also lose it at any moment,
+    // for no reason at all; rageW eases in and out so he does not snap between states
+    if (d.br && !d.dead) {
+      d.rage = Math.max(0, (d.rage || 0) - dt);
+      d.rageCd = Math.max(0, (d.rageCd || 0) - dt);
+      if (!d.rage && !d.rageCd && d.hp < d.hp0 && Math.random() < dt * 0.12) rageOn(d);
+      d.rageW = (d.rageW || 0) + ((d.rage > 0 ? 1 : 0) - (d.rageW || 0)) * Math.min(1, dt * 5);
+    }
     // what he is making for: the altar fire, unless a level has given him something else (d.to, a point that may move).
     // d.wait keeps him standing where he is, doing nothing, until the level lets him go
     const ox = d.to ? d.to.x : 0,
       oz = d.to ? d.to.z : 0,
       r = Math.hypot(g.position.x - ox, g.position.z - oz) || 1,
-      stag = (!d.br && d.wob > 0.6) || d.hold > 0 || d.flung || d.dead > 0 || d.wait,
+      stag = (!d.br && d.wob > 0.8 && !(d.wA > 0.5 && d.at % 1 > 0.35)) || d.hold > 0 || d.flung || d.dead > 0 || d.wait,
       walking = !stag && r > d.rng,
       attacking = !stag && !walking;
     // he comes in at a run, weaving from side to side, and turns to face wherever he is heading; once in range he squares up to the fire, bouncing on his feet
     {
       const nx = (ox - g.position.x) / r,
         nz = (oz - g.position.z) / r,
-        sp = d.pi && d.cr ? 2.6 : d.def.speed,
+        sp = d.pi && d.cr ? 2.6 : d.def.speed * (d.br ? 1 + 1.5 * (d.rageW || 0) : 1),
         bm = d.pi && !d.cr ? 1 + 0.4 * Math.sin(d.ph - 0.3) : 1,
         lat = !walking
           ? 0
@@ -879,17 +905,18 @@ function gruntUpdate(dt) {
             : d.pi
               ? Math.sin(T * 1.6 + d.seed * 3) * 1.2
               : d.br
-                ? 0
+                ? Math.sin(T * 2.4 + d.seed * 3) * 1.8 * (d.rageW || 0)
                 : Math.sin(T * 1.9 + d.seed * 3) * 1.4,
         vx = nx * sp - nz * lat,
         vz = nz * sp + nx * lat;
       if (walking) {
         g.position.x += vx * bm * dt;
         g.position.z += vz * bm * dt;
-        d.ph += dt * (d.br ? 3.2 : d.pi ? (d.cr ? 8.5 : 11.5) : 10);
+        d.ph += dt * (d.br ? 3.2 * (1 + 1.4 * (d.rageW || 0)) : d.pi ? (d.cr ? 8.5 : 11.5) : 10);
       }
       if (!d.flung && !d.dead) {
-        const want = walking ? Math.atan2(vx, vz) : Math.atan2(nx, nz);
+        // (a raging brute weaves as he runs but keeps turned square to whoever he is after, so his swings go at them)
+        const want = walking && !(d.br && d.rage > 0) ? Math.atan2(vx, vz) : Math.atan2(nx, nz);
         g.rotation.y += Math.atan2(Math.sin(want - g.rotation.y), Math.cos(want - g.rotation.y)) * Math.min(1, dt * 9);
         R.position.y =
           d.pi || d.df
@@ -904,10 +931,19 @@ function gruntUpdate(dt) {
     // every hit that lands during the wind-up knocks the swing back a little and holds it for a moment, even on a brute that cannot be staggered.
     // a strike that is interrupted (he is hit and reels) is not thrown away on the spot: the swing holds where it was while its weight fades out, and picks up again from there if he recovers in time
     // attack: a sidearm swing. He coils to his right with the club cocked back, whips his torso round, and the forearm and wrist snap through last so the club head flicks across in front of him
+    // A raging brute swings as he runs: his own blows, one after another and quicker than usual, without stopping to plant his feet
+    const raging = d.br && d.rage > 0 && !d.dead && !stag,
+      rs = d.br && !d.dead ? d.rageW || 0 : 0,
+      wa = Math.max(d.wA, rs);
     {
       const was = Math.floor(d.at);
       d.hitch = Math.max(0, (d.hitch || 0) - dt);
-      d.at = attacking && !d.hitch ? d.at + dt / d.def.swing : attacking || d.wA >= 0.05 ? d.at : 0;
+      d.at =
+        (attacking || raging) && !d.hitch
+          ? d.at + dt / (d.def.swing * (raging && !attacking ? 0.7 : 1))
+          : attacking || d.wA >= 0.05 || rs >= 0.05
+            ? d.at
+            : 0;
       if (Math.floor(d.at) !== was || d.sk === undefined) {
         d.sk = (Math.random() * (d.br ? BSTR.length : STRIKES.length)) | 0;
         d.sd = Math.random() < 0.5 ? -1 : 1;
@@ -916,7 +952,7 @@ function gruntUpdate(dt) {
     const u = d.at % 1,
       wind = 0,
       S = d.pi ? PATK[d.sk](u) : d.br ? BSTR[d.sk](u) : STRIKES[d.sk](u),
-      smash = S.lean * d.wA,
+      smash = S.lean * wa,
       aw = d.df
         ? 0
         : kf(u, [
@@ -924,11 +960,11 @@ function gruntUpdate(dt) {
             [0.32, 1],
             [0.76, 1],
             [1, 0],
-          ]) * d.wA,
-      tw = d.df ? 0 : S.tw * d.wA * (d.pi ? d.sd : 1),
+          ]) * wa,
+      tw = d.df ? 0 : S.tw * wa * (d.pi ? d.sd : 1),
       Ap = d.pi ? {} : S.aL ? { armR: S.a, foreR: S.f, armL: S.aL, foreL: S.fL } : { armR: S.a, foreR: S.f },
       wrist = S.w,
-      lg = (S.leg || 0) * d.wA;
+      lg = (S.leg || 0) * wa;
     if (d.pi) {
       if (attacking && d.lu < S.hit && u >= S.hit)
         for (const h of S.both ? [B.handR, B.handL] : [d.sd > 0 ? B.handR : B.handL]) {
@@ -936,11 +972,12 @@ function gruntUpdate(dt) {
           puff(tmpA, 0xffd0c0, 7, 2.2, 0.25, 2);
           if (d.onHit) d.onHit();
         }
-    } else if (!d.df && attacking && d.lu < 0.48 && u >= 0.48) {
+    } else if (!d.df && (attacking || raging) && d.lu < 0.48 && u >= 0.48) {
       d.club.localToWorld(tmpA.set(0, 0.42, 0));
       puff(tmpA, 0xffe2b0, 16, 3.2, 0.3, 2);
       flash(tmpA, 0xffc890, 10);
-      shake = Math.max(shake, d.br ? 0.14 : 0.05);
+      // (the ground shakes under a planted blow; a swing thrown on the run, which may be far from anyone, barely stirs it)
+      shake = Math.max(shake, !attacking ? 0.03 : d.br ? 0.14 : 0.05);
       // the moment the blow lands: a level that wants it to hurt someone says how
       if (d.onHit) d.onHit();
       if (d.sk === 2) {

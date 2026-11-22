@@ -4,6 +4,8 @@
 // finishes the line at once if it is still typing, and otherwise moves on. After the last line the box closes.
 //   say([{ who: 'Vishwamitra', face: url, text: '…' }, …], done)   opens it; done() is called when it closes.
 //                                                                   A line may also have wait: seconds it must stay up before it can be passed
+//                                                                   or choices: [{ text, pick() }, …]: buttons (or keys 1, 2…) shown once it is typed; the
+//                                                                   one chosen has its pick() called, and only then does the talk go on
 //   talking()                                                       true while it is open
 //   talkUpdate(dt)                                                  call once a frame
 // The box makes its own elements and carries its own styles, so a page needs nothing in its HTML or stylesheet for it.
@@ -24,17 +26,25 @@ const TALK = { q: [], i: 0, n: 0, age: 0, held: 0, done: null };
   #talk p u { text-decoration: none; visibility: hidden; }
   #talk .nx { position: absolute; right: 16px; bottom: 9px; font: 12px Marcellus, serif; letter-spacing: .12em; color: #ffd08a; opacity: 0; }
   #talk.rdy .nx { opacity: .9; animation: talknx .7s ease-in-out infinite; }
+  #talk.pick .nx { opacity: 0; animation: none; }
+  #talk .ch { display: none; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+  #talk.pick .ch { display: flex; }
+  #talk .ch button { font: 16px Marcellus, serif; padding: 7px 14px; color: #fff3df; background: rgba(255, 208, 138, .12); border: 1px solid #e9c07a; border-radius: 4px; cursor: pointer; }
+  #talk .ch button:hover { background: #ffd08a; color: #2a1220; }
+  #talk .ch button i { font-style: normal; color: #ffd08a; margin-right: 8px; }
+  #talk .ch button:hover i { color: #2a1220; }
   @keyframes talknx { 50% { transform: translateY(3px); } }`;
   document.head.append(st);
   const el = document.createElement('div');
   el.id = 'talk';
-  el.innerHTML = '<img alt="" src=""><div class="tx"><b></b><p><span></span><u></u></p></div><span class="nx">SPACE ▼</span>';
+  el.innerHTML = '<img alt="" src=""><div class="tx"><b></b><p><span></span><u></u></p><div class="ch"></div></div><span class="nx">SPACE ▼</span>';
   document.body.append(el);
   TALK.el = el;
   TALK.img = el.querySelector('img');
   TALK.name = el.querySelector('b');
   TALK.shown = el.querySelector('p span');
   TALK.rest = el.querySelector('p u');
+  TALK.ch = el.querySelector('.ch');
 }
 const talking = () => TALK.q.length > 0;
 // what is on screen: the part of the line typed so far, and the rest of it present but invisible so the words never jump as they wrap
@@ -43,13 +53,27 @@ function talkDraw() {
     n = Math.min(L.text.length, Math.floor(TALK.n));
   TALK.shown.textContent = L.text.slice(0, n);
   TALK.rest.textContent = L.text.slice(n);
-  TALK.el.classList.toggle('rdy', n >= L.text.length && TALK.held >= (L.wait || 0));
+  const typed = n >= L.text.length && TALK.held >= (L.wait || 0);
+  TALK.el.classList.toggle('rdy', typed);
+  TALK.el.classList.toggle('pick', typed && !!L.choices);
 }
 function talkLine() {
   const L = TALK.q[TALK.i];
   TALK.n = TALK.held = 0;
   TALK.name.textContent = L.who || '';
   TALK.img.src = L.face || '';
+  TALK.ch.innerHTML = '';
+  (L.choices || []).forEach((c, i) => {
+    const b = document.createElement('button');
+    b.innerHTML = `<i>${i + 1}</i>${c.text}`;
+    b.onclick = () => talkPick(i);
+    TALK.ch.append(b);
+  });
+  // a drawn portrait is a cut-out, like a sticker: no box or border behind it
+  const cut = (L.face || '').startsWith('data:image/svg');
+  TALK.img.style.background = cut ? 'none' : '';
+  TALK.img.style.border = cut ? 'none' : '';
+  TALK.img.style.boxShadow = cut ? 'none' : '';
   talkDraw();
 }
 function say(lines, done) {
@@ -68,12 +92,23 @@ function talkNext() {
   if (TALK.n < L.text.length) {
     TALK.n = L.text.length;
     talkDraw();
-  } else if (++TALK.i < TALK.q.length) talkLine();
+  } else if (L.choices) return;
+  else talkOn();
+}
+// a choice made: its pick() is called, and the talk goes on
+function talkPick(i) {
+  const L = TALK.q[TALK.i];
+  if (!talking() || !L.choices || !TALK.el.classList.contains('pick') || !L.choices[i]) return;
+  L.choices[i].pick();
+  talkOn();
+}
+function talkOn() {
+  if (++TALK.i < TALK.q.length) talkLine();
   else {
     const done = TALK.done;
     TALK.q = [];
     TALK.done = null;
-    TALK.el.classList.remove('on', 'rdy');
+    TALK.el.classList.remove('on', 'rdy', 'pick');
     if (done) done();
   }
 }
@@ -94,6 +129,11 @@ function talkUpdate(dt) {
   talkDraw();
 }
 addEventListener('keydown', (e) => {
+  if (talking() && /^Digit[1-9]$/.test(e.code)) {
+    e.preventDefault();
+    if (!e.repeat) talkPick(+e.code[5] - 1);
+    return;
+  }
   if (!talking() || !['Space', 'Enter', 'KeyE', 'KeyF'].includes(e.code)) return;
   e.preventDefault();
   if (!e.repeat) talkNext();

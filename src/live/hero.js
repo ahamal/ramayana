@@ -114,6 +114,8 @@ let move = 'idle',
   fireT = 0,
   hits = 0,
   T = 0;
+// how far the camera may be turned, tilted and pulled back; a level may narrow these (yaw null: it turns all the way round)
+const CAMLIM = { yaw: null, pitch: [0.05, 1.35], dist: [2.5, 32] };
 let yaw = 0.5,
   pitch = 0.74,
   dist = 15,
@@ -227,7 +229,8 @@ addEventListener('pointermove', (e) => {
   ndc.set((e.clientX / innerWidth) * 2 - 1, -((e.clientY / innerHeight) * 2 - 1));
   if (drag) {
     yaw -= (e.clientX - drag[0]) * 0.006;
-    pitch = Math.max(0.05, Math.min(1.35, pitch + (e.clientY - drag[1]) * 0.004));
+    if (CAMLIM.yaw) yaw = Math.max(CAMLIM.yaw[0], Math.min(CAMLIM.yaw[1], yaw));
+    pitch = Math.max(CAMLIM.pitch[0], Math.min(CAMLIM.pitch[1], pitch + (e.clientY - drag[1]) * 0.004));
     drag = [e.clientX, e.clientY];
   }
 });
@@ -241,7 +244,7 @@ cv.addEventListener(
   'wheel',
   (e) => {
     e.preventDefault();
-    dist = Math.max(2.5, Math.min(32, dist * (1 + e.deltaY * 0.001)));
+    dist = Math.max(CAMLIM.dist[0], Math.min(CAMLIM.dist[1], dist * (1 + e.deltaY * 0.001)));
   },
   { passive: false },
 );
@@ -282,6 +285,8 @@ function loose() {
     if (CUR.mp >= K.cost) CUR.mp -= K.cost;
     else K = KINDS[0];
   }
+  // a level may want to know each time a shot leaves the bow, and with what (AFTER_SHOT)
+  if (AFTER_SHOT) AFTER_SHOT(CUR, K);
   const n = K.fan || 1;
   if (K.wind) return windGust(hL, aimDir);
   if (K.manava) return manavaFire(hL, aimDir);
@@ -309,6 +314,8 @@ function loose() {
     };
     // where it left the bow, so its flight can be limited from there
     sh.from = sh.g.position.clone();
+    // the damage it carries: a roll between the lowest and highest of the brother who loosed it
+    sh.dmg = CUR.dmg ? Math.round(CUR.dmg[0] + Math.random() * (CUR.dmg[1] - CUR.dmg[0])) : null;
     shots.push(sh);
     if (aimLock && i === (n - 1) >> 1) sh.lock = aimLock;
     if (!K.charge && !K.naga && !K.agni) armStreak(sh);
@@ -444,6 +451,8 @@ const IKS = [
 const RAMA = {
   name: 'rama',
   pace: 1,
+  // the damage of one arrow, lowest to highest, as in Dota
+  dmg: [48, 56],
   range: 13,
   keep: 4.5,
   group: rama,
@@ -488,7 +497,8 @@ function cloneHero(src, name, at, tint) {
   const mesh = g.children.find((o) => o.isSkinnedMesh);
   return {
     name,
-    pace: 0.68,
+    pace: 0.8,
+    dmg: [30, 36],
     range: 14,
     keep: 3.5,
     group: g,
@@ -549,6 +559,8 @@ let SEL = RAMA,
 const IN = { x: 0, z: 0, walk: false, fire: false, at: null, quick: 1 };
 // for a level's scenes: LOCK shuts out firing and switching brothers; DIRECT(h, dt), if it returns true, has given that hero his orders
 // for this frame by filling IN (and may set move, namaste and firing, which are his at that moment)
+// AFTER_SHOT: a level's hook, called with the hero and the kind of arrow each time one is loosed
+let AFTER_SHOT = null;
 let LOCK = false,
   DIRECT = null,
   CAM = null;
@@ -585,10 +597,11 @@ function brain(h, dt) {
     tz = 0,
     crowd = 0;
   for (const d of grunts) {
-    if (d.dead || d.flung) continue;
+    if (d.dead || d.flung || d.asleep) continue;
     const l = Math.hypot(d.g.position.x - P.x, d.g.position.z - P.z);
-    // on a big map, enemies too far off to matter are not his concern
-    if (l > h.range + 12) continue;
+    // on a big map, enemies too far off to matter are not his concern: he does not go after one until it is only a little
+    // beyond his reach
+    if (l > h.range + 3) continue;
     if (l < bd) {
       bd = l;
       best = d;
@@ -1200,6 +1213,7 @@ function shotsUpdate(dt) {
       hitP = s.g.position.clone();
       struck.wob = 1;
       struck.pw = -1;
+      struck.dmg = s.dmg;
       struck.vel.addScaledVector(tmp2, 1.2);
     }
     if (!s.lock)
@@ -1228,6 +1242,7 @@ function shotsUpdate(dt) {
           hitP = q.clone();
           d.wob = 1;
           d.pw = -1;
+          d.dmg = s.dmg;
           d.vel.addScaledVector(tmp2, 1.2);
           break;
         }
@@ -1291,8 +1306,13 @@ function worldUpdate(dt) {
 function cameraUpdate(dt) {
   // camera: one orbiting view from above, never cutting in close
   // a level's scene may point the camera at something else for a while (CAM, a position that may move): it drifts across, unhurried
+  // While a scene holds the camera it aims a little short of the subject, on the near side, so the subject sits higher on the
+  // screen, clear of the dialogue box along the bottom. The amount grows with the zoom. (Ordinary dialogue leaves it alone)
+  const ahead = CAM ? dist * 0.12 : 0;
   tgt.lerp(
-    tmp.copy(CAM || (who === 'sage' ? V.group.position : rama.position)).add(V3(0, 0.9, 0)),
+    tmp
+      .copy(CAM || (who === 'sage' ? V.group.position : rama.position))
+      .add(V3(Math.sin(yaw) * ahead, 0.9, Math.cos(yaw) * ahead)),
     camInit ? Math.min(1, dt * (CAM ? 1.4 : 4)) : (camInit = 1),
   );
   cam.position.set(
