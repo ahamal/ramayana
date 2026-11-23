@@ -767,12 +767,15 @@ const BSTR = [
     };
   },
 ];
-// a brute loses his temper: for two to three and a half seconds he runs at two and a half times his pace (5.5, a little quicker
-// than the brothers' 5), weaving, swinging his club again and
-// again as he comes (see the attack); then he cannot lose it again for a few seconds more
+// A brute loses his temper, briefly: for about a second and a half he comes on at two and a half times his pace (5.5, a little
+// quicker than the brothers' 5), weaving, and lays about him left and right: a sweep from his right, a backhand from his left,
+// and again. After it he cannot lose his temper again for a few seconds
 function rageOn(d) {
-  d.rage = 1.8 + Math.random() * 1.6;
+  d.rage = 1.4 + Math.random() * 0.4;
   d.rageCd = d.rage + 3 + Math.random() * 3;
+  // the blows start afresh, with the sweep from his right
+  d.at = 0;
+  d.sk = 1;
 }
 // a level may hold every enemy still for a while (HOLD_FOES), as it does while someone is speaking
 let HOLD_FOES = false;
@@ -940,12 +943,13 @@ function gruntUpdate(dt) {
       d.hitch = Math.max(0, (d.hitch || 0) - dt);
       d.at =
         (attacking || raging) && !d.hitch
-          ? d.at + dt / (d.def.swing * (raging && !attacking ? 0.7 : 1))
+          ? d.at + dt / (d.def.swing * (raging ? 0.42 : 1))
           : attacking || d.wA >= 0.05 || rs >= 0.05
             ? d.at
             : 0;
       if (Math.floor(d.at) !== was || d.sk === undefined) {
-        d.sk = (Math.random() * (d.br ? BSTR.length : STRIKES.length)) | 0;
+        // (in a rage, the two sideways blows turn and turn about: from his right, from his left)
+        d.sk = raging ? (d.sk === 0 ? 1 : 0) : (Math.random() * (d.br ? BSTR.length : STRIKES.length)) | 0;
         d.sd = Math.random() < 0.5 ? -1 : 1;
       }
     }

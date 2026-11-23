@@ -595,7 +595,9 @@ function brain(h, dt) {
     // the push away from everything that is too close, each counting for more the nearer it is
     tx = 0,
     tz = 0,
-    crowd = 0;
+    crowd = 0,
+    // how much room the most pressing enemy still leaves him: below nothing, something is inside the distance he keeps from it
+    room = 1e9;
   for (const d of grunts) {
     if (d.dead || d.flung || d.asleep) continue;
     const l = Math.hypot(d.g.position.x - P.x, d.g.position.z - P.z);
@@ -606,8 +608,12 @@ function brain(h, dt) {
       bd = l;
       best = d;
     }
-    if (l < h.keep + 0.8) {
-      const k = 1 - l / (h.keep + 0.8);
+    // the distance he keeps depends on what it is: a brute's club reaches far and he can charge, so a brute is given a wide
+    // berth, and a wider one still while he is in a rage
+    const kp = d.br ? (d.rage > 0 ? 11 : 8) : h.keep;
+    room = Math.min(room, l - kp);
+    if (l < kp + 0.8) {
+      const k = 1 - l / (kp + 0.8);
       tx += ((P.x - d.g.position.x) / (l || 1)) * k;
       tz += ((P.z - d.g.position.z) / (l || 1)) * k;
       crowd++;
@@ -638,14 +644,14 @@ function brain(h, dt) {
   const lead = FOLLOW && who !== 'sage' && h !== SEL ? SEL.group.position : null,
     ld = lead ? Math.hypot(lead.x - P.x, lead.z - P.z) : 0;
   if (lead) h.post.copy(P);
-  if (lead && ld > 6.5 && !(best && bd < h.keep)) {
+  if (lead && ld > 6.5 && !(best && room < 0)) {
     h.mode = null;
     dx = lead.x - P.x;
     dz = lead.z - P.z;
   } else if (best) {
-    if (bd < h.keep) h.mode = 'back';
+    if (room < 0) h.mode = 'back';
     else if (bd > h.range * 0.92) h.mode = 'close';
-    else if (h.mode === 'back' ? bd > h.keep + 1.2 : h.mode === 'close' ? bd < h.range * 0.72 : !h.mode) h.mode = 'hold';
+    else if (h.mode === 'back' ? room > 1.2 : h.mode === 'close' ? bd < h.range * 0.72 : !h.mode) h.mode = 'hold';
     const ex = (best.g.position.x - P.x) / (bd || 1),
       ez = (best.g.position.z - P.z) / (bd || 1);
     if (h.mode === 'close') {
@@ -654,8 +660,9 @@ function brain(h, dt) {
     } else if (h.mode === 'back') {
       // away from the whole crowd, not just the nearest of them. Hemmed in on all sides the pushes cancel, and he stands his ground and shoots
       const tl = Math.hypot(tx, tz);
-      dx = crowd > 1 ? (tl > 0.25 ? tx / tl : 0) : -ex;
-      dz = crowd > 1 ? (tl > 0.25 ? tz / tl : 0) : -ez;
+      // (and away from whatever is pressing him, which with a brute about need not be the one he is shooting at)
+      dx = tl > 0.25 ? tx / tl : crowd > 1 ? 0 : -ex;
+      dz = tl > 0.25 ? tz / tl : crowd > 1 ? 0 : -ez;
       // at the edge of the ground he cannot back off any further outwards: he slides round the edge instead
       const r = Math.hypot(P.x, P.z) || 1,
         out = (dx * P.x + dz * P.z) / r;
@@ -727,7 +734,8 @@ function heroUpdate(dt) {
   one(SEL, who === 'sage');
   AUTO = false;
   for (const h of HEROES) {
-    if (h.mp !== undefined) h.mp = Math.min(h.mpMax, h.mp + dt * 4);
+    // (mana comes back at four a second, unless a level gives the hero his own rate)
+    if (h.mp !== undefined) h.mp = Math.min(h.mpMax, h.mp + dt * (h.mpRegen || 4));
     if (h.st !== undefined) {
       h.st = Math.min(h.stMax, h.st + dt * 4);
       if (h.st >= h.stMax * 0.5) h.tired = false;
@@ -988,6 +996,11 @@ function heroStep(dt) {
     gl.material.color.set(K.color);
     gl.scale.setScalar((K.glow || 0.6) * (0.4 + draw * 0.8));
     if (drawn && K.charge && Math.random() < 0.7) puff(hL, K.color, 2, 1.2, 0.5, 0, 0.9);
+    // the fire arrow burns at its head while it is on the string
+    if (drawn && K.agni) {
+      gl.scale.multiplyScalar(1.7 + 0.25 * Math.sin(T * 19) + 0.15 * Math.sin(T * 31.7));
+      if (Math.random() < dt * 22) puff(hL, K.color, 1, 0.7, 0.3, -1.5, 0.14);
+    }
     const wd = drawn && !!K.wind;
     windSw.forEach((m, i) => {
       m.visible = wd;

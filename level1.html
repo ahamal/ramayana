@@ -4,31 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Level 1 · Ramayana</title>
-<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Tiro+Devanagari+Sanskrit&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Marcellus&family=Tiro+Devanagari+Sanskrit&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="src/live/live.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-<!-- the menu: a button in the top right corner that opens a short list (styled here, as the stylesheet may be cached) -->
-<div id="menu" style="position:fixed;right:16px;top:16px;z-index:30;display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-  <button id="menuBtn" aria-label="Menu" style="width:40px;height:40px;padding:0;display:grid;place-items:center;background:rgba(24,12,28,.6);border:1px solid rgba(255,210,150,.45);border-radius:6px;backdrop-filter:blur(5px)">
-    <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="#ffd08a" stroke-width="2" stroke-linecap="round"><path d="M3 5h14M3 10h14M3 15h14"/></svg>
-  </button>
-  <div id="menuList" style="display:none;flex-direction:column;min-width:170px;padding:6px;background:rgba(24,12,28,.85);border:1px solid rgba(255,210,150,.45);border-radius:6px;backdrop-filter:blur(5px)">
-    <a href="index.html" style="padding:8px 10px;color:#ffd9a0;text-decoration:none;font:14px Marcellus,serif;letter-spacing:.08em">Main menu</a>
-    <a href="level1.html" style="padding:8px 10px;color:#ffd9a0;text-decoration:none;font:14px Marcellus,serif;letter-spacing:.08em">Restart level</a>
-  </div>
-</div>
-<script>
-  (function () {
-    var list = document.getElementById('menuList');
-    function toggle(open) { list.style.display = (open === undefined ? list.style.display === 'none' : open) ? 'flex' : 'none'; }
-    document.getElementById('menuBtn').addEventListener('click', function () { toggle(); });
-    // Escape opens and closes it; a click anywhere else closes it
-    addEventListener('keydown', function (e) { if (e.code === 'Escape') toggle(); });
-    addEventListener('pointerdown', function (e) { if (!document.getElementById('menu').contains(e.target)) toggle(false); });
-  })();
-</script>
 <div id="flash"></div>
 <div id="party"></div>
 <div id="hud"><div id="arrows"></div></div>
