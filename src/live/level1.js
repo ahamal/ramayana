@@ -1640,7 +1640,7 @@ function prisoner(x, z, i, job, ends) {
       lean: [0.08, 0.13, 0.04][i % 3],
       // his way to the hermitage (for the bound ones by the road; the others' is worked out when they are freed): onto the road,
       // along it to the sage's house, and to his own place on the grass in front of it
-      path: job ? [] : [[x + 2.5, roadZ(x + 2.5) + (i - 1) * 0.7], [-48, roadZ(-48) + (i - 1) * 0.7], [-36, 0.4 + (i - 1) * 0.7], VSEATS[i]],
+      path: job ? [] : [[x + 2.5, roadZ(x + 2.5) + (i - 1) * 0.7], [-48, roadZ(-48) + (i - 1) * 0.7], VSEATS[i]],
     };
   pose(p);
   PRISONERS.push(p);
@@ -1654,16 +1654,17 @@ function prisoner(x, z, i, job, ends) {
 SPAWN_MAX = 40;
 const CAMPS = [],
   apart = (a, b) => Math.hypot(a.x - b.x, a.z - b.z),
-  // Places to sit: on the bare ground north of the fire and facing it, in a loose half circle two deep, as people sit who have
-  // not been told where to. Each is a little out of line with its neighbours, nearer or further and to one side (by amounts
-  // that are fixed, so a man's seat is the same every time). They are taken in turn as men are freed, from the west end round
+  // Places to sit: on the ground in front of the wood store, in a loose half circle two deep round the open space before it,
+  // as people sit who have not been told where to. Each is a little out of line with its neighbours, nearer or further and to
+  // one side (by amounts that are fixed, so a man's seat is the same every time). They are taken in turn as men are freed
+  VFOCUS = [WOODSHED[0] + 3 * Math.sin(WOODSHED[2]), WOODSHED[1] + 3 * Math.cos(WOODSHED[2])],
   VSEATS = Array.from({ length: 16 }, (_, i) => {
     const row = i % 2,
       wob = (n) => Math.sin(i * 12.9898 + n * 78.233) * 43758.5453,
       j = (n) => wob(n) - Math.floor(wob(n)) - 0.5,
-      a = -1.15 + (Math.floor(i / 2) + row * 0.5) * 0.3 + j(1) * 0.1,
-      r = 6.6 + row * 1.7 + j(2) * 0.7;
-    return [r * Math.sin(a), -r * Math.cos(a)];
+      a = WOODSHED[2] - 1.15 + (Math.floor(i / 2) + row * 0.5) * 0.3 + j(1) * 0.1,
+      r = 3.3 + row * 1.6 + j(2) * 0.5;
+    return [VFOCUS[0] + r * Math.sin(a), VFOCUS[1] + r * Math.cos(a)];
   });
 // (the first three are taken by the men from the camp by the road)
 let seatsTaken = 3,
@@ -1933,6 +1934,8 @@ function campUpdate(dt) {
           { who: 'Villager', face: f[0], text: 'You came! We thought no one would.' },
           { who: 'Elder', face: f[1], text: 'They dragged us from the hermitage at dawn, to spill our blood on the sage’s altar. Bless you both.' },
           { who: 'Rama', face: photo(RAMA), text: 'Go to Vishwamitra. You will be safe by his fire.' },
+          // (all of them together, as they turn to go)
+          { who: 'Villagers', face: f[f.length - 1], text: 'Jai Shree Ram!' },
         ],
         () => {
           LOCK = false;
@@ -1966,11 +1969,13 @@ function campUpdate(dt) {
               { who: 'Mason', face: f[0], text: 'They had us cutting stone for a wall to their king. Not one block more.' },
               { who: 'Old mason', face: f[1], text: 'These hands have raised temples, prince. Give us stone and they are yours.' },
               { who: 'Rama', face: photo(RAMA), text: 'Go to the hermitage. There will be work worth your hands.' },
+              { who: 'Masons', face: f[f.length - 1], text: 'Jai Shree Ram!' },
             ]
           : [
               { who: 'Brahmin', face: f[0], text: 'The pot was already on the fire. Another hour and you would have found bones.' },
               { who: 'Old brahmin', face: f[1], text: 'Live long, sons of Dasharatha. The sage’s rite needs voices. We will sit at his fire and chant till dawn.' },
               { who: 'Rama', face: photo(RAMA), text: 'Go to Vishwamitra. Keep the rite. We will keep the night.' },
+              { who: 'Brahmins', face: f[f.length - 1], text: 'Jai Shree Ram!' },
             ],
         () => {
           LOCK = false;
@@ -2041,6 +2046,7 @@ function campUpdate(dt) {
       } else {
         p.nam = Math.max(0, p.nam - dt / 0.4);
         const w = p.path[0],
+          // (seated, wherever he sits, he faces the fire)
           dx = w ? w[0] - P.x : -P.x,
           dz = w ? w[1] - P.z : -P.z,
           l = Math.hypot(dx, dz) || 1,
@@ -2155,7 +2161,8 @@ function woodStep(p, dt) {
     W.bent = false;
   } else if (W.t > 0.45) {
     W.bundle.visible = false;
-    woodGain(5);
+    // (wood brought in feeds the fire; what the fire gives back for it is counted at the end of the night)
+    STOCK.pend += 5;
     W.axe.visible = true;
     puff(tmpA.set(P.x, 0.2, P.z), 0xcbb48a, 5, 1, 0.4, 2);
     W.s = 'out';
@@ -2165,7 +2172,7 @@ function woodStep(p, dt) {
 }
 
 // ---------- the men's orders ----------
-// After Vishwamitra's talk, the men freed from the first camp are sitting by the fire. Walk up to them and Rama sets them to
+// After Vishwamitra's talk, the men freed from the first camp are sitting by the wood store. Walk up to them and Rama sets them to
 // gathering wood for the night; they get up and go to the wood store. Before they go they tell him of the two other camps, north
 // and south, and that there is time to reach only one before dark. The player chooses by going: the first camp a brother comes
 // near becomes the objective
@@ -2223,11 +2230,11 @@ function orderUpdate() {
 //   wait           (before it starts) until a brother comes near the altar
 //   brothersSit    both walk to their places before the fire, sit and bow
 //   hush           a moment after both are down...
-//   sageOm         ...Vishwamitra, eyes shut, makes them wait through one long Om
+//   sageOm         ...Vishwamitra, eyes shut, asks his question; his eyes open and the brothers answer
 //   sageRises      he gets to his feet, unhurried
 //   sageComes      and walks round the fire to them
-//   sageGreets     he stops before them and begins
-//   sageTalks      he tells them why they are here, and at the end raises his hand and gives Rama the Agneyastra: the fire
+//   sageGreets     he stops before the two of them, facing both
+//   sageTalks      he turns to Rama, raises his hand and gives him the Agneyastra: the fire
 //                  passes from his palm to Rama, who sits still to receive it
 //   sageReturns    the brothers rise and the level is the player's again, while he goes back to his seat by the fire and sits
 //   sageOffers     he settles onto his own spot
@@ -2236,7 +2243,11 @@ function orderUpdate() {
 const SEATS = { rama: V3(-4.3, 0, 4.5), lak: V3(-5.3, 0, 3.5) },
   SAGE_HOME = V3(0, 0, -2),
   SAGE_VIA = V3(-2.4, 0, -0.3),
-  SAGE_MEET = V3(-2.7, 0, 2.9),
+  // He stops squarely in front of the pair, the same distance from each, having come the last few steps straight toward the
+  // middle of them (by SAGE_VIA2), so he is plainly walking to both and not to Rama
+  SAGE_MID = V3((SEATS.rama.x + SEATS.lak.x) / 2, 0, (SEATS.rama.z + SEATS.lak.z) / 2),
+  SAGE_MEET = V3(SAGE_MID.x + 2.3 * 0.7071, 0, SAGE_MID.z - 2.3 * 0.7071),
+  SAGE_VIA2 = V3(SAGE_MID.x + 3.9 * 0.7071, 0, SAGE_MID.z - 3.9 * 0.7071),
   ARR = { step: 'wait', t: 0, bow: true },
   // Vishwamitra has no eyelids of his own. He is given a pair here, hidden until he shuts his eyes, and his pupils hide when he does
   SAGE_EYES = { lids: [], pupils: [] };
@@ -2336,59 +2347,66 @@ function arriveUpdate(dt) {
       to('hush');
     }
   } else if (A.step === 'hush') {
-    // then he keeps them waiting. His eyes close, and he says one long Om before anything else happens: patience.
-    // The brothers hold their bow all through it, and until he has come over and begins to speak
+    // He keeps them waiting a moment, eyes shut, and asks his question without opening them. Then they open, and the brothers
+    // answer him where they sit, still bowed: Rama humbly, Lakshmana sure of himself
     if (A.t > 1.5) {
       sageEyes(true);
-      say([{ who: 'Vishwamitra', face: snap(V.bone.head, V.group.rotation.y, null), text: 'Om…' }], () => to('sageRises'));
+      const f = snap(V.bone.head, V.group.rotation.y, null);
+      say(
+        [
+          { who: 'Vishwamitra', face: f, text: 'So Dasharatha sent you boys to help me?' },
+          {
+            who: 'Rama',
+            face: photo(RAMA),
+            text: 'We are only your pupils, Gurudev. Tell us what must be done, and we will try to be worthy of it.',
+            on: () => sageEyes(false),
+          },
+          { who: 'Lakshmana', face: photo(LAK), text: 'Let the demons come. Not one of them will reach your fire.' },
+        ],
+        () => to('sageRises'),
+      );
       to('sageOm');
     }
   } else if (A.step === 'sageRises') {
-    // three more seconds of stillness after the Om. His eyes open near the end of it, and then he gets up
-    if (A.t > 2.3) sageEyes(false);
-    if (A.t > 3) {
+    // a breath of stillness after they have answered, and then he gets up
+    if (A.t > 0.9) {
+      sageEyes(false);
       SG.at = V.group.position.clone();
       to('sageComes');
     }
   } else if (A.step === 'sageComes') {
     if (!A.via) A.via = sageWalk(SAGE_VIA, dt, true);
+    else if (!A.via2) A.via2 = sageWalk(SAGE_VIA2, dt, true);
     else if (sageWalk(SAGE_MEET, dt)) {
       SG.move = 'idle';
       // he turns to face them, unhurriedly (see the top of this function)
-      A.face = Math.atan2(-4.8 - SAGE_MEET.x, 4 - SAGE_MEET.z);
+      A.face = Math.atan2(SAGE_MID.x - SAGE_MEET.x, SAGE_MID.z - SAGE_MEET.z);
       to('sageGreets');
     }
   } else if (A.step === 'sageGreets') {
-    if (A.t > 0.6) {
+    // (he stands a moment facing the two of them before he speaks)
+    if (A.t > 1.3) {
       A.bow = false;
       const f = snap(V.bone.head, V.group.rotation.y, null);
       say(
         [
-          { who: 'Vishwamitra', face: f, text: 'Rama. Lakshmana. You have come, and not a day too soon.' },
           {
             who: 'Vishwamitra',
             face: f,
-            text: 'For six nights this fire must burn without a break. Once the rite begins I may not rise, nor lift a hand in anger.',
-          },
-          { who: 'Vishwamitra', face: f, text: 'The rakshasas know it. Maricha and Subahu send their kind to foul the altar with blood and filth.' },
-          { who: 'Vishwamitra', face: f, text: 'You met some on the road. More will come with the dark, and from every side.' },
-          { who: 'Rama', face: photo(RAMA), text: 'Then tend your fire, Gurudev. Nothing will reach it while we stand.' },
-          { who: 'Vishwamitra', face: f, text: 'Guard the fire. That is all I ask of you.' },
-          {
-            who: 'Vishwamitra',
-            face: f,
-            text: 'And take this, Rama. The Agneyastra: Agni himself, bound to an arrow.',
+            text: 'Then take this, Rama. The Agneyastra: Agni himself, bound to an arrow.',
             // as he says it he raises his hand and the fire passes from it to Rama; the line stays up while it does
             wait: GIFT.T + 0.2,
             on: () => {
+              // (for the gift he turns from the pair to Rama)
+              A.face = Math.atan2(SEATS.rama.x - SAGE_MEET.x, SEATS.rama.z - SAGE_MEET.z);
               A.giving = true;
               giveAstra(1);
             },
           },
-          { who: 'Vishwamitra', face: f, text: 'Call on it when the bow alone will not do. It asks for your strength each time.' },
+          { who: 'Vishwamitra', face: f, text: 'Use it, Rama, when the bow alone will not do.' },
         ],
         () => {
-          A.via = false;
+          A.via = A.via2 = false;
           A.face = null;
           // the talk is over: the camera goes straight back to the brother being played, and does not follow the sage home,
           // and the brothers get up at once (see 'sageReturns')
@@ -2487,7 +2505,6 @@ const VIEW = new THREE.Vector3();
   ic.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:15;width:36px;height:36px;display:grid;place-items:center;cursor:pointer;opacity:.95';
   ic.innerHTML =
     '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#000" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20Z"/><path d="M9 4v13.5M15 6.5V20"/></svg>';
-  document.body.append(ic);
   MINI.toggle = (on = !MINI.open) => {
     MINI.open = on;
     box.style.opacity = on ? 1 : 0;
@@ -2777,6 +2794,7 @@ function sceneryUpdate(dt) {
   talkUpdate(dt);
   tipsUpdate();
   heroBars(dt);
+  coinsUpdate(dt);
   SKY.position.copy(cam.position);
   SUN.position.copy(cam.position).add(SUN0);
 }
@@ -2817,7 +2835,7 @@ function goal() {
   const C = CAMPS;
   if (ARR.step === 'wait') return C[0].seen && !C[0].rescued ? 'Free the villagers.' : 'Follow the road to Vishwamitra’s hermitage.';
   if (!ARR.talked) return '';
-  if (!ORDER.done) return 'Speak to the men by the fire.';
+  if (!ORDER.done) return 'Speak to the men by the wood store.';
   if (!ORDER.pick) return 'Free the masons in the east, or the brahmins in the south.';
   const c = C[ORDER.pick === 'east' ? 1 : 2];
   if (!c.prisoners.every((p) => p.free)) return ORDER.pick === 'east' ? 'Free the stone masons, east past the river.' : 'Free the brahmins, south over the crossing.';
@@ -2979,7 +2997,7 @@ const ASTRA = { have: [0], armed: 0, last: 0, slots: [] },
 {
   const bar = document.createElement('div');
   // (the arrow on Rama's bow sits in the bottom left corner; the count of wood keeps the top left)
-  bar.style.cssText = 'position:fixed;left:16px;bottom:26px;z-index:14;display:flex;gap:8px;align-items:flex-end;transition:opacity .3s';
+  bar.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:14;display:flex;gap:8px;align-items:flex-end;transition:opacity .3s';
   const row = document.createElement('div');
   row.style.cssText = 'position:fixed;left:16px;top:16px;z-index:14;display:flex;flex-direction:column;gap:18px;align-items:flex-start';
   document.body.append(row, bar);
@@ -3013,12 +3031,12 @@ function astraSlot(k) {
     n = ASTRA.slots.length + 1,
     max = KINDS[k].cost ? Math.floor(RAMA.mpMax / KINDS[k].cost) : 0;
   b.style.cssText =
-    'position:relative;flex:none;width:36px;height:36px;display:grid;place-items:center;font-style:normal;cursor:pointer';
+    'position:relative;flex:none;width:42px;height:42px;border-radius:50%;background:rgba(22,22,24,.88);display:grid;place-items:center;font-style:normal;cursor:pointer';
   b.innerHTML =
-    // (the icon alone, in black: no box behind it and no key number on it)
-    `<span style="width:32px;height:32px;display:block;filter:brightness(0);transition:opacity .15s,transform .15s">${ASTRA_ICON[k]}</span>` +
+    // (the icon in its own pale colour on a dark disc, like the coin's count across the screen; no key number on it)
+    `<span style="width:26px;height:26px;display:block;transition:opacity .15s">${ASTRA_ICON[k]}</span>` +
     // one light for each he could loose on a full measure, lit for each he can loose now
-    `<u style="position:absolute;left:-2px;right:-2px;bottom:-10px;display:flex;justify-content:center;gap:2px;text-decoration:none">${'<s style="flex:1;max-width:11px;height:5px;border-radius:2px;background:rgba(22,22,24,.6)"></s>'.repeat(max)}</u>`;
+    `<u style="position:absolute;left:2px;right:2px;bottom:-11px;display:flex;justify-content:center;gap:2px;text-decoration:none">${'<s style="flex:1;max-width:11px;height:5px;border-radius:2px;background:rgba(22,22,24,.6)"></s>'.repeat(max)}</u>`;
   b.addEventListener('click', () => who === 'rama' && !LOCK && armAstra(k));
   b.k = k;
   b.icon = b.firstChild;
@@ -3187,7 +3205,11 @@ addEventListener(
 // the loop of road, clear of every road and of the straight ways in to the fire from west, east, south and the hall, so nobody
 // walks into one and together they light the whole court. They are cold until Rama lights them: an Agneyastra that flies through one, or lands within a few
 // paces of it, sets its bowl burning, and it burns from then on, a flame with a light of its own, so there is light there at night.
-const WOOD_ICON =
+// Tejas: what lamps are bought with. Its sign is an old punch-marked coin: a round piece of worn silver with a thick edge,
+// stamped with a sun, a crescent and a few dots
+const TEJAS_ICON =
+  '<svg viewBox="0 0 24 24" width="100%" height="100%"><defs><linearGradient id="tjF" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6e0d2"/><stop offset=".55" stop-color="#bdb6a5"/><stop offset="1" stop-color="#8f8878"/></linearGradient></defs><circle cx="12" cy="13.4" r="8.8" fill="#5f594c"/><circle cx="12" cy="12" r="8.8" fill="#7b7465"/><circle cx="12" cy="10.6" r="8.8" fill="url(#tjF)"/><g fill="none" stroke="#6a6355" stroke-width="1.1" stroke-linecap="round"><circle cx="9.6" cy="8.8" r="1.4"/><path d="M11.8 8.8L13.0 8.8M10.7 10.7L11.3 11.7M8.5 10.7L7.9 11.7M7.4 8.8L6.2 8.8M8.5 6.9L7.9 5.9M10.7 6.9L11.3 5.9"/><path d="M13.8 11.6a2.5 2.5 0 1 0 3.4 1.2"/></g><g fill="#6a6355"><circle cx="15.4" cy="6.6" r=".8"/><circle cx="8.2" cy="14" r=".8"/><circle cx="10.8" cy="15.2" r=".8"/></g><path d="M5.6 6.6A8 8 0 0 1 16.6 3.6" fill="none" stroke="#fffaf0" stroke-opacity=".7" stroke-width=".9" stroke-linecap="round"/></svg>',
+  WOOD_ICON =
   '<svg viewBox="0 0 20 20"><g fill="none" stroke="#f0dcb4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5 L 13 4.2 a2.3 2.3 0 0 1 2 4.2 L 5.5 12.7"/><circle cx="4.5" cy="10.6" r="2.3"/><path d="M6 15.8 L 15.5 11.5 a2.3 2.3 0 0 1 2 4.2" opacity=".7"/></g></svg>';
 const PED = 0.3,
   LAMP_COST = 10,
@@ -3327,16 +3349,17 @@ function lampLight(l) {
 // ring round it, and beside it what would be built and what it costs. Building is a hold, not a tap: while Space (or the mouse,
 // on the sign) is held the ring fills round the key, and when it closes the wood is spent and the lamp puts itself together.
 // Let go early and the ring runs back; nothing is spent. With too little wood the cost shows red and the sign shakes
-const STOCK = { n: 20, el: null, sign: null, ring: null, at: null, hold: false, k: 0 },
+const STOCK = { n: 40, pend: 0, el: null, sign: null, ring: null, at: null, hold: false, k: 0 },
   RING_LEN = 2 * Math.PI * 20,
   HOLD_T = 0.35;
 {
   const el = document.createElement('div');
+  // (the count of Tejas keeps the bottom right corner)
   el.style.cssText =
-    'display:flex;align-items:center;gap:6px;padding:4px 11px 4px 8px;border-radius:6px;' +
-    'background:rgba(22,22,24,.65);color:#fff3df;font:700 17px var(--f)';
-  el.innerHTML = `<span style="width:18px;height:18px;display:block">${WOOD_ICON}</span><b style="font-weight:400">0</b>`;
-  ASTRA.row.append(el);
+    'position:fixed;right:16px;bottom:16px;z-index:14;display:flex;align-items:center;gap:9px;padding:7px 18px 7px 9px;border-radius:999px;' +
+    'background:rgba(22,22,24,.88);color:#fff3df;font:700 21px var(--f)';
+  el.innerHTML = `<span style="width:28px;height:28px;display:block">${TEJAS_ICON}</span><b style="font-weight:400;line-height:1;font-variant-numeric:lining-nums;position:relative;top:-1px">0</b>`;
+  document.body.append(el);
   STOCK.el = el;
   const sg = document.createElement('div');
   sg.style.cssText =
@@ -3347,7 +3370,7 @@ const STOCK = { n: 20, el: null, sign: null, ring: null, at: null, hold: false, 
     `<svg width="48" height="48" viewBox="0 0 48 48" style="flex:none;display:block"><circle cx="24" cy="24" r="20" fill="#1a1a1c" stroke="rgba(255,210,150,.25)" stroke-width="3"/>` +
     `<circle cx="24" cy="24" r="20" fill="none" stroke="#ffd08a" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="${RING_LEN}" stroke-dashoffset="${RING_LEN}" transform="rotate(-90 24 24)"/>` +
     `<text x="24" y="27" text-anchor="middle" font-family="Cormorant Garamond,Georgia,serif" font-weight="700" font-size="9.5" letter-spacing="1" fill="#ffd08a">SPACE</text></svg>` +
-    `<span style="display:flex;align-items:center;gap:5px"><span style="width:16px;height:16px;display:block">${WOOD_ICON}</span><i style="font-style:normal">${LAMP_COST}</i></span>`;
+    `<span style="display:flex;align-items:center;gap:5px"><span style="width:16px;height:16px;display:block">${TEJAS_ICON}</span><i style="font-style:normal">${LAMP_COST}</i></span>`;
   document.body.append(sg);
   STOCK.sign = sg;
   STOCK.ring = sg.querySelectorAll('circle')[1];
@@ -3377,6 +3400,13 @@ const STOCK = { n: 20, el: null, sign: null, ring: null, at: null, hold: false, 
   );
   addEventListener('keyup', (e) => e.code === 'Space' && hold(false));
   woodGain(0);
+}
+// The end of a night: what was gathered that day is counted into Tejas all at once
+function nightTally() {
+  const n = STOCK.pend;
+  STOCK.pend = 0;
+  woodGain(n);
+  return n;
 }
 function woodGain(n) {
   STOCK.n += n;
@@ -3495,7 +3525,7 @@ function tipsUpdate() {
         : goal()
       : k === 'build'
         ? STOCK.n < LAMP_COST
-          ? 'A lamp needs more wood than you have.'
+          ? 'A lamp needs more Tejas than you have.'
           : 'Hold <kbd>Space</kbd> to construct the lamp.'
         : k === 'agni'
           ? 'Press <kbd>2</kbd> to draw the Agneyastra, then click to loose it.'
@@ -3563,6 +3593,77 @@ function heroBars(dt) {
     o.c.scale.setScalar(0.15 * o.s * fl);
     if (o.s > 0.8 && Math.random() < dt * 5) puff(o.g.position, KINDS[k || 1].color, 1, 0.5, 0.2, -1.5, 0.12);
   });
+}
+// ---------- coins ----------
+// A brute carries a coin. When he dies it jumps out of him, falls and lies turning on the ground where it came down, shining a
+// little; the first brother to walk up to it draws it to him, and it is counted
+const COINS = [],
+  COIN_WORTH = 10,
+  COIN_M = toon(0xa9a393, { rim: 0.15 }),
+  COIN_G = new THREE.CylinderGeometry(0.26, 0.26, 0.06, 20);
+function coinsUpdate(dt) {
+  for (const d of grunts)
+    if (d.br && d.dead && !d.coin) {
+      d.coin = true;
+      const g = new THREE.Group(),
+        P = d.g.position,
+        a = Math.random() * 6.283,
+        gl = glow(0xfff0c8, 0.55);
+      add(g, COIN_G, COIN_M, [0, 0, 0], [Math.PI / 2, 0, 0]);
+      g.add(gl);
+      g.position.set(P.x, P.y + 1.6, P.z);
+      scene.add(g);
+      COINS.push({ g, gl, vx: Math.cos(a) * 1.6, vz: Math.sin(a) * 1.6, vy: 6.5, down: false, to: null, t: 0 });
+    }
+  for (let i = COINS.length - 1; i >= 0; i--) {
+    const c = COINS[i],
+      P = c.g.position;
+    c.t += dt;
+    c.g.rotation.y += dt * (c.down ? 2.6 : 11);
+    c.gl.material.opacity = 0.1 + 0.04 * Math.sin(c.t * 4);
+    if (c.to) {
+      // drawn in to the brother who came for it, quicker the nearer it gets
+      const q = c.to.group.position,
+        k = Math.min(1, dt * (6 + c.t * 20));
+      P.x += (q.x - P.x) * k;
+      P.y += (q.y + 1.1 - P.y) * k;
+      P.z += (q.z - P.z) * k;
+      c.g.scale.setScalar(Math.max(0.3, 1 - c.t * 1.6));
+      if (Math.hypot(q.x - P.x, q.z - P.z) < 0.35) {
+        puff(P, 0xfff0c8, 8, 1.6, 0.3, 0, 0.25);
+        woodGain(COIN_WORTH);
+        scene.remove(c.g);
+        COINS.splice(i, 1);
+      }
+      continue;
+    }
+    if (!c.down) {
+      c.vy -= 16 * dt;
+      P.x += c.vx * dt;
+      P.y += c.vy * dt;
+      P.z += c.vz * dt;
+      const y = groundY(P.x, P.z) + 0.42;
+      if (P.y <= y && c.vy < 0) {
+        // (one small bounce, then it stays)
+        if (c.vy < -3) {
+          P.y = y;
+          c.vy *= -0.35;
+          c.vx *= 0.4;
+          c.vz *= 0.4;
+        } else {
+          c.down = true;
+          c.y = y;
+        }
+      }
+    } else {
+      P.y = c.y + 0.07 * Math.sin(c.t * 2.4);
+      const h = HEROES.find((h) => h.hp > 0 && Math.hypot(h.group.position.x - P.x, h.group.position.z - P.z) < 1.1);
+      if (h) {
+        c.to = h;
+        c.t = 0;
+      }
+    }
+  }
 }
 // ---------- the menu ----------
 // There is no button for it. Escape brings up a short list in the middle of the screen: go on, start the level again, or leave
@@ -3706,6 +3807,8 @@ let shown = 0,
 // With the flag `dev` in the address (level1.html?dev), a small row of buttons shows at the top of the screen, one for each
 // place the level can be started from. Pressing one reloads the page there, keeping the flag, so the buttons stay
 if (new URLSearchParams(location.search).has('dev')) {
+  // (there is no night yet: N counts the day's gathering as the end of a night would)
+  addEventListener('keydown', (e) => e.code === 'KeyN' && !e.repeat && nightTally());
   const now = new URLSearchParams(location.search).get('skip') || '',
     row = document.createElement('div');
   // (three small words in the top right corner, faint until the pointer is on them; the one the level was started at is brighter)
@@ -3734,8 +3837,11 @@ function frame(now) {
   heroUpdate(dt);
   shotsUpdate(dt);
   worldUpdate(dt);
-  sceneryUpdate(dt);
+  // The camera is moved before the level's own update, and its matrices brought up to date at once: the health bars, the lamp
+  // sign and the sky are placed from where the camera is, and placed from last frame's camera they trail and shake as it moves
   cameraUpdate(dt);
+  cam.updateMatrixWorld();
+  sceneryUpdate(dt);
   if (!shot && T > 0.5) {
     shot = 1;
     HEROES.forEach(portrait);

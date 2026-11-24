@@ -23,7 +23,7 @@ const TALK = { q: [], i: 0, n: 0, age: 0, held: 0, done: null };
   #talk img[src=""] { display: none; }
   #talk .tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
   #talk b { font: 700 15px var(--f, Marcellus, Georgia, serif); letter-spacing: .16em; text-transform: uppercase; color: #ffd08a; }
-  #talk p { margin: 0; font: italic 500 24px/1.32 var(--f, Marcellus, Georgia, serif); min-height: 2.64em; text-shadow: 0 1px 0 rgba(0, 0, 0, .5); }
+  #talk p { margin: 0; font: 500 24px/1.32 var(--f, Marcellus, Georgia, serif); min-height: 2.64em; text-shadow: 0 1px 0 rgba(0, 0, 0, .5); }
   #talk p u { text-decoration: none; visibility: hidden; }
   #talk .nx { position: absolute; right: 16px; bottom: 9px; font: 700 12px var(--f, Marcellus, Georgia, serif); letter-spacing: .14em; color: #ffd08a; opacity: 0; }
   #talk.rdy .nx { opacity: .9; animation: talknx .7s ease-in-out infinite; }

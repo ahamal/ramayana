@@ -767,7 +767,7 @@ const BSTR = [
     };
   },
 ];
-// A brute loses his temper, briefly: for about a second and a half he comes on at two and a half times his pace (5.5, a little
+// A brute loses his temper, briefly: for about a second and a half he comes on at nearly three times his pace (6.4, clearly
 // quicker than the brothers' 5), weaving, and lays about him left and right: a sweep from his right, a backhand from his left,
 // and again. After it he cannot lose his temper again for a few seconds
 function rageOn(d) {
@@ -899,7 +899,7 @@ function gruntUpdate(dt) {
     {
       const nx = (ox - g.position.x) / r,
         nz = (oz - g.position.z) / r,
-        sp = d.pi && d.cr ? 2.6 : d.def.speed * (d.br ? 1 + 1.5 * (d.rageW || 0) : 1),
+        sp = d.pi && d.cr ? 2.6 : d.def.speed * (d.br ? 1 + 1.9 * (d.rageW || 0) : 1),
         bm = d.pi && !d.cr ? 1 + 0.4 * Math.sin(d.ph - 0.3) : 1,
         lat = !walking
           ? 0
@@ -915,7 +915,7 @@ function gruntUpdate(dt) {
       if (walking) {
         g.position.x += vx * bm * dt;
         g.position.z += vz * bm * dt;
-        d.ph += dt * (d.br ? 3.2 * (1 + 1.4 * (d.rageW || 0)) : d.pi ? (d.cr ? 8.5 : 11.5) : 10);
+        d.ph += dt * (d.br ? 3.2 * (1 + 1.75 * (d.rageW || 0)) : d.pi ? (d.cr ? 8.5 : 11.5) : 10);
       }
       if (!d.flung && !d.dead) {
         // (a raging brute weaves as he runs but keeps turned square to whoever he is after, so his swings go at them)
