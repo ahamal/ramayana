@@ -3805,9 +3805,9 @@ const FIRE = { hp: 100, max: 100, s: 1 },
   // each wave: [kind, how many, side (in quarter turns from the night's first side), seconds after the wave begins]
   WAVES = [
     [['grunt', 2, 0, 0], ['grunt', 2, 0, 4], ['grunt', 2, 0, 8]],
-    [['pish', 4, 1, 0], ['pish', 4, 3, 7]],
+    [['pish', 4, 1, 0], ['pish', 4, 3, 7], ['runner', 2, 2, 11]],
     [['grunt', 3, 0, 0], ['defiler', 2, 2, 0], ['grunt', 3, 2, 3], ['archer', 2, 1, 4], ['defiler', 1, 0, 5]],
-    [['grunt', 3, 1, 0], ['brute', 1, 1, 2], ['grunt', 3, 1, 6]],
+    [['grunt', 3, 1, 0], ['brute', 1, 1, 2], ['runner', 3, 3, 4], ['grunt', 3, 1, 6]],
     [['brute', 1, 0, 0], ['pish', 4, 2, 0], ['defiler', 2, 1, 4], ['archer', 3, 2, 6], ['pish', 4, 0, 8], ['brute', 1, 3, 10], ['defiler', 2, 3, 13]],
   ],
   sideOf = (q) => WAVE.a0 + (q * Math.PI) / 2,
@@ -3834,17 +3834,20 @@ function waveDemon(kind, a) {
       const l = d.lamp;
       if (!l.lit || apart(l, P) > d.rng + 0.8) return;
       puff(tmpA.set(l.x, l.y + 1.5, l.z), 0xffb050, 8, 2, 0.3, 1);
-      if ((l.hits = (l.hits || 0) + 1) >= 4) {
+      l.dip = 1;
+      // (a runner's thrown water counts for two blows on a lamp, and his empty bucket for half of one)
+      if ((l.hits = (l.hits || 0) + (d.rn ? (d.threw ? 2 : 0.5) : 1)) >= 4) {
         lampOut(l);
         puff(tmpA, 0x77726c, 22, 1.4, 1.2, -0.8, 0.3);
       }
-    } else if (Math.hypot(P.x, P.z) < d.rng + 1) fireHurt(d.br ? 6 : d.pi ? 1 : 1.5);
+    } else if (Math.hypot(P.x, P.z) < d.rng + 1) fireHurt(d.br ? 6 : d.rn ? (d.threw ? 4 : 0.6) : d.pi ? 1 : 1.5);
   };
   WAVE.live.push(d);
 }
 function fireHurt(n) {
   if (FIRE.hp <= 0 || NIGHT.dawn) return;
   FIRE.hp = Math.max(0, FIRE.hp - n);
+  if (n >= 1) FIRE.dip = 1;
   if (n >= 1) puff(tmpA.set(R(-0.4, 0.4), 1.2, R(-0.4, 0.4)), 0x5a6a3a, 8, 2, 0.5, 1, 0.3);
   if (FIRE.hp > 0) return;
   // the fire is out: the rite is broken
@@ -3865,8 +3868,17 @@ function fireHurt(n) {
 }
 function waveUpdate(dt) {
   // the fire burns as high as it is whole
-  FIRE.s += (0.3 + 0.7 * (FIRE.hp / FIRE.max) - FIRE.s) * Math.min(1, dt * 3);
-  fireL.intensity = 9 * (0.35 + 0.65 * (FIRE.hp / FIRE.max));
+  // The fire's strength is its health, and is shown by the fire itself and nothing else: whole, it stands tall; as it is
+  // hurt it sinks, its light and the pool of light under it sinking with it, until at the last it is a low flicker; and
+  // then it is out. Each blow also makes it gutter for a moment (FIRE.dip), so that the blow is seen
+  {
+    const r = FIRE.hp / FIRE.max;
+    FIRE.dip = Math.max(0, (FIRE.dip || 0) - dt * 2.5);
+    FIRE.s += ((0.1 + 0.9 * r) * (1 - 0.35 * FIRE.dip) - FIRE.s) * Math.min(1, dt * (FIRE.dip > 0 ? 12 : 3));
+    fireL.intensity = 9 * (0.12 + 0.88 * r) * (1 - 0.45 * FIRE.dip);
+    // (the hearth's own small flames, inside the great one, are let show only while it is still taller than they are)
+    for (const m of flames) m.visible = r > 0.3 && !NIGHT.lost;
+  }
   if (NIGHT.lost || NIGHT.done) return;
   const W = WAVE;
   if (W.st === 'off') {
@@ -3887,20 +3899,22 @@ function waveUpdate(dt) {
     let foe = null,
       lamp = null,
       slow = false;
-    if (!d.pi && !d.df)
+    if (!d.pi && !d.df && !d.rn)
       for (const h of HEROES) if (h.hp > 0 && apart(h.group.position, P) < (d.br ? 9 : 6.5) && (!foe || apart(h.group.position, P) < apart(foe.group.position, P))) foe = h;
     for (const l of LAMPS)
       if (l.lit) {
         if (apart(l, P) < 5.5) slow = true;
-        if (d.pi && (!lamp || apart(l, P) < apart(lamp, P))) lamp = l;
+        if ((d.pi || d.rn) && (!lamp || apart(l, P) < apart(lamp, P))) lamp = l;
       }
     d.slowK = slow && !d.df ? 0.7 : 1;
+    // (a runner makes for whichever fire is nearest him, a lamp's or the altar's, and for nothing else)
+    if (d.rn && lamp && apart(lamp, P) > Math.hypot(P.x, P.z)) lamp = null;
     // (an archer chooses his own mark and his own distance: see the archer, with the enemies)
     if (d.ar) continue;
     d.foe = foe;
     d.lamp = foe ? null : lamp;
     d.to = foe ? foe.group.position : lamp;
-    d.rng = foe ? (d.br ? 2.3 : 1.5) : lamp ? 1.3 : d.df ? d.def.reach : d.br ? 3.2 : d.pi ? 2.2 : 2.6;
+    d.rng = foe ? (d.br ? 2.3 : 1.5) : lamp ? 1.3 : d.df ? d.def.reach : d.br ? 3.2 : d.pi || d.rn ? 2.2 : 2.6;
     // (a defiler has no blow: while its pot is tipped over the fire, the fire is fouled)
     if (d.df && d.pour > 0.5 && Math.hypot(P.x, P.z) < 4.5) fireHurt(2.5 * dt);
   }
@@ -3956,10 +3970,61 @@ function woodGain(n) {
   if (n) STOCK.el.animate([{ transform: 'scale(1.15)' }, { transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' });
 }
 // which empty platform Rama is standing by, if any; the sign held over it on the screen; and the ring, filling while he holds
+// ---------- places where something can be built ----------
+// A place to build is shown the same way whatever is to be built there (a lamp today; a statue or a wall later), and
+// building is always the player's choice, never an order. Once building is open, each empty place shows two things from
+// afar: the thing itself standing there as a faint ghost, and over it a small dark token with a coin and its price, which
+// bobs a little. Come close, and the token gives way to the full sign with its ring, and the ghost firms. A place the
+// player cannot yet afford shows its token dimmer, with the price in red. The moment building opens, every place flares
+// once, so that it is noticed.
+// SITES is the list; a place is { x, y, z, cost, open(), ghost } and adds itself
+const SITES = [],
+  GHOST_FAR = new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.1, depthWrite: false, fog: false }),
+  buildOpen = () => !!ARR.talked;
+for (const l of LAMPS) SITES.push({ x: l.x, y: l.y, z: l.z, cost: LAMP_COST, open: () => !l.built, ghost: l.ghost, of: l });
+function siteMarks(dt) {
+  const on = buildOpen();
+  if (on && !STOCK.opened) {
+    // building has just opened: each place flares
+    STOCK.opened = true;
+    for (const q of SITES)
+      if (q.open()) {
+        flash(tmpA.set(q.x, q.y + 0.3, q.z), 0xffd08a, 10);
+        puff(tmpA, 0xffe2a8, 18, 2, 0.5, -1.2, 0.3);
+        ring(tmpA.setY(q.y + 0.08), 1.6, 0xffd08a, 0.8);
+      }
+  }
+  GHOST_FAR.opacity = 0.09 + 0.03 * Math.sin(T * 2.2);
+  for (const q of SITES) {
+    const show = on && q.open(),
+      here = q.of === STOCK.at;
+    q.ghost.visible = show;
+    if (show && q.near !== here) {
+      q.near = here;
+      q.ghost.traverse((o) => o.isMesh && (o.material = here ? GHOST : GHOST_FAR));
+    }
+    if (!q.el) {
+      q.el = document.createElement('div');
+      q.el.style.cssText =
+        'position:fixed;left:0;top:0;z-index:12;display:none;align-items:center;gap:3px;padding:4px 7px 4px 5px;border-radius:999px;background:rgba(22,19,16,.6);font:600 12px var(--f);color:#fff3df;pointer-events:none;white-space:nowrap';
+      q.el.innerHTML = `<span style="width:11px;height:11px;display:block">${TEJAS_ICON}</span><i style="font-style:normal;line-height:1;font-variant-numeric:lining-nums">${q.cost}</i>`;
+      document.body.append(q.el);
+    }
+    tmpA.set(q.x, q.y + 2.3 + 0.07 * Math.sin(T * 2.4 + q.x), q.z).project(cam);
+    const seen = show && !here && !LOCK && !talking() && tmpA.z < 1 && Math.abs(tmpA.x) < 1.02 && Math.abs(tmpA.y) < 1.02,
+      poor = STOCK.n < q.cost;
+    q.el.style.display = seen ? 'flex' : 'none';
+    if (!seen) continue;
+    q.el.style.transform = `translate(-50%,-50%) translate(${((tmpA.x + 1) / 2) * innerWidth}px,${((1 - tmpA.y) / 2) * innerHeight}px)`;
+    q.el.style.opacity = poor ? 0.5 : 0.9;
+    q.el.lastChild.style.color = poor ? '#ff8a7a' : '#fff3df';
+  }
+}
 function buildUpdate(dt) {
   // (all of this is for whichever brother is being played, Rama or Lakshmana)
   const P = SEL.group.position;
-  STOCK.at = (!LOCK && !talking() && LAMPS.find((l) => !l.built && Math.hypot(P.x - l.x, P.z - l.z) < 2.4)) || null;
+  // (nothing can be built until Vishwamitra has spoken with the brothers: see buildOpen)
+  STOCK.at = (buildOpen() && !LOCK && !talking() && LAMPS.find((l) => !l.built && Math.hypot(P.x - l.x, P.z - l.z) < 2.4)) || null;
   // When every lamp stands, Rama standing on any of the four signs gets the same sign over his head, and Space held there
   // is his draw. Which sign he began the night from is kept in RITE.sign
   const on = !STOCK.at && nightReady() && SIGNS_AT.find((q) => Math.hypot(P.x - q.x, P.z - q.z) < 1.5);
@@ -3996,7 +4061,7 @@ function buildUpdate(dt) {
   }
   sg.style.display = STOCK.at ? 'flex' : 'none';
   // the ghost stands on the platform he is at: breathing a little, firmer as the ring fills, red if he cannot pay
-  for (const o of LAMPS) o.ghost.visible = o === STOCK.at;
+  siteMarks(dt);
   GHOST.opacity = 0.26 + 0.06 * Math.sin(T * 3) + 0.4 * STOCK.k;
   GHOST.color.set(STOCK.n < LAMP_COST ? 0xff7a6a : 0xffd9a0);
   STOCK.ring.setAttribute('stroke-dashoffset', RING_LEN * (1 - STOCK.k));
@@ -4262,19 +4327,65 @@ const COINS = [],
 // The end of the day (and of the night): every coin not yet claimed flies to Rama, wherever he is. Those lying on the ground
 // go from where they lie; what the woodcutters have earned by their gathering comes from the wood store, a few coins one
 // after another, each worth its share
+// The night's end, for coins. Those lying near the brother being played (and the workmen's pay, if he stands near where it
+// is kept) fly to him over the ground, as before. Anything further off does not cross the map to him: it goes straight to
+// the counter at the foot of the screen, as a coin that comes in from where it lay (or from the screen's edge on that side,
+// if it lay out of sight), swings up, and drops into the count
+const COIN_NEAR = 14;
+function coinToCounter(pos, worth, delay) {
+  const v = tmpA.copy(pos).project(cam),
+    // (behind the camera, the picture of it is turned about)
+    k = v.z > 1 ? -1 : 1,
+    x0 = Math.max(24, Math.min(innerWidth - 24, ((v.x * k + 1) / 2) * innerWidth)),
+    y0 = v.z > 1 ? innerHeight - 24 : Math.max(24, Math.min(innerHeight - 24, ((1 - v.y) / 2) * innerHeight)),
+    r = STOCK.el.getBoundingClientRect(),
+    x1 = r.left + 10,
+    y1 = r.top + r.height / 2,
+    el = document.createElement('div');
+  el.style.cssText = 'position:fixed;left:0;top:0;z-index:14;width:18px;height:18px;margin:-9px 0 0 -9px;pointer-events:none;opacity:0;filter:drop-shadow(0 0 6px rgba(255,208,138,.7))';
+  el.innerHTML = TEJAS_ICON;
+  document.body.append(el);
+  const at = (x, y, sc) => `translate(${x}px,${y}px) scale(${sc})`;
+  el.animate(
+    [
+      { transform: at(x0, y0, 0.4), opacity: 0, offset: 0 },
+      { transform: at(x0, y0 - 18, 1.25), opacity: 1, offset: 0.18 },
+      { transform: at((x0 + x1) / 2, Math.min(y0, y1) - 70, 1.1), opacity: 1, offset: 0.6 },
+      { transform: at(x1, y1, 0.7), opacity: 1, offset: 1 },
+    ],
+    { duration: 760, delay: delay * 1000, easing: 'cubic-bezier(.45,0,.55,1)', fill: 'forwards' },
+  ).onfinish = () => {
+    el.remove();
+    woodGain(worth);
+  };
+}
 function coinsHome() {
-  for (const c of COINS) {
-    c.to = SEL;
-    c.far = true;
-    c.t = 0;
+  const me = SEL.group.position;
+  let far = 0;
+  for (const c of [...COINS]) {
+    if (apart(c.g.position, me) < COIN_NEAR) {
+      c.to = SEL;
+      c.far = true;
+      c.t = 0;
+      continue;
+    }
+    coinToCounter(c.g.position, c.worth === undefined ? COIN_WORTH : c.worth, far++ * 0.09);
+    scene.remove(c.g);
+    COINS.splice(COINS.indexOf(c), 1);
   }
   // (the woodcutters' from the wood store, the masons' from their yard)
   for (const [n, at] of [
     [STOCK.pend, WOODSHED],
     [STOCK.pendS, WORKSHOP],
   ]) {
-    const m = Math.min(n, 12);
+    const near = Math.hypot(at[0] - me.x, at[1] - me.z) < COIN_NEAR,
+      m = Math.min(n, near ? 12 : 8);
     for (let i = 0; i < m; i++) {
+      const worth = Math.floor(n / m) + (i < n % m ? 1 : 0);
+      if (!near) {
+        coinToCounter(tmpB.set(at[0] + R(-1, 1), groundY(at[0], at[1]) + 1.2, at[1] + R(-1, 1)), worth, far++ * 0.09);
+        continue;
+      }
       const g = new THREE.Group(),
         gl = glow(0xfff0c8, 0.55);
       add(g, COIN_G, COIN_M, [0, 0, 0], [Math.PI / 2, 0, 0]);
@@ -4282,7 +4393,7 @@ function coinsHome() {
       g.position.set(at[0] + R(-1, 1), groundY(at[0], at[1]) + 1.2, at[1] + R(-1, 1));
       g.visible = false;
       scene.add(g);
-      COINS.push({ g, gl, vx: 0, vz: 0, vy: 0, down: true, to: SEL, far: true, t: 0, wait: i * 0.14, worth: Math.floor(n / m) + (i < n % m ? 1 : 0) });
+      COINS.push({ g, gl, vx: 0, vz: 0, vy: 0, down: true, to: SEL, far: true, t: 0, wait: i * 0.14, worth });
     }
   }
   STOCK.pend = STOCK.pendS = 0;
@@ -4415,11 +4526,15 @@ function lampsUpdate(dt) {
     if (!l.lit) continue;
     // it catches over half a second, then burns unevenly: the flame leaning and stretching, the light wavering with it
     l.glow = Math.min(1, l.glow + dt * 2);
-    const f = 0.9 + 0.1 * Math.sin(T * 11 + l.seed) + 0.05 * Math.sin(T * 23.7 + l.seed * 2);
+    // (a lamp shows its hurt as the fire does: each blow it has taken leaves its flames lower and its light less, and at
+    // the blow itself they gutter)
+    l.dip = Math.max(0, (l.dip || 0) - dt * 2.5);
+    l.str = (l.str === undefined ? 1 : l.str) + ((1 - 0.2 * Math.min(4, l.hits || 0)) * (1 - 0.4 * l.dip) - (l.str === undefined ? 1 : l.str)) * Math.min(1, dt * 10);
+    const f = (0.9 + 0.1 * Math.sin(T * 11 + l.seed) + 0.05 * Math.sin(T * 23.7 + l.seed * 2)) * l.str;
     // (each of the five flames wavers in its own time)
     l.flame.children.forEach((c, i) => {
       const k = 0.85 + 0.15 * Math.sin(T * (10 + i * 1.7) + l.seed + i * 2.1) + 0.08 * Math.sin(T * 24.3 + i * 4);
-      c.scale.set(l.glow * (0.9 + 0.1 * k), l.glow * k, l.glow * (0.9 + 0.1 * k));
+      c.scale.set(l.glow * l.str * (0.9 + 0.1 * k), l.glow * l.str * k, l.glow * l.str * (0.9 + 0.1 * k));
       c.rotation.z = Math.sin(T * 5 + l.seed + i) * 0.1;
     });
     l.light.intensity = 14 * l.glow * f;

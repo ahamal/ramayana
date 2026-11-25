@@ -55,10 +55,11 @@ function makeGrunt(d, seed) {
     R = makeRig(),
     vr = br ? [(Math.random() * 3) | 0, (Math.random() * 4) | 0, Math.random() < 0.5, Math.random() < 0.5, Math.random() < 0.4] : [],
     ar = !!d.ar,
-    skinC = br ? [0x2f4f8f, 0x35467f, 0x2a5a86][vr[0]] : ar ? 0x5c4450 : 0x4b3f5c,
+    rn = !!d.rn,
+    skinC = br ? [0x2f4f8f, 0x35467f, 0x2a5a86][vr[0]] : ar ? 0x5c4450 : rn ? 0xb8862c : 0x4b3f5c,
     skin = toon(skinC, { vertexColors: true, rim: 0.45 }),
     sk = toon(skinC, { rim: 0.45 }),
-    cloth = toon(br ? [0xb5601a, 0x8f1f1a, 0x9a7a1e, 0x1f5a55][vr[1]] : ar ? 0x74201c : 0x5a1410, { vertexColors: true }),
+    cloth = toon(br ? [0xb5601a, 0x8f1f1a, 0x9a7a1e, 0x1f5a55][vr[1]] : ar ? 0x74201c : rn ? 0x2c2622 : 0x5a1410, { vertexColors: true }),
     iron = toon(0x2c2a30, { rim: 0.5 }),
     boneC = toon(0xd8cdb0, { rim: 0.4 }),
     hairC = toon(0x16101c, { rim: 0.25 }),
@@ -194,6 +195,10 @@ function makeGrunt(d, seed) {
       tor(pg, 0.11, 0.012, bronze2, [0, -0.02, 0], [Math.PI / 2, 0, 0], [1.25, 1.2, 1]);
       cyl(pg, 0.003, 0.03, 0.12, boneC, [-0.03, 0.11, 0], [0, 0, 0.5]);
     }
+  } else if (rn) {
+    // The runner: a small ochre-yellow rakshasa, bare-headed, with a strip of pale cloth bound round his brow and nothing on him
+    // to slow him down. He is told by his size, his colour and his pace
+    tor(head, 0.127, 0.02, toon(0xd8cdb0, { rim: 0.2 }), [0, 0.05, 0], [Math.PI / 2 - 0.12, 0, 0], [1.05, 1.06, 1]);
   } else if (!br) {
     sph(head, 0.132, hairC, [0, 0.03, -0.045], [1.06, 1.05, 1]);
     sph(head, 0.11, hairC, [0, -0.09, -0.1], [1.25, 1.35, 0.8]);
@@ -265,6 +270,37 @@ function makeGrunt(d, seed) {
         cyl(q, 0.005, 0.005, 0.2, DARK, [x, 0.3, z]);
         add(q, new THREE.BoxGeometry(0.004, 0.07, 0.03), DARK, [x, 0.37, z], [0, i, 0]);
       }
+    } else if (rn) {
+      // What the runner carries is a wooden bucket nearly as big as his own body, brimming with water, hugged before
+      // him in both hands. Like the archer's bow it is its own thing in
+      // the world: each frame it is put where he is holding it and his hands are brought to its rim (see the runner, below).
+      // Staves bound with two iron hoops, open at the top; its middle is the group's own middle
+      const stave = toon(0x6a4526, { rim: 0.15 }),
+        blood = new THREE.MeshBasicMaterial({ color: 0x5fb884 });
+      R.bone.handR.remove(grip);
+      add(club, new THREE.CylinderGeometry(0.115, 0.085, 0.2, 16, 1, true), stave);
+      add(club, new THREE.CircleGeometry(0.085, 16), stave, [0, -0.099, 0], [Math.PI / 2, 0, 0]);
+      for (const [y, r] of [
+        [-0.055, 0.094],
+        [0.075, 0.114],
+      ])
+        tor(club, r, 0.008, iron, [0, y, 0], [Math.PI / 2, 0, 0]);
+      d.wet = add(club, new THREE.CircleGeometry(0.108, 16), blood, [0, 0.08, 0], [-Math.PI / 2, 0, 0]);
+      {
+        const sg = new THREE.CylinderGeometry(1, 1, 1, STREAM_R, STREAM_N - 1, true);
+        d.stream = new THREE.Mesh(sg, STREAM_M);
+        d.stream.frustumCulled = false;
+        d.stream.visible = false;
+        d.stream.castShadow = false;
+        scene.add(d.stream);
+      }
+      d.ik = new CCDIKSolver(body, [
+        { target: BI.tgtL, effector: BI.handL, links: [{ index: BI.foreL }, { index: BI.armL }], iteration: 14 },
+        { target: BI.tgtR, effector: BI.handR, links: [{ index: BI.foreR }, { index: BI.armR }], iteration: 14 },
+      ]);
+      // (his arms are a little long for him, to go round such a bucket and hold it clear of his chest)
+      R.bone.armL.scale.setScalar(1.15);
+      R.bone.armR.scale.setScalar(1.15);
     } else {
       cyl(club, 0.018, 0.015, 0.22, WOOD, [0, 0.03, 0]);
       cyl(club, 0.058, 0.026, 0.36, WOOD, [0, 0.32, 0]);
@@ -287,13 +323,18 @@ function makeGrunt(d, seed) {
       club.position.copy(g.position);
       club.scale.setScalar(1.12 * (d.k || 1));
     }
+    if (rn) {
+      scene.add(club);
+      club.position.copy(g.position);
+      club.scale.setScalar(BUCKET * (d.k || 1));
+    }
     d.club = club;
     d.grip = grip;
     d.clubP = club.position.clone();
     d.clubQ = club.quaternion.clone();
   }
   d.mats = new Set();
-  for (const root of ar ? [g, d.club] : [g])
+  for (const root of ar || rn ? [g, d.club] : [g])
     root.traverse((o) => {
       if (o.isMesh) {
         o.castShadow = true;
@@ -502,6 +543,10 @@ const FOES = {
   pish: { hp: 100, dmg: [20, 26], speed: 3.0, reach: 4.8, swing: 1.4, radius: 0.34, mass: 1, aimY: 0.45, barY: 1.15 },
   defiler: { hp: 100, dmg: [20, 26], speed: 3.2, reach: 2.5, swing: 2.6, radius: 0, mass: 0, aimY: 1.55, barY: 2.35 },
   // the archer stands off (reach is how near he comes before he stops and shoots) and looses one arrow every `swing` seconds
+  // the runner is small, quick (quicker than the brothers) and frail, and has eyes only for a fire: he carries a bucket of water to it
+  // (his health is set by the brothers' arrows: Rama's does 48 to 56 and Lakshmana's 30 to 36, so 45 is one of Rama's
+  // or two of Lakshmana's)
+  runner: { hp: 45, dmg: [10, 14], speed: 5.5, reach: 2.2, swing: 1.15, radius: 0.28, mass: 0.7, aimY: 0.72, barY: 1.5 },
   archer: { hp: 90, dmg: [22, 30], speed: 2.5, reach: 12, swing: 2.3, radius: 0.38, mass: 1, aimY: 1.1, barY: 2.1 },
 };
 // a level may name the spot (at) instead of the angle; the enemy then simply stands there, with no flash of arrival
@@ -529,9 +574,10 @@ function spawn(a, kind, at) {
     flung: false,
     ft: 0,
     summoned: true,
-    k: br ? 1 : pi ? 0.9 + Math.random() * 0.2 : kind === 'archer' ? 0.9 + Math.random() * 0.12 : 0.88 + Math.random() * 0.3,
+    k: br ? 1 : pi ? 0.9 + Math.random() * 0.2 : kind === 'archer' ? 0.9 + Math.random() * 0.12 : kind === 'runner' ? 0.76 + Math.random() * 0.06 : 0.88 + Math.random() * 0.3,
     br,
     ar: kind === 'archer',
+    rn: kind === 'runner',
     def: FOES[kind] || FOES.grunt,
   };
   dummies.push(d);
@@ -549,6 +595,7 @@ function summon(kind) {
 }
 function banish(d) {
   scene.remove(d.g);
+  if (d.stream) scene.remove(d.stream);
   if (d.bar) scene.remove(d.bar.g);
   if (d.club) scene.remove(d.club);
   for (const o of d.club ? [d.g, d.club] : [d.g])
@@ -894,6 +941,35 @@ const BSTR = [
     };
   },
 ];
+// ---------- the runner ----------
+// He runs hugging his bucket to him, held high against his chest, a hand on either side of it on the outside of its staves.
+// At a fire he heaves it: rocks it back and down, then swings it up over his head and tips it, and a gout of water leaves
+// it and flies in a high arc onto the flame. The bucket holds RUN_WATER such throws, and the water in it sinks with each.
+// The bucket turns about his hands, so they stay on its sides and never go into it. When it is dry he does not leave: he
+// takes the empty bucket by its rim in one hand and lays about the fire with it as the others do with a club, which does
+// little.
+// (Places are in his own frame: y up, z forward. BUCKET is how many times its made size the bucket is. d.threw is true
+// when the blow just struck was a throw of water, for a level that counts the harm)
+const BUCKET = 2.5,
+  RUN_WATER = 3,
+  RUN_AT = [0, 1.12, 0.51],
+  RUN_KF = (u, a, b, c) =>
+    kf(u, [
+      [0, 0],
+      [0.3, a],
+      [0.48, b],
+      [0.64, c],
+      [1, 0],
+    ]),
+  WATER = 0x7fd09c,
+  // The thrown water is one gout of it, not drops: a tube of STREAM_N rings, fat in the middle and drawn to a point at
+  // either end, that travels along a high arc from the bucket's lip to the fire, its rings put on the arc afresh each frame
+  STREAM_N = 14,
+  STREAM_R = 7,
+  STREAM_M = new THREE.MeshBasicMaterial({ color: 0x5fc98c, transparent: true, opacity: 0.8, depthWrite: false, fog: false }),
+  [RN_C, RN_H, RN_T, RN_P] = [0, 0, 0, 0].map(() => new THREE.Vector3()),
+  [RN_Q, RN_Q2, RN_Q3] = [0, 0, 0].map(() => new THREE.Quaternion()),
+  RN_X = new THREE.Vector3(1, 0, 0);
 // ---------- the archer ----------
 // The same foot soldier, lean, with a bow where the club would be. He does not come to the fire: he makes for whichever
 // brother is nearest, stops a good bowshot off (or nearer, if something stands between them), and shoots. One shot takes his
@@ -1029,6 +1105,8 @@ function gruntUpdate(dt) {
       d.at = 0;
       d.dead = 0;
       d.lu = 0;
+      // (a runner's bucket holds so many throws)
+      d.water = RUN_WATER;
     }
     // health: every fresh blow costs one, a heavy one costs all three, and so does burning through; being flung away sends him back to the start
     const r0 = Math.hypot(g.position.x, g.position.z) || 1;
@@ -1062,7 +1140,7 @@ function gruntUpdate(dt) {
         if (d.vel.length() > 0.8) g.rotation.y = Math.atan2(-d.vel.x, -d.vel.z);
         if (d.club) {
           scene.attach(d.club);
-          d.club.scale.setScalar((d.br ? 1.3 : d.ar ? 1.12 : 1) * d.sz * (d.k || 1));
+          d.club.scale.setScalar((d.br ? 1.3 : d.ar ? 1.12 : d.rn ? BUCKET : 1) * d.sz * (d.k || 1));
         }
         d.cv = V3((-g.position.x / r0) * 0.8, 1.6, (-g.position.z / r0) * 0.8);
         d.mats.forEach((m) => {
@@ -1155,14 +1233,15 @@ function gruntUpdate(dt) {
               ? Math.sin(T * 1.6 + d.seed * 3) * 1.2
               : d.br
                 ? Math.sin(T * 2.4 + d.seed * 3) * 1.8 * (d.rageW || 0)
-                : Math.sin(T * 1.9 + d.seed * 3) * 1.4,
+                : // (a runner hardly weaves: he comes straight)
+                  Math.sin(T * 1.9 + d.seed * 3) * (d.rn ? 0.35 : 1.4),
         // (on a way round he weaves less, so the weave does not carry him into what he is going round)
         vx = wx * sp - wz * lat * (al ? 0.35 : 1),
         vz = wz * sp + wx * lat * (al ? 0.35 : 1);
       if (walking) {
         g.position.x += vx * bm * dt;
         g.position.z += vz * bm * dt;
-        d.ph += dt * (d.br ? 3.2 * (1 + 1.75 * (d.rageW || 0)) : d.pi ? (d.cr ? 8.5 : 11.5) : 10);
+        d.ph += dt * (d.br ? 3.2 * (1 + 1.75 * (d.rageW || 0)) : d.pi ? (d.cr ? 8.5 : 11.5) : d.rn ? 16 : 10);
       }
       if (!d.flung && !d.dead) {
         // (a raging brute weaves as he runs but keeps turned square to whoever he is after, so his swings go at them)
@@ -1230,9 +1309,19 @@ function gruntUpdate(dt) {
           if (d.onHit) d.onHit();
         }
     } else if (!d.df && (attacking || raging) && d.lu < 0.48 && u >= 0.48) {
-      d.club.localToWorld(tmpA.set(0, 0.42, 0));
-      puff(tmpA, 0xffe2b0, 16, 3.2, 0.3, 2);
-      flash(tmpA, 0xffc890, 10);
+      d.club.localToWorld(tmpA.set(0, d.rn ? (d.water > 0 ? 0.1 : -0.1) : 0.42, 0));
+      if (d.rn) {
+        d.threw = d.water > 0;
+        if (d.threw) {
+          // a throw: the water leaves the bucket's mouth as one gout (see the runner, below), with spray about the lip
+          d.water--;
+          d.gout = { t: 0, from: tmpA.clone(), to: V3(ox, d.to && d.to.y !== undefined ? d.to.y + 1.5 : groundY(ox, oz) + 1.0, oz) };
+          puff(tmpA, 0xc8f0d6, 10, 2.4, 0.3, 5, 0.12);
+        } else puff(tmpA, 0xcbb48a, 8, 1.8, 0.3, 3, 0.1);
+      } else {
+        puff(tmpA, 0xffe2b0, 16, 3.2, 0.3, 2);
+        flash(tmpA, 0xffc890, 10);
+      }
       // (the ground shakes under a planted blow; a swing thrown on the run, which may be far from anyone, barely stirs it)
       shake = Math.max(shake, !attacking ? 0.03 : d.br ? 0.14 : 0.05);
       // the moment the blow lands: a level that wants it to hurt someone says how
@@ -1475,6 +1564,103 @@ function gruntUpdate(dt) {
       B[n].quaternion.setFromEuler(EG);
     }
     B.handR.quaternion.setFromEuler(EG.set(wrist[0] * aw * (1 - f), wrist[1] * aw * (1 - f), 0));
+    if (d.rn && d.gout) {
+      // the gout in the air: its head runs the arc in a third of a second, its tail a little behind, and where the head
+      // comes down it bursts in a splash and a breath of steam
+      const G = d.gout,
+        was = G.t;
+      G.t += dt / 0.36;
+      const head = Math.min(1, G.t),
+        tail = Math.max(0, G.t - 0.42),
+        dx = G.to.x - G.from.x,
+        dz = G.to.z - G.from.z,
+        dl = Math.hypot(dx, dz) || 1,
+        pos = d.stream.geometry.attributes.position,
+        ring = STREAM_R + 1;
+      for (let j = 0; j < STREAM_N; j++) {
+        const q = j / (STREAM_N - 1),
+          t = head + (tail - head) * q,
+          cx = G.from.x + dx * t,
+          // (a low, flat throw: it rises only a little above the straight line to the fire)
+          cy = G.from.y + (G.to.y - G.from.y) * t + 0.28 * 4 * t * (1 - t),
+          cz = G.from.z + dz * t,
+          // (thickest just behind its head and drawn out thin behind, as thrown water is)
+          r = 0.015 + 0.085 * Math.pow(Math.sin(Math.PI * Math.pow(q, 0.6)), 0.8) * (1 + 0.18 * Math.sin(q * 14 + T * 20));
+        for (let i = 0; i < ring; i++) {
+          const a = (i / STREAM_R) * 6.2832;
+          pos.setXYZ(j * ring + i, cx + (-dz / dl) * Math.cos(a) * r, cy + Math.sin(a) * r, cz + (dx / dl) * Math.cos(a) * r);
+        }
+      }
+      pos.needsUpdate = true;
+      d.stream.visible = tail < 1 && !d.dead;
+      // (drops break from it all the way, so that it is not one smooth shape)
+      if (head < 1)
+        for (let i = 0; i < 2; i++) {
+          const t = tail + (head - tail) * Math.random();
+          puff(tmpA.set(G.from.x + dx * t, G.from.y + (G.to.y - G.from.y) * t + 0.28 * 4 * t * (1 - t), G.from.z + dz * t), i ? 0xd6f4e2 : WATER, 1, 0.9, 0.3, 6, 0.16);
+        }
+      if (was < 1 && G.t >= 1) {
+        puff(G.to, WATER, 26, 3, 0.45, 7, 0.25);
+        puff(G.to, 0xd6f4e2, 10, 2, 0.3, 5, 0.15);
+        puff(tmpA.copy(G.to).setY(G.to.y + 0.2), 0xdcd8d2, 12, 1.2, 1.0, -1.4, 0.45);
+      }
+      if (tail >= 1) d.gout = null;
+    } else if (d.rn) d.stream.visible = false;
+    if (d.rn && !d.dead) {
+      const bk = d.club,
+        dry = !(d.water > 0);
+      // He does not change in an instant from carrying the bucket to swinging it. d.dryK runs from 0 (in both hands) to 1
+      // (hanging from his right hand) over half a second once it is empty: his left hand lets go, his arms ease from where
+      // they were placed to where the foot soldier's blows put them, and the bucket swings down from his chest to his fist
+      d.dryK = Math.max(0, Math.min(1, (d.dryK || 0) + ((dry ? 1 : -1) * dt) / 0.5));
+      const k = d.dryK * d.dryK * (3 - 2 * d.dryK);
+      if (k < 1) {
+        // in both hands: carried level and high; at a fire, each throw rocks it back and down, then swings it up over his
+        // head and tips it right over, and holds it there a moment
+        const w2 = dry ? 0 : wa,
+          py = RUN_KF(u, -0.1, 0.32, 0.3) * w2,
+          pz = RUN_KF(u, -0.08, 0.03, 0.03) * w2,
+          tilt = RUN_KF(u, -0.45, 1.9, 1.8) * w2,
+          side = 0.1 * BUCKET + 0.045;
+        d.pre = d.pre || {};
+        for (const n of ['armL', 'foreL', 'armR', 'foreR']) d.pre[n] = (d.pre[n] || new THREE.Quaternion()).copy(B[n].quaternion);
+        RN_C.set(RUN_AT[0], RUN_AT[1] + py + 0.025 * Math.sin(d.ph * 2) * d.wW, RUN_AT[2] + pz);
+        B.tgtL.position.set(RN_C.x + side, RN_C.y, RN_C.z);
+        B.tgtR.position.set(RN_C.x - side, RN_C.y, RN_C.z);
+        g.updateMatrixWorld(true);
+        d.ik.update();
+        if (k > 0)
+          for (const n of ['armL', 'foreL', 'armR', 'foreR']) {
+            RN_Q.copy(B[n].quaternion);
+            B[n].quaternion.copy(RN_Q).slerp(d.pre[n], k);
+          }
+        g.updateMatrixWorld(true);
+        RN_P.copy(R.localToWorld(RN_H.copy(RN_C)));
+        R.getWorldQuaternion(RN_Q3).multiply(RN_Q2.setFromAxisAngle(RN_X, tilt));
+      }
+      if (k > 0) {
+        // in one hand: the bucket is a club. It hangs from his right hand by its rim, its bottom the striking end, and
+        // goes where the hand goes
+        B.handR.getWorldPosition(RN_H);
+        B.handR.getWorldQuaternion(RN_Q);
+        RN_Q.multiply(RN_Q2.setFromUnitVectors(RN_T.set(0, -1, 0), RN_C.set(-0.5, -0.35, 0.8).normalize()));
+        RN_H.add(RN_C.set(0, -0.11 * bk.scale.x, 0).applyQuaternion(RN_Q));
+        if (k < 1) {
+          bk.position.copy(RN_P).lerp(RN_H, k);
+          bk.quaternion.copy(RN_Q3).slerp(RN_Q, k);
+        } else {
+          bk.position.copy(RN_H);
+          bk.quaternion.copy(RN_Q);
+        }
+      } else {
+        bk.position.copy(RN_P);
+        bk.quaternion.copy(RN_Q3);
+      }
+      // (the water in it: lower with every throw, and gone when it is dry)
+      d.wet.visible = !dry;
+      d.wet.position.y = -0.06 + 0.14 * (d.water / RUN_WATER);
+      d.wet.scale.setScalar(0.82 + 0.18 * (d.water / RUN_WATER));
+    }
     if (d.ar && !d.dead) {
       const bow = d.club,
         // (an arrow is on the string from the moment his hand is back from the quiver until it is loosed)

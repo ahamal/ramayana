@@ -4,9 +4,18 @@
 // plastered floor, looked at from the same height and distance
 setDay();
 TREE_MATS.trunk.color.set(0x7b5a3d);
+// (a thin line of trees along the far side only: none between the camera and the ground, and none close in)
+[...TREES].forEach((t, i) => {
+  if (!(t.z > 2 || Math.hypot(t.x, t.z) < 27 || i % 2)) return;
+  t.parts.forEach((m) => scene.remove(m));
+  SOLIDS.splice(SOLIDS.indexOf(t.solid), 1);
+  TREES.splice(TREES.indexOf(t), 1);
+});
 yaw = 0;
 dist = 28;
 pitch = 0.62;
+// (the brother not being played holds his fire here unless told otherwise, so that what is summoned can be watched)
+CALM = true;
 // ---------- practice dummies and target boards ----------
 for (let i = 0; i < 10; i++) {
   const a = (i / 10) * 6.283 + 0.15,

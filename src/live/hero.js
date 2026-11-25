@@ -855,7 +855,7 @@ function heroStep(dt) {
       mface = a + Math.PI / 2;
     }
   } // with the keys: straight where they point; he stops dead and keeps that heading when they are let go. With the Walk and Run buttons: round the fire, as before
-  // aim. Under the player: at the point under the pointer, snapping to the body of the nearest living enemy within 2.5 units of it.
+  // aim. Under the player: at the point under the pointer, snapping to the body of the nearest living enemy within 5 units of it.
   // On his own: at the enemy his own judgement picked
   if (AUTO) {
     aimLock = IN.at;
@@ -876,7 +876,7 @@ function heroStep(dt) {
     for (let i = 0; i < 3; i++) if (ray.ray.intersectPlane(plane, tmp)) plane.constant = -(groundY(tmp.x, tmp.z) + 1.15);
     if (ray.ray.intersectPlane(plane, tmp)) {
       let best = null,
-        bd = 2.5;
+        bd = 5;
       for (const d of grunts) {
         if (d.dead || d.flung) continue;
         const l = Math.hypot(d.g.position.x - tmp.x, d.g.position.z - tmp.z);

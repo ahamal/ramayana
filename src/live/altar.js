@@ -267,10 +267,12 @@ function hearthUpdate(dt, s = 1) {
     m.rotation.z = Math.sin(T * 3.1 + i * 1.7) * 0.07;
     m.rotation.x = Math.cos(T * 2.6 + i * 2.2) * 0.06;
   });
-  HEARTH.pool.material.opacity = 0.26 + 0.05 * Math.sin(T * 11) + 0.03 * Math.sin(T * 6.3);
+  // (the pool of light on the ground, the smoke and the embers all shrink with the flame)
+  HEARTH.pool.material.opacity = (0.26 + 0.05 * Math.sin(T * 11) + 0.03 * Math.sin(T * 6.3)) * (0.25 + 0.75 * s);
+  HEARTH.pool.scale.setScalar(4.6 * (0.4 + 0.6 * s));
   const j = (r) => (Math.random() * 2 - 1) * r;
-  if (Math.random() < dt * 22) puff(tmpA.set(j(0.15), 2.1, j(0.15)), 0x77726c, 1, 0.25, 3.6, -0.8, 0.22);
-  if (Math.random() < dt * 7) puff(tmpA.set(j(0.3), 1.4, j(0.3)), 0xffa040, 1, 0.6, 1.4, -1.8, 0.1);
+  if (Math.random() < dt * 22) puff(tmpA.set(j(0.15), 0.6 + 1.5 * s, j(0.15)), 0x77726c, 1, 0.25, 3.6, -0.8, 0.22);
+  if (Math.random() < dt * 7 * s) puff(tmpA.set(j(0.3), 0.5 + 0.9 * s, j(0.3)), 0xffa040, 1, 0.6, 1.4, -1.8, 0.1);
 }
 // Day into night, by k from 0 (the day as it was) to 1 (full night): the sky going from pale blue down to a deep blue with
 // an ember of red left at the horizon, the sun's disc paling to a moon, the light on the ground thin and blue. What the day
