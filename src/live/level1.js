@@ -144,6 +144,9 @@ const WX = -90,
   // and two more below, outside the fork's arms, facing the middle as the others do: five houses round the fire
   SW_HOUSE = [-40, 17.5, 2.1],
   SE_HOUSE = [40, 17.5, -2.1],
+  // the masons' yard, out beyond the top right house as the wood store is out beyond the top left one, and well clear of it.
+  // (Those two houses are the workmen's: the woodcutters' on the left, the masons' on the right)
+  WORKSHOP = [LONG[0] - Math.sin(LONG[2]) * 12.5, LONG[1] - Math.cos(LONG[2]) * 12.5, LONG[2]],
   // on the worn ground round the fire: nothing grows or lies there
   inCourt = (x, z, pad) => Math.hypot(x, z) < 11 + pad,
   // matching each other either side as well: the wood store beyond the sage's house and the lotus pond beyond the pupils';
@@ -157,7 +160,7 @@ const WX = -90,
   ROADS = [],
   nearRoad = (x, z, pad) => ROADLINE.some((p) => Math.abs(p.x - x) < pad && Math.abs(p.z - z) < pad && Math.hypot(p.x - x, p.z - z) < pad),
   // the hermitage's ground: nothing wild grows here. It is everything within the half ring and a good way outside it, on its near side as far as a little beyond the altar
-  inHut = (x, z, pad) => Math.hypot(x - YARD[0], z - YARD[1]) < 54 + pad && z < 32 + pad,
+  inHut = (x, z, pad) => (Math.hypot(x - YARD[0], z - YARD[1]) < 54 + pad && z < 32 + pad) || Math.hypot(x - WORKSHOP[0], z - WORKSHOP[1]) < 6.5 + pad,
   // the two camps where prisoners are kept at work, each beyond a river: stone masons past the east crossing, brahmins past the south
   WORK = [
     [110, -9],
@@ -725,6 +728,7 @@ for (let i = 0; i < 170; i++) {
       [SW_HOUSE, 7.2],
       [SE_HOUSE, 7.2],
       [WOODSHED, 2.6],
+      [WORKSHOP, 5],
       [SHED, 3.6],
       [POND, 4.5],
     ],
@@ -1350,6 +1354,7 @@ house(SW_HOUSE, { R: 4.4, wins: [0.9, -0.9] });
 house(SE_HOUSE, { R: 4.4, wins: [0.9, -0.9] });
 
 // ---------- behind the houses ----------
+const MASON_AT = [];
 {
   const { mud, band, lime, thatch, thatch2, clay } = HM,
     box = (g, w, h, d, m, p, r) => add(g, new THREE.BoxGeometry(w, h, d), m, p, r);
@@ -1370,6 +1375,90 @@ house(SE_HOUSE, { R: 4.4, wins: [0.9, -0.9] });
     cyl(g, 0.025, 0.03, 0.75, WOOD, [2.05, 0.7, 0.9], [0, 0, -0.5]);
     box(g, 0.22, 0.14, 0.05, toon(0x55585e, { rim: 0.3 }), [1.9, 0.48, 0.9], [0, 0, -0.5]);
     SOLIDS.push({ ...g.at(0, 0), r: 1.3 }, { ...g.at(1.9, 0.9), r: 0.4 });
+  }
+  // The masons' yard, out behind the top right house: a small open workshop, left as it was on the morning they were taken. Under a
+  // thatch on four posts stands their bench, with a mallet and chisels still on it. To one side a guardian is half out of
+  // its stone: head, shoulders and one arm cut, and below the waist still the square block, with a chisel left standing in
+  // it. To the other side a second block lies across two logs with no more than a head roughed out at one end. Behind are
+  // the blocks not yet begun. A hammer lies where it was dropped, a stool is on its side, and the ground is pale with dust
+  // and chips. (Its near side, +z here, is toward the house)
+  {
+    const g = site(WORKSHOP),
+      iron = toon(0x55585e, { rim: 0.3 }),
+      pale = toon(0xb9b6ae, { rim: 0.15 }),
+      dust = add(g, new THREE.CircleGeometry(4.2, 28), toon(0xd8d2c4, { rim: 0, transparent: true, depthWrite: false }), [0, 0.03, 0], [-Math.PI / 2, 0, 0]);
+    dust.material.opacity = 0.32;
+    dust.castShadow = false;
+    // the shelter and the bench under it
+    for (const sx of [-1, 1]) {
+      cyl(g, 0.07, 0.09, 2.1, WOOD, [sx * 1.35, 1.05, 0.75]);
+      cyl(g, 0.07, 0.09, 1.7, WOOD, [sx * 1.35, 0.85, -0.75]);
+    }
+    box(g, 3.3, 0.3, 2.3, thatch, [0, 2.12, 0], [-0.22, 0, 0]);
+    box(g, 3.5, 0.12, 2.5, thatch2, [0, 1.95, 0], [-0.22, 0, 0]);
+    box(g, 1.9, 0.09, 0.7, WOOD, [0, 0.82, -0.1]);
+    for (const [lx, lz] of [
+      [-0.85, -0.38],
+      [0.85, -0.38],
+      [-0.85, 0.18],
+      [0.85, 0.18],
+    ])
+      cyl(g, 0.045, 0.05, 0.8, WOOD, [lx, 0.4, lz]);
+    cyl(g, 0.09, 0.09, 0.2, WOOD, [-0.45, 0.94, -0.1], [0, 0, Math.PI / 2]);
+    cyl(g, 0.02, 0.02, 0.34, WOOD, [-0.45, 0.94, 0.12], [Math.PI / 2, 0, 0]);
+    for (let i = 0; i < 3; i++) cyl(g, 0.014, 0.018, 0.3, iron, [0.2 + i * 0.16, 0.885, -0.1 + i * 0.04], [Math.PI / 2, 0, 0.5 - i * 0.4]);
+    // the guardian, half out of its block
+    {
+      const X = -2.7,
+        Z = 0.3;
+      box(g, 1.0, 0.3, 1.0, ROCKM[1], [X, 0.15, Z]);
+      box(g, 0.86, 1.05, 0.62, ROCKM[0], [X, 0.82, Z]);
+      // (the waist up is cut: chest, shoulders, head and tall crown, and his right arm down to the head of a mace)
+      cyl(g, 0.3, 0.36, 0.62, pale, [X, 1.64, Z], [0, 0, 0], [1, 1, 0.72]);
+      sph(g, 0.2, pale, [X, 2.14, Z + 0.02]);
+      cyl(g, 0.1, 0.19, 0.3, pale, [X, 2.42, Z]);
+      cyl(g, 0.09, 0.1, 0.62, pale, [X - 0.4, 1.62, Z + 0.06], [0, 0, -0.12]);
+      sph(g, 0.15, pale, [X - 0.46, 1.24, Z + 0.1]);
+      // (his left side is still the rough of the block)
+      box(g, 0.36, 0.7, 0.5, ROCKM[0], [X + 0.36, 1.62, Z], [0, 0, 0.06]);
+      // (a chisel left standing in the stone at his waist)
+      cyl(g, 0.016, 0.02, 0.3, iron, [X + 0.1, 1.38, Z + 0.4], [1.1, 0, 0]);
+      SOLIDS.push({ ...g.at(X, Z), r: 0.62 });
+    }
+    // the second, hardly begun, lying across two logs
+    {
+      const X = 2.7,
+        Z = 0.2;
+      for (const o of [-0.6, 0.6]) cyl(g, 0.11, 0.12, 1.0, WOOD, [X + o, 0.11, Z], [Math.PI / 2, 0, 0]);
+      box(g, 2.0, 0.62, 0.72, ROCKM[1], [X, 0.53, Z], [0, 0.04, 0]);
+      sph(g, 0.22, pale, [X - 1.0, 0.6, Z], [0.8, 1, 1]);
+      SOLIDS.push({ ...g.at(X - 0.5, Z), r: 0.55 }, { ...g.at(X + 0.5, Z), r: 0.55 });
+    }
+    // the blocks not yet begun, at the back
+    for (const [bx, by, bz, ry] of [
+      [0.1, 0.24, -2.6, 0.1],
+      [1.05, 0.24, -2.5, -0.15],
+      [0.55, 0.72, -2.55, 0.3],
+    ])
+      box(g, 0.9, 0.48, 0.6, ROCKM[(bx * 10) & 1], [bx, by, bz], [0, ry, 0]);
+    SOLIDS.push({ ...g.at(0.55, -2.55), r: 0.85 }, { ...g.at(0, -0.1), r: 0.9 });
+    // left as it fell: a hammer on the ground, a stool on its side, a water pot tipped over, chips everywhere
+    cyl(g, 0.02, 0.022, 0.8, WOOD, [-1.5, 0.03, 1.7], [Math.PI / 2, 0, 0.9]);
+    box(g, 0.13, 0.13, 0.22, iron, [-1.2, 0.07, 1.46], [0, 0.9, 0]);
+    cyl(g, 0.2, 0.2, 0.3, WOOD, [1.3, 0.2, 1.7], [0, 0.4, Math.PI / 2]);
+    sph(g, 0.24, clay, [0.2, 0.2, 2.2], [1, 0.9, 1.15]);
+    for (let i = 0; i < 26; i++) {
+      const cx = i % 2 ? R(-3.6, -1.6) : R(1.4, 3.8),
+        cz = R(-0.8, 1.6);
+      box(g, R(0.06, 0.2), 0.05, R(0.05, 0.14), i % 3 ? pale : ROCKM[0], [cx, 0.04, cz], [0, R(0, 6), 0]).castShadow = false;
+    }
+    // where each of the three stands to work, and what he works at (h: how high his hammer falls)
+    for (const [x, z, fx, fz, h] of [
+      [-2.7, 1.3, -2.7, 0.3, 1.3],
+      [2.7, 1.15, 2.7, 0.2, 0.75],
+      [0.55, -1.35, 0.55, -2.55, 0.85],
+    ])
+      MASON_AT.push({ ...g.at(x, z), face: { ...g.at(fx, fz), h } });
   }
   // the cow's shelter: a low back wall, four posts and a sloping thatch roof, open at the front, with a trough and a heap of hay
   {
@@ -1759,7 +1848,7 @@ function prisoner(x, z, i, job, ends) {
 }
 // ---------- the camps ----------
 // There are three. The first is the one by the road, where the prisoners sit bound. In the other two, each outside the fork
-// of the rivers and beyond a crossing, the demons have their prisoners at work, hoeing or hauling sacks, under a ragged red banner by a fire.
+// of the rivers and beyond a crossing, the demons have their prisoners at work, hoeing or hauling sacks, by a fire.
 // Every camp works the same way: its demons stand idle until a brother comes near or one of them is hurt, then all go for whichever
 // brother is closest; once they are dead its prisoners can be freed, and those bow and walk to the hermitage to sit before the houses.
 SPAWN_MAX = 40;
@@ -1837,14 +1926,13 @@ function camp(x, z, guards, prisoners, watch) {
     HELD,
   );
 }
-// a demon camp beyond a river. Each is ringed on its far side by a palisade of sharpened stakes, open toward the way the brothers
-// come (open is that direction, as an angle), with two hide tents inside it, a ragged red banner and a fire.
-//   the masons' camp is a stone yard: boulders dragged in, standing slabs the masons dress with hammers, and a squat dark wall
-//   they are made to raise, block by block, carried across the yard
+// a demon camp beyond a river: pitched, not built. One hide tent on the far side from the way the brothers come (open is that
+// direction, as an angle) and a fire.
+//   the masons' camp is a stone yard: boulders dragged in, standing slabs the masons dress with hammers, and cut blocks
+//   carried across the yard from one heap to another
 //   the brahmins' camp is a larder: they sit bound to stakes in a row before a great black pot on the fire
 function workCamp(x, z, guards, jobs, open) {
-  const red = toon(0x7a1616, { rim: 0.1 }),
-    hide = toon(0x4a3524, { rim: 0.08 }),
+  const hide = toon(0x4a3524, { rim: 0.08 }),
     stakeM = toon(0x3a2a1c, { rim: 0.05 }),
     A = [x - 5, z + 4.5],
     B = [x + 4.5, z + 5.5],
@@ -1853,53 +1941,54 @@ function workCamp(x, z, guards, jobs, open) {
     G = new THREE.Group();
   G.position.y = groundY(x, z);
   scene.add(G);
-  // the palisade: every stake its own height and lean, pointed at the top
+  // It is a camp pitched for a few days, not a place built: one hide tent and a fire. All of that (K) is
+  // what the demons would carry off with them; KS is what of it stands in the way
   const back = open + Math.PI,
-    R = 11;
-  for (let i = 0, n = 62; i < n; i++) {
-    const a = back + (i / (n - 1) - 0.5) * 4.1,
-      w = Math.sin(i * 12.9898) * 43758.5453,
-      j = w - Math.floor(w),
-      h = 2.3 + j * 0.9,
-      sx = x + Math.cos(a) * (R + (j - 0.5) * 0.3),
-      sz = z + Math.sin(a) * (R + (j - 0.5) * 0.3);
-    add(G, new THREE.CylinderGeometry(0.03, 0.17, h, 6), stakeM, [sx, h / 2 - 0.1, sz], [(j - 0.5) * 0.22, i, (0.5 - j) * 0.18]);
-    if (i % 2) SOLIDS.push({ x: sx, z: sz, r: 0.75 });
-  }
-  // the tents: a tall cone of dark hide with a black mouth, facing the fire
-  for (const s of [-1, 1]) {
+    K = new THREE.Group(),
+    KS = [],
+    FL = [];
+  G.add(K);
+  // the tent: a low cone of dark hide with a black mouth, facing the fire
+  // (the masons' camp has none: there the demons sleep on the ground among the stone)
+  for (const s of mason ? [] : [-1]) {
     const a = back + s * 1.3,
-      tx = x + Math.cos(a) * 8.2,
-      tz = z + Math.sin(a) * 8.2,
+      tx = x + Math.cos(a) * 7,
+      tz = z + Math.sin(a) * 7,
       TENT = new THREE.Group();
     TENT.position.set(tx, 0, tz);
     TENT.rotation.y = Math.atan2(x - tx, z - tz);
-    G.add(TENT);
+    K.add(TENT);
+    TENT.scale.setScalar(0.85);
     add(TENT, new THREE.ConeGeometry(2, 3, 7), hide, [0, 1.5, 0], [0, Math.PI / 7, 0]);
     add(TENT, new THREE.ConeGeometry(0.75, 1.7, 3), DARK, [0, 0.85, 1.42], [-0.5, Math.PI, 0], [1, 1, 0.3]).castShadow = false;
     cyl(TENT, 0.03, 0.03, 0.9, WOOD, [0, 3.2, 0], [0.2, 0, 0.15]);
     cyl(TENT, 0.03, 0.03, 0.9, WOOD, [0, 3.2, 0], [-0.15, 0, -0.25]);
-    SOLIDS.push({ x: tx, z: tz, r: 1.8 });
+    KS.push({ x: tx, z: tz, r: 1.55 });
   }
-  // the banner, tall enough to be seen over the stakes
-  const bx = x - 5,
-    bz = z - 1.5;
-  cyl(G, 0.07, 0.1, 5.2, WOOD, [bx, 2.6, bz]);
-  add(G, new THREE.BoxGeometry(1.5, 2.1, 0.03), red, [bx + 0.82, 3.9, bz]);
-  add(G, new THREE.BoxGeometry(1.52, 0.2, 0.035), DARK, [bx + 0.82, 3.5, bz]);
-  SOLIDS.push({ x: bx, z: bz, r: 0.25 });
   // the fire in its ring of stones
   for (let i = 0; i < 9; i++)
     add(G, new THREE.DodecahedronGeometry(0.2, 0), ROCKM[i % 2], [x + Math.cos(i * 0.7) * 0.85, 0.1, z + Math.sin(i * 0.7) * 0.85], [i, i * 2, 0]);
-  for (const [fx, fz, fs] of [
-    [0, 0, 1],
-    [0.3, 0.15, 0.7],
-    [-0.25, 0.2, 0.75],
-  ])
-    add(G, new THREE.ConeGeometry(0.26 * fs, 0.8 * fs, 7), new THREE.MeshBasicMaterial({ color: fs === 1 ? 0xff8a2a : 0xffb347 }), [x + fx, 0.4 * fs, z + fz]).castShadow = false;
-  const fl = glow(0xffb040, mason ? 1.6 : 1.2);
+  // The flame is made as the altar's is, only small: three sheets one inside another, red-orange outside and pale yellow at
+  // the heart, each see-through and adding its light to what is behind it, and each growing from its foot. (Under the
+  // brahmins' pot it is kept low)
+  const fk = mason ? 1 : 0.55;
+  for (const [r, h, c] of [
+    [0.3, 0.95, 0xff5a10],
+    [0.21, 0.7, 0xffa020],
+    [0.12, 0.46, 0xffe070],
+  ]) {
+    const m = new THREE.Mesh(
+      new THREE.ConeGeometry(r * fk, h * fk, 10, 4),
+      new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }),
+    );
+    m.geometry.translate(0, (h * fk) / 2, 0);
+    m.position.set(x, 0.1, z);
+    K.add(m);
+    FL.push(m);
+  }
+  const fl = glow(0xffb040, mason ? 1.3 : 1.0);
   fl.position.set(x, mason ? 0.6 : 0.35, z);
-  G.add(fl);
+  K.add(fl);
   SOLIDS.push({ x, z, r: mason ? 1 : 1.5 });
   let men;
   if (mason) {
@@ -1907,42 +1996,39 @@ function workCamp(x, z, guards, jobs, open) {
     for (const [dx, dz, r] of [
       [-6, -7, 1.3],
       [-4.2, -8.2, 0.95],
-      [-7.3, -5.4, 0.8],
     ]) {
       add(G, new THREE.DodecahedronGeometry(r, 0), ROCKM[(r * 10) & 1], [x + dx, r * 0.55, z + dz], [dx, dz, r]);
       SOLIDS.push({ x: x + dx, z: z + dz, r: r * 0.9 });
     }
-    // the wall they are made to raise: three courses of block, the top one unfinished
-    const blk = (px, py, pz, w) => add(G, new THREE.BoxGeometry(w, 0.56, 0.9), ROCKM[(px * 3 + py * 5) & 1], [px, py, pz]);
-    for (let r = 0; r < 3; r++)
-      for (let k = 0; k < 4 - r; k++) blk(x + 3.2 + k * 1.25 + (r % 2) * 0.6, 0.28 + r * 0.57, z - 7.2, 1.2);
-    for (let k = 0; k < 4; k++) SOLIDS.push({ x: x + 3.4 + k * 1.25, z: z - 7.2, r: 0.75 });
     // cut blocks stacked at either end of the carriers' walk
     for (const [hx, hz] of [A, B])
-      for (let i = 0; i < 3; i++) add(G, new THREE.BoxGeometry(0.8, 0.42, 0.5), ROCKM[i % 2], [hx + (i < 2 ? i * 0.86 - 0.43 : 0), i < 2 ? 0.21 : 0.63, hz - 1.1], [0, i * 0.2, 0]);
+      for (let i = 0; i < (hx === A[0] ? 2 : 1); i++) add(G, new THREE.BoxGeometry(0.8, 0.42, 0.5), ROCKM[i % 2], [hx + (i ? 0.2 : 0), i ? 0.63 : 0.21, hz - 1.1], [0, i * 0.2, 0]);
     let cut = 0,
       haul = 0;
     men = jobs.map((job, i) => {
       if (job !== 'chop') return prisoner(A[0] + 1 + haul * 2.4, A[1] + 0.4 * haul++, CAMPS.length + i, 'carry', haul % 2 ? [A, B] : [B, A]);
-      // a standing slab, and the mason before it with his hammer
-      const sx = x - 2.2 + cut++ * 3;
-      add(G, new THREE.BoxGeometry(0.8, 1.35, 0.42), ROCKM[cut % 2], [sx, 0.66, z - 5.6], [0, 0.12 * (cut % 2 ? 1 : -1), 0.03]);
-      SOLIDS.push({ x: sx, z: z - 5.6, r: 0.5 });
-      const m = prisoner(sx + 0.15, z - 4.75, CAMPS.length + i, 'chop');
-      m.g.rotation.y = Math.PI;
+      // one standing slab, and the two masons at it with their hammers, one on either side
+      const sx = x - 0.7,
+        far = cut++ > 0;
+      if (!far) {
+        add(G, new THREE.BoxGeometry(0.8, 1.35, 0.42), ROCKM[1], [sx, 0.66, z - 5.6], [0, 0.12, 0.03]);
+        SOLIDS.push({ x: sx, z: z - 5.6, r: 0.5 });
+      }
+      const m = prisoner(sx + (far ? -0.15 : 0.15), z - 5.6 + (far ? -0.85 : 0.85), CAMPS.length + i, 'chop');
+      m.g.rotation.y = far ? 0 : Math.PI;
       m.slab = [sx, z - 5.6];
       return m;
     });
   } else {
     // the pot: black, wide-mouthed, sitting on the fire, with something pale simmering in it
     const pot = toon(0x1c1a1c, { rim: 0.25 });
-    add(G, new THREE.SphereGeometry(0.9, 24, 14, 0, Math.PI * 2, Math.PI * 0.32, Math.PI * 0.68), pot, [x, 1.15, z]);
-    tor(G, 0.79, 0.08, pot, [x, 1.62, z], [Math.PI / 2, 0, 0]);
-    add(G, new THREE.CircleGeometry(0.75, 24), toon(0x8a7d5c, { rim: 0 }), [x, 1.58, z], [-Math.PI / 2, 0, 0]).castShadow = false;
+    add(K, new THREE.SphereGeometry(0.9, 24, 14, 0, Math.PI * 2, Math.PI * 0.32, Math.PI * 0.68), pot, [x, 1.15, z]);
+    tor(K, 0.79, 0.08, pot, [x, 1.62, z], [Math.PI / 2, 0, 0]);
+    add(K, new THREE.CircleGeometry(0.75, 24), toon(0x8a7d5c, { rim: 0 }), [x, 1.58, z], [-Math.PI / 2, 0, 0]).castShadow = false;
     // (three legs of stone hold it over the flames)
     for (let i = 0; i < 3; i++) add(G, new THREE.BoxGeometry(0.3, 0.7, 0.3), ROCKM[i % 2], [x + Math.cos(i * 2.1 + 0.5) * 0.85, 0.3, z + Math.sin(i * 2.1 + 0.5) * 0.85]);
     // firewood for it, stacked to one side
-    for (let i = 0; i < 6; i++) cyl(G, 0.11, 0.11, 1.5, WOOD, [x + 4.3, 0.11 + ((i / 3) | 0) * 0.21, z + 3 + (i % 3) * 0.23 + ((i / 3) | 0) * 0.11], [0, 0, Math.PI / 2]);
+    for (let i = 0; i < 6; i++) cyl(K, 0.11, 0.11, 1.5, WOOD, [x + 4.3, 0.11 + ((i / 3) | 0) * 0.21, z + 3 + (i % 3) * 0.23 + ((i / 3) | 0) * 0.11], [0, 0, Math.PI / 2]);
     // the brahmins: bound to stakes in a row, facing the pot
     men = jobs.map((_, i) => {
       const m = prisoner(x + (i - (jobs.length - 1) / 2) * 1.9, z - 3.7 - (i === 1 ? 0.4 : 0), CAMPS.length + i);
@@ -1950,7 +2036,15 @@ function workCamp(x, z, guards, jobs, open) {
       return m;
     });
   }
-  return camp(x, z, guards, men, V3(x, 0, z - 4));
+  SOLIDS.push(...KS);
+  const c = camp(x, z, guards, men, V3(x, 0, z - 4));
+  c.kit = K;
+  c.kitS = KS;
+  // (its flames, and the glow about them, for the flicker)
+  c.flames = FL;
+  c.glow = fl;
+  c.glow0 = fl.scale.x;
+  return c;
 }
 // the masons' camp: past the east crossing, a little north of the road
 LOOK = 'mason';
@@ -1993,6 +2087,15 @@ function campUpdate(dt) {
   const me = SEL.group.position;
   for (const c of CAMPS) {
     if (c.gone) continue;
+    // the camp's fire: its three sheets of flame leap and lean as the altar's do, and the glow about it breathes with them
+    if (c.flames) {
+      c.flames.forEach((m, i) => {
+        m.scale.set(1 + 0.08 * Math.sin(T * 7 + i * 2 + c.x), 1 + 0.16 * Math.sin(T * (9 + i * 2.3) + i + c.x) + 0.09 * Math.sin(T * (17.3 + i * 3.1)), 1 + 0.08 * Math.cos(T * 6.1 + i));
+        m.rotation.z = Math.sin(T * 3.1 + i * 1.7) * 0.07;
+        m.rotation.x = Math.cos(T * 2.6 + i * 2.2) * 0.06;
+      });
+      c.glow.scale.setScalar(c.glow0 * (1 + 0.07 * Math.sin(T * 8) + 0.04 * Math.sin(T * 13.7)));
+    }
     const live = c.guards.filter((d) => grunts.includes(d) && !d.dead),
       far = apart(me, c) > 62;
     if (!c.roused)
@@ -2071,6 +2174,23 @@ function campUpdate(dt) {
     // at the other camps too, once all are on their feet, they speak before they go
     if (!c.first && allUp && !c.thanked && !talking()) {
       c.thanked = true;
+      // Only one of the two far camps can be saved. The moment the men of one are free, the other is empty: its demons
+      // have gone, and taken their prisoners with them
+      for (const o of CAMPS)
+        if (o !== c && !o.first && !o.thanked && !o.gone) {
+          o.gone = true;
+          o.guards.forEach((d) => grunts.includes(d) && banish(d));
+          // (and they have struck their camp: tent and fire are gone, and only the ring of fire stones is left)
+          if (o.kit) {
+            o.kit.visible = false;
+            for (const q of o.kitS) SOLIDS.includes(q) && SOLIDS.splice(SOLIDS.indexOf(q), 1);
+          }
+          for (const q of o.prisoners) {
+            q.g.visible = false;
+            const i = SOLIDS.indexOf(q.solid);
+            if (i >= 0) SOLIDS.splice(i, 1);
+          }
+        }
       const f = c.prisoners.map((p) => snap(p.rig.bone.head, p.g.rotation.y, null)),
         mason = c.prisoners[0].look === 'mason';
       LOCK = true;
@@ -2137,8 +2257,8 @@ function campUpdate(dt) {
       // They hold the bow a moment (at the first camp, while they give their thanks), then lower their hands and walk to
       // Vishwamitra's hermitage, where they sit down facing the fire
       p.up = Math.min(1, p.up + dt / 0.45);
-      if (p.wood) woodNight(p);
-      if (p.wood) p.jobW += ((p.wood.bent ? 1 : 0) - p.jobW) * Math.min(1, dt * 5);
+      if (p.wood || p.mason) woodNight(p);
+      if (p.wood || p.mason) p.jobW += (((p.wood || p.mason).bent ? 1 : 0) - p.jobW) * Math.min(1, dt * 5);
       else p.jobW = Math.max(0, p.jobW - dt / 0.4);
       let want;
       if (!p.go) {
@@ -2156,11 +2276,13 @@ function campUpdate(dt) {
             const via = c.via || [],
               from = via.length ? { x: via[via.length - 1][0], z: via[via.length - 1][1] } : P;
             // (any other freed villager goes straight to gathering wood)
-            // The brahmins come to Vishwamitra's fire and sit close round it. The masons come in and wait by the east house.
+            // The brahmins come to Vishwamitra's fire and sit close round it. The masons go to their yard beyond the top right house.
             if (p.look === 'brahmin') p.path = [...via, ...route(from, BSEATS[bSeat++ % BSEATS.length])];
             else if (p.look === 'mason') {
+              // (the masons go straight back to their yard and take up the work where it was left)
               p.stand = true;
-              p.path = [...via, [30 + (mSeat % 3) * 1.6, 9 + ((mSeat++ / 3) | 0) * 1.5]];
+              toStone(p, mSeat++);
+              p.path = [...via, ...route(from, p.mason.spot)];
             } else {
               toWood(p, woodN++);
               p.path = [...via, ...route(from, p.wood.home)];
@@ -2202,10 +2324,12 @@ function campUpdate(dt) {
           const A = navAim(P, w[0], w[1], 1.8);
           if ((p.via = A.via)) want = Math.atan2(A.x - P.x, A.z - P.z);
         }
+        if (!w && p.mason && p.mason.s === 'work') want = Math.atan2(p.mason.spot[2].x - P.x, p.mason.spot[2].z - P.z);
         // (at his tree he faces it)
         if (!w && p.wood && p.wood.s !== 'drop' && p.wood.s !== 'fetch') want = Math.atan2(p.wood.spot[2].x - P.x, p.wood.spot[2].z - P.z);
         if (!w && p.wk < 0.05) {
           if (p.wood) woodStep(p, dt);
+          else if (p.mason) stoneStep(p, dt);
           else if (p.stand) p.sit = 0;
           else p.sit = Math.min(1, p.sit + dt / 0.9);
         }
@@ -2297,29 +2421,69 @@ function toWood(p, i) {
   axe.visible = false;
   p.wood = { axe, s: 'fetch', t: 0, i, spot: woodSpot(i), home: [WOODSHED[0] - 3.6 + (i % 3) * 1.3, WOODSHED[1] + 3.6 + (i % 2) * 0.9], bundle: b, bent: false };
 }
-// No one gathers wood in the dark. When the day goes, each man drops what he is doing and runs for the villagers' house in
-// the south-west, nearly twice as fast as he walks, and is gone in at its door. At dawn he comes out again, walks to the
-// store, takes up an axe and goes back to his tree
-const HUT_DOOR = [SW_HOUSE[0] + Math.sin(SW_HOUSE[2]) * 5.5, SW_HOUSE[1] + Math.cos(SW_HOUSE[2]) * 5.5];
+// No one works in the dark. When the day goes, each man drops what he is doing and runs for his own house, nearly twice
+// as fast as he walks, and is gone in at its door: the woodcutters to the top left house, the masons to the top right.
+// At dawn he comes out again and goes back to his work (a woodcutter by way of the store, for his axe)
+const HUT_DOOR = [SAGE_HOUSE[0] + Math.sin(SAGE_HOUSE[2]) * 5.5, SAGE_HOUSE[1] + Math.cos(SAGE_HOUSE[2]) * 5.5],
+  HUT_DOOR_E = [LONG[0] + Math.sin(LONG[2]) * 5.5, LONG[1] + Math.cos(LONG[2]) * 5.5];
 function woodNight(p) {
-  const W = p.wood,
+  const W = p.wood || p.mason,
+    door = p.mason ? HUT_DOOR_E : HUT_DOOR,
     dark = NIGHT.go && !NIGHT.dawn;
   if (dark && !W.in) {
     W.in = true;
     W.s = 'home';
     W.t = 0;
     W.bent = false;
-    W.bundle.visible = W.axe.visible = false;
+    if (W.bundle) W.bundle.visible = false;
+    W.axe.visible = false;
     W.pace0 = p.pace;
     p.pace *= 1.9;
-    p.path = route(p.g.position, [HUT_DOOR[0] + R(-0.5, 0.5), HUT_DOOR[1] + R(-0.5, 0.5)]);
+    p.path = route(p.g.position, [door[0] + R(-0.5, 0.5), door[1] + R(-0.5, 0.5)]);
   } else if (!dark && W.in && W.s === 'in') {
     W.in = false;
     p.g.visible = true;
     p.pace = W.pace0;
-    W.s = 'fetch';
+    W.s = p.mason ? 'go' : 'fetch';
     W.t = 0;
-    p.path = [W.home];
+    p.path = [p.mason ? W.spot : W.home];
+  }
+}
+// A mason at his work: he walks to his place in the yard, takes up a hammer and works at the stone before him without
+// stopping, dust jumping from it at each blow. What the work earns is counted as the woodcutters' is, and paid at dawn
+function toStone(p, i) {
+  const ham = new THREE.Group(),
+    q = MASON_AT[i % MASON_AT.length];
+  cyl(ham, 0.02, 0.022, 0.8, WOOD, [0, 0, 0.3], [Math.PI / 2, 0, 0]);
+  add(ham, new THREE.BoxGeometry(0.13, 0.22, 0.13), AXEM, [0, 0, 0.68]);
+  p.rig.bone.handR.add(ham);
+  ham.visible = false;
+  p.mason = { axe: ham, s: 'go', t: 0, u: 1, earn: R(0, 10), spot: [q.x, q.z, q.face], bent: false };
+}
+function stoneStep(p, dt) {
+  const W = p.mason,
+    P = p.g.position;
+  W.t += dt;
+  if (W.s === 'home' || W.s === 'in') {
+    p.g.visible = false;
+    W.s = 'in';
+    return;
+  }
+  if (W.s === 'go') {
+    W.s = 'work';
+    W.axe.visible = true;
+    p.job = 'chop';
+    W.bent = true;
+    W.u = 1;
+    return;
+  }
+  const u = chopAt(p),
+    t = W.spot[2];
+  if (W.u < CHOP_HIT && u >= CHOP_HIT) puff(tmpA.set(t.x + (P.x - t.x) * 0.4, groundY(t.x, t.z) + t.h, t.z + (P.z - t.z) * 0.4), 0xdcd7cc, 6, 2, 0.4, 6, 0.12);
+  W.u = u;
+  if ((W.earn += dt) > MASON_PAY_T) {
+    W.earn = 0;
+    STOCK.pendS += 1;
   }
 }
 // (called each frame while he stands at the end of his way: at the forest's edge, or back at the store)
@@ -3553,7 +3717,10 @@ function lampLight(l) {
 const COST_HTML = `<span style="width:14px;height:14px;display:block">${TEJAS_ICON}</span><i style="font-style:normal;line-height:1;font-variant-numeric:lining-nums">${LAMP_COST}</i>`,
   MOON_ICON =
     '<svg width="22" height="22" viewBox="0 0 22 22" style="display:block"><path fill="#f0dcb4" d="M14.6 2.6 A 8.6 8.6 0 1 0 19.4 14.2 A 7 7 0 0 1 14.6 2.6 Z"/></svg>';
-const STOCK = { n: 10, pend: 0, el: null, sign: null, ring: null, at: null, hold: false, k: 0 },
+// (pend: what the woodcutters have earned and not yet been paid out; pendS: the same for the masons, one coin each every
+// MASON_PAY_T seconds of work)
+const MASON_PAY_T = 30;
+const STOCK = { n: 10, pend: 0, pendS: 0, el: null, sign: null, ring: null, at: null, hold: false, k: 0 },
   RING_LEN = 2 * Math.PI * 23.5,
   HOLD_T = 0.8;
 {
@@ -4392,19 +4559,24 @@ function coinsHome() {
     c.far = true;
     c.t = 0;
   }
-  const n = STOCK.pend,
-    m = Math.min(n, 12);
-  STOCK.pend = 0;
-  for (let i = 0; i < m; i++) {
-    const g = new THREE.Group(),
-      gl = glow(0xfff0c8, 0.55);
-    add(g, COIN_G, COIN_M, [0, 0, 0], [Math.PI / 2, 0, 0]);
-    g.add(gl);
-    g.position.set(WOODSHED[0] + R(-1, 1), groundY(WOODSHED[0], WOODSHED[1]) + 1.2, WOODSHED[1] + R(-1, 1));
-    g.visible = false;
-    scene.add(g);
-    COINS.push({ g, gl, vx: 0, vz: 0, vy: 0, down: true, to: RAMA, far: true, t: 0, wait: i * 0.14, worth: Math.floor(n / m) + (i < n % m ? 1 : 0) });
+  // (the woodcutters' from the wood store, the masons' from their yard)
+  for (const [n, at] of [
+    [STOCK.pend, WOODSHED],
+    [STOCK.pendS, WORKSHOP],
+  ]) {
+    const m = Math.min(n, 12);
+    for (let i = 0; i < m; i++) {
+      const g = new THREE.Group(),
+        gl = glow(0xfff0c8, 0.55);
+      add(g, COIN_G, COIN_M, [0, 0, 0], [Math.PI / 2, 0, 0]);
+      g.add(gl);
+      g.position.set(at[0] + R(-1, 1), groundY(at[0], at[1]) + 1.2, at[1] + R(-1, 1));
+      g.visible = false;
+      scene.add(g);
+      COINS.push({ g, gl, vx: 0, vz: 0, vy: 0, down: true, to: RAMA, far: true, t: 0, wait: i * 0.14, worth: Math.floor(n / m) + (i < n % m ? 1 : 0) });
+    }
   }
+  STOCK.pend = STOCK.pendS = 0;
 }
 function coinsUpdate(dt) {
   for (const d of grunts)
@@ -4498,15 +4670,16 @@ function coinsUpdate(dt) {
   }
 }
 // ---------- the menu ----------
-// There is no button for it. Escape brings up a short list in the middle of the screen: go on, start the level again, or leave
+// There is no button for it. Escape brings up a short list in the middle of the screen: go on, look at the map, start the
+// level again, or leave
 {
   for (const id of ['menu', 'hud']) if ($(id)) $(id).style.display = 'none';
   const m = document.createElement('div');
   m.style.cssText = 'position:fixed;inset:0;z-index:60;display:none;place-items:center;background:rgba(12,12,14,.55);backdrop-filter:blur(3px)';
   m.innerHTML =
     '<div style="display:flex;flex-direction:column;gap:2px;min-width:230px;padding:14px;border-radius:10px;background:#1c1c1ef2;text-align:center">' +
-    ['Resume', 'Restart level', 'Main menu']
-      .map((t, i) => `<a data-i="${i}" href="${['#', 'level1.html', 'index.html'][i]}" style="padding:10px 14px;border-radius:6px;color:#f1e4cc;text-decoration:none;font:600 20px var(--f);letter-spacing:.03em">${t}</a>`)
+    ['Resume', 'Map', 'Restart level', 'Main menu']
+      .map((t, i) => `<a data-i="${i}" href="${['#', '#', 'level1.html', 'index.html'][i]}" style="padding:10px 14px;border-radius:6px;color:#f1e4cc;text-decoration:none;font:600 20px var(--f);letter-spacing:.03em">${t}</a>`)
       .join('') +
     '</div>';
   document.body.append(m);
@@ -4518,9 +4691,11 @@ function coinsUpdate(dt) {
   m.addEventListener('pointerdown', (e) => e.stopPropagation());
   m.addEventListener('click', (e) => {
     const a = e.target.closest('a');
-    if (a && a.dataset.i !== '0') return;
+    if (a && a.dataset.i > 1) return;
     e.preventDefault();
     show(false);
+    // (Map: the list goes away and the map opens in its place)
+    if (a && a.dataset.i === '1') MINI.toggle(true);
   });
   addEventListener('keydown', (e) => e.code === 'Escape' && show(m.style.display === 'none'));
 }
