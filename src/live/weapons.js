@@ -1031,13 +1031,16 @@ function dummyUpdate(dt) {
       d.wob = Math.max(d.wob, 0.45);
       d.rest = 0;
     }
-    g.position.addScaledVector(d.vel, dt);
+    // (a stone-hurler on his feet is not pushed about by blows: see the enemies)
+    if (!d.st || d.flung) g.position.addScaledVector(d.vel, dt);
     d.vel.multiplyScalar(Math.max(0, 1 - 4 * dt));
     d.rest = d.vel.lengthSq() > 0.05 ? 0 : d.rest + dt;
     if (d.rest > 2.2) g.position.lerp(d.home, Math.min(1, dt * 1.6));
     d.wob = Math.max(0, d.wob - dt * 1.4);
     {
-      const wf = d.rig ? (d.br ? 0.06 : 0.25) : 1,
+      // (a stone-hurler, like a brute, is too heavy to be shaken about by a blow: with a boulder held out at arm's length,
+      // the foot soldier's quick shudder threw it from side to side many times a second)
+      const wf = d.rig ? (d.br || d.st ? 0.06 : 0.25) : 1,
         wv = d.rig ? d.fw || 0 : d.wob;
       g.rotation.x = Math.sin(T * 21) * 0.2 * wv * wf;
       g.rotation.z = Math.cos(T * 17) * 0.14 * wv * wf;

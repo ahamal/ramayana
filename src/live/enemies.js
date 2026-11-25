@@ -56,10 +56,11 @@ function makeGrunt(d, seed) {
     vr = br ? [(Math.random() * 3) | 0, (Math.random() * 4) | 0, Math.random() < 0.5, Math.random() < 0.5, Math.random() < 0.4] : [],
     ar = !!d.ar,
     rn = !!d.rn,
-    skinC = br ? [0x2f4f8f, 0x35467f, 0x2a5a86][vr[0]] : ar ? 0x5c4450 : rn ? 0xb8862c : 0x4b3f5c,
+    st = !!d.st,
+    skinC = br ? [0x2f4f8f, 0x35467f, 0x2a5a86][vr[0]] : ar ? 0x5c4450 : rn ? 0xb8862c : st ? 0x8c6548 : 0x4b3f5c,
     skin = toon(skinC, { vertexColors: true, rim: 0.45 }),
     sk = toon(skinC, { rim: 0.45 }),
-    cloth = toon(br ? [0xb5601a, 0x8f1f1a, 0x9a7a1e, 0x1f5a55][vr[1]] : ar ? 0x74201c : rn ? 0x2c2622 : 0x5a1410, { vertexColors: true }),
+    cloth = toon(br ? [0xb5601a, 0x8f1f1a, 0x9a7a1e, 0x1f5a55][vr[1]] : ar ? 0x74201c : rn ? 0x2c2622 : st ? 0x3d2c1f : 0x5a1410, { vertexColors: true }),
     iron = toon(0x2c2a30, { rim: 0.5 }),
     boneC = toon(0xd8cdb0, { rim: 0.4 }),
     hairC = toon(0x16101c, { rim: 0.25 }),
@@ -195,6 +196,21 @@ function makeGrunt(d, seed) {
       tor(pg, 0.11, 0.012, bronze2, [0, -0.02, 0], [Math.PI / 2, 0, 0], [1.25, 1.2, 1]);
       cyl(pg, 0.003, 0.03, 0.12, boneC, [-0.03, 0.11, 0], [0, 0, 0.5]);
     }
+  } else if (st) {
+    // The stone-hurler: one of Tataka's brood. No taller than a foot soldier but thick-armed, the dull brown of dry earth, bald, with
+    // heavy horns that curl out and round like a ram's, a rough hide about his hips and a string of river stones on his
+    // chest. He is told from far off by his bulk, his horns and the boulder in his hands
+    for (const s of [-1, 1]) {
+      R.on('chest', sph(new THREE.Group(), 0.125, sk, [0, 0, 0], [1.15, 0.95, 1.1]).parent, [s * 0.225, 1.47, -0.02]);
+      tusk(head, s, 0.11, -0.02, -0.02, 0.095, 1.45 * Math.PI, 2.75 * Math.PI, 0.044, boneC);
+    }
+    R.on('spine', sph(new THREE.Group(), 0.17, sk, [0, 0, 0], [1.1, 1, 1]).parent, [0, 1.15, 0.04]);
+    const rock = toon(0x8f8a82, { rim: 0.15 });
+    for (let i = 0; i < 7; i++) {
+      const x = (i - 3) * 0.058,
+        u = x / 0.24;
+      sph(R.on('chest', new THREE.Group(), [x, 1.4 - (1 - u * u) * 0.09, 0.03 + 0.17 * Math.sqrt(1 - u * u * 0.9)]), 0.026 + (i % 2) * 0.008, rock, [0, 0, 0], [1, 0.85, 0.9]);
+    }
   } else if (rn) {
     // The runner: a small ochre-yellow rakshasa, bare-headed, with a strip of pale cloth bound round his brow and nothing on him
     // to slow him down. He is told by his size, his colour and his pace
@@ -211,6 +227,8 @@ function makeGrunt(d, seed) {
     if (br) tusk(head, s, 0.1, 0.045, -0.005, 0.095, 1.5 * Math.PI, 2.3 * Math.PI, 0.038, boneC);
     // (the archer's horns are curved like the brute's, a little smaller)
     else if (ar) tusk(head, s, 0.095, 0.05, -0.005, 0.085, 1.5 * Math.PI, 2.35 * Math.PI, 0.033, boneC);
+    else if (st) {
+    }
     else cyl(head, 0.003, 0.03, 0.17, boneC, [s * 0.1, 0.14, 0], [0, 0, s * -0.55]);
     cyl(head, 0.002, 0.03, 0.1, sk, [s * 0.145, 0.005, -0.01], [0, 0, s * -1.25], [1, 1, 0.5]);
   }
@@ -270,6 +288,15 @@ function makeGrunt(d, seed) {
         cyl(q, 0.005, 0.005, 0.2, DARK, [x, 0.3, z]);
         add(q, new THREE.BoxGeometry(0.004, 0.07, 0.03), DARK, [x, 0.37, z], [0, i, 0]);
       }
+    } else if (st) {
+      // What the stone-hurler holds is a boulder, in both hands. Like the runner's bucket it is its own thing in the world;
+      // each frame it is put between his two hands, wherever his arms have taken them (see the stone-hurler, below)
+      R.bone.handR.remove(grip);
+      // (the boulder in his hands has a stone colour of its own, not the one the thrown boulders share: what he holds
+      // crumbles away with him when he dies, and with a shared colour every boulder in the air and in every other
+      // hurler's hands crumbled away with it, and stayed gone)
+      add(club, STONE_G, toon(0x5e6068, { rim: 0.25 }), [0, 0, 0], [0.4, 1.1, 0.2]);
+      d.hasStone = 1;
     } else if (rn) {
       // What the runner carries is a wooden bucket nearly as big as his own body, brimming with water, hugged before
       // him in both hands. Like the archer's bow it is its own thing in
@@ -328,13 +355,18 @@ function makeGrunt(d, seed) {
       club.position.copy(g.position);
       club.scale.setScalar(BUCKET * (d.k || 1));
     }
+    if (st) {
+      scene.add(club);
+      club.position.copy(g.position);
+      club.scale.setScalar(d.k || 1);
+    }
     d.club = club;
     d.grip = grip;
     d.clubP = club.position.clone();
     d.clubQ = club.quaternion.clone();
   }
   d.mats = new Set();
-  for (const root of ar || rn ? [g, d.club] : [g])
+  for (const root of ar || rn || st ? [g, d.club] : [g])
     root.traverse((o) => {
       if (o.isMesh) {
         o.castShadow = true;
@@ -547,6 +579,9 @@ const FOES = {
   // (his health is set by the brothers' arrows: Rama's does 48 to 56 and Lakshmana's 30 to 36, so 45 is one of Rama's
   // or two of Lakshmana's)
   runner: { hp: 45, dmg: [10, 14], speed: 5.5, reach: 2.2, swing: 1.15, radius: 0.28, mass: 0.7, aimY: 0.72, barY: 1.5 },
+  // the stone-hurler is a foot soldier's height but thicker, slow and tough, and never comes near: he stops a long throw off (reach) and lobs a boulder
+  // every `swing` seconds at whatever he has been set on
+  hurler: { hp: 320, dmg: [36, 44], speed: 2.0, reach: 12, swing: 3.8, radius: 0.45, mass: 4, aimY: 1.15, barY: 2.2 },
   archer: { hp: 90, dmg: [22, 30], speed: 2.5, reach: 12, swing: 2.3, radius: 0.38, mass: 1, aimY: 1.1, barY: 2.1 },
 };
 // a level may name the spot (at) instead of the angle; the enemy then simply stands there, with no flash of arrival
@@ -557,7 +592,7 @@ function spawn(a, kind, at) {
     br = kind === 'brute';
   if (grunts.length >= SPAWN_MAX) return;
   // (an archer arrives well out, beyond his own bowshot, and walks in to it)
-  const r = kind === 'archer' ? 19 + Math.random() * 3 : 11 + Math.random() * 2.5,
+  const r = kind === 'archer' ? 23 + Math.random() * 3 : 18 + Math.random() * 3,
     g = new THREE.Group();
   if (at) g.position.copy(at);
   else g.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
@@ -574,10 +609,11 @@ function spawn(a, kind, at) {
     flung: false,
     ft: 0,
     summoned: true,
-    k: br ? 1 : pi ? 0.9 + Math.random() * 0.2 : kind === 'archer' ? 0.9 + Math.random() * 0.12 : kind === 'runner' ? 0.76 + Math.random() * 0.06 : 0.88 + Math.random() * 0.3,
+    k: br ? 1 : pi ? 0.9 + Math.random() * 0.2 : kind === 'archer' ? 0.9 + Math.random() * 0.12 : kind === 'runner' ? 0.76 + Math.random() * 0.06 : kind === 'hurler' ? 0.98 + Math.random() * 0.1 : 0.88 + Math.random() * 0.3,
     br,
     ar: kind === 'archer',
     rn: kind === 'runner',
+    st: kind === 'hurler',
     def: FOES[kind] || FOES.grunt,
   };
   dummies.push(d);
@@ -600,7 +636,7 @@ function banish(d) {
   if (d.club) scene.remove(d.club);
   for (const o of d.club ? [d.g, d.club] : [d.g])
     o.traverse((m) => {
-      if (m.isMesh && !m.isSkinnedMesh) m.geometry.dispose();
+      if (m.isMesh && !m.isSkinnedMesh && m.geometry !== STONE_G) m.geometry.dispose();
     });
   d.mats.forEach((m) => m.dispose());
   grunts.splice(grunts.indexOf(d), 1);
@@ -941,6 +977,140 @@ const BSTR = [
     };
   },
 ];
+// ---------- the stone-hurler ----------
+// As Tataka fights, so do her brood: from far off, with stones. He walks in holding a boulder over his head, stops a long
+// throw from his mark, rocks back, and heaves it. The boulder goes over in a low hard arc and comes down a second
+// later. There is no mark on the ground to say where: the boulder itself is the warning, and a brother who watches it can
+// step out from under it, though a lamp cannot. Where it lands it throws up dust, and hurts whoever is under it. He then heaves another up from behind him, and goes on.
+// (A level says what he is set on with d.to, and with d.onStone(x, z) what a boulder landing there does to its lamps and
+// its fire; the hurt to a brother under it is dealt here.)
+const STONE_M = toon(0x5e6068, { rim: 0.25 }),
+  // A boulder: a twelve-sided lump with its corners pushed in and out unevenly and its faces left flat, so it is craggy and
+  // angular, not a ball. (Each corner is moved by an amount got from where it is, so the faces that meet there stay joined)
+  STONE_G = (() => {
+    const g = new THREE.DodecahedronGeometry(0.27, 0),
+      p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i),
+        y = p.getY(i),
+        z = p.getZ(i),
+        h = Math.sin(Math.round(x * 50) * 12.9898 + Math.round(y * 50) * 78.233 + Math.round(z * 50) * 37.719) * 43758.5453,
+        k = 0.78 + 0.42 * (h - Math.floor(h));
+      p.setXYZ(i, x * k * 1.12, y * k * 0.86, z * k);
+    }
+    g.computeVertexNormals();
+    return g;
+  })(),
+  STONE_T = 0.95,
+  STONE_R = 1.9,
+  STONES = [],
+  // His arms are not placed by any solver: they are swung, both together, by two angles. One is how far round the upper
+  // arms are raised from the shoulder (0 hanging down, a quarter turn straight out before him, a half turn straight up,
+  // and past that back over his head); the other is how far the elbows are bent, in that same plane. He carries the
+  // boulder against his belly with his elbows well bent. To throw he lifts it up in front and on over his head, and lets
+  // it sink behind his head with his elbows bent and pointing up, leaning back; then his body comes forward, his arms
+  // come over and straighten, and he lets go while his hands are still high, a little before his head, so that the
+  // boulder leaves upward and forward, off the top of the swing; and his empty hands come on down in front of him, where
+  // the next boulder is. The boulder is between his hands all the way, a little beyond them along his forearms.
+  // (he stands with it a moment, then lifts it slowly, over a third of the whole throw; the swing forward is quick)
+  ST_LET = 0.49,
+  ST_RAISE = (u) =>
+    kf(u, [
+      // (The boulder leaves along the line his hands are moving on at that moment. A hand swinging over the top is moving
+      // upward only until the arm is upright, and downward after; so to send the boulder up and away he must let go
+      // while his arms are still tipped back behind his head, and to have them there on the way forward he must first
+      // take it a long way back.)
+      [0, 0.5],
+      [0.12, 0.5],
+      [0.44, 4.05],
+      [ST_LET, 3.52],
+      [0.6, 1.25],
+      [1, 0.5],
+    ]),
+  ST_BEND = (u) =>
+    kf(u, [
+      [0, 0.95],
+      [0.12, 0.95],
+      [0.44, 1.3],
+      [ST_LET, 0.3],
+      [0.6, 0.3],
+      [1, 0.95],
+    ]),
+  ST_QF = new THREE.Quaternion(),
+  ST_EF = new THREE.Euler(),
+  ST_AX = new THREE.Vector3(),
+  // (a forearm's turn at the elbow, as the three numbers a pose is given in: by `bend`, about the same line the shoulder
+  // swings about, as that line lies in the arm's own frame once the arm has been brought in to the side by z0)
+  ST_FORE = (bend, z0) => {
+    ST_EF.setFromQuaternion(ST_QF.setFromAxisAngle(ST_AX.set(Math.cos(z0), -Math.sin(z0), 0), -bend), 'XYZ');
+    return [ST_EF.x, ST_EF.y, ST_EF.z];
+  },
+  // (w: how far he is into throwing at all, from 0 walking with it to 1 throwing: so he eases into and out of a throw)
+  STHROW = (u, w) => {
+    const th = 0.5 + (ST_RAISE(u) - 0.5) * w,
+      be = 0.95 + (ST_BEND(u) - 0.95) * w,
+      zR = 0.785 - 0.16,
+      zL = -0.785 + 0.16;
+    return {
+      a: [-th, 0, zR],
+      f: ST_FORE(be, zR),
+      aL: [-th, 0, zL],
+      fL: ST_FORE(be, zL),
+      w: [0, 0],
+      tw: 0,
+      // (back as it goes up, forward as it is thrown)
+      lean:
+        w *
+        kf(u, [
+          [0, 0],
+          [0.12, 0],
+          [0.44, -0.45],
+          [ST_LET, -0.05],
+          [0.6, 0.7],
+          [1, 0],
+        ]),
+    };
+  },
+  [ST_C, ST_H, ST_S] = [0, 0, 0].map(() => new THREE.Vector3()),
+  ST_Q = new THREE.Quaternion();
+function stoneThrow(d, tx, tz, up) {
+  const m = new THREE.Mesh(STONE_G, STONE_M),
+    a = Math.random() * 6.283,
+    r = Math.random() * 0.9,
+    to = V3(tx + Math.cos(a) * r, 0, tz + Math.sin(a) * r);
+  // (the boulder stops `up` above the ground there: on the lamp's dish or in the fire, not under them)
+  const gy = groundY(to.x, to.z);
+  to.y = gy + (up || 0);
+  m.position.copy(d.club.position);
+  m.scale.copy(d.club.scale);
+  m.castShadow = true;
+  scene.add(m);
+  STONES.push({ m, gy, from: m.position.clone(), to, t: 0, by: d, dmg: d.def.dmg, spin: V3(Math.random() * 4, Math.random() * 4, Math.random() * 4) });
+}
+function stonesUpdate(dt) {
+  for (let i = STONES.length - 1; i >= 0; i--) {
+    const s = STONES[i];
+    s.t += dt / STONE_T;
+    const t = Math.min(1, s.t);
+    s.m.position.lerpVectors(s.from, s.to, t).setY(s.from.y + (s.to.y + 0.2 - s.from.y) * t + 1.6 * 4 * t * (1 - t));
+    s.m.rotation.set(s.spin.x * s.t, s.spin.y * s.t, s.spin.z * s.t);
+    // (the mark: faint and wide at first, darker and closing to the boulder's own size as it comes down)
+    if (s.t < 1) continue;
+    // it has landed
+    puff(tmpA.copy(s.to).setY(s.to.y + 0.2), 0xb9a88a, 34, 4, 0.7, 4, 0.45);
+    puff(tmpA, 0x77726c, 10, 5, 0.3, 9, 0.2);
+    ring(tmpA.copy(s.to).setY(s.gy + 0.09), STONE_R, 0xcbb48a, 0.5);
+    for (const h of HEROES) {
+      const q = h.group.position;
+      if (!heroUp(h) || Math.hypot(q.x - s.to.x, q.z - s.to.z) > STONE_R) continue;
+      if (h.hp !== undefined) h.hp = Math.max(0, h.hp - Math.round(s.dmg[0] + Math.random() * (s.dmg[1] - s.dmg[0])));
+      heroHit(h, s.to.x, s.to.z);
+    }
+    if (s.by.onStone) s.by.onStone(s.to.x, s.to.z);
+    scene.remove(s.m);
+    STONES.splice(i, 1);
+  }
+}
 // ---------- the runner ----------
 // He runs hugging his bucket to him, held high against his chest, a hand on either side of it on the outside of its staves.
 // At a fire he heaves it: rocks it back and down, then swings it up over his head and tips it, and a gout of water leaves
@@ -1087,6 +1257,7 @@ let HOLD_FOES = false;
 function gruntUpdate(dt) {
   if (HOLD_FOES) return;
   foeShotsUpdate(dt);
+  stonesUpdate(dt);
   for (const d of grunts) {
     // one that a level has put to sleep (far off, standing idle, out of sight) costs nothing until it is woken
     if (d.asleep) continue;
@@ -1127,7 +1298,14 @@ function gruntUpdate(dt) {
           uu = d.at - fl;
         // (only early in the wind-up; once the swing is well under way a hit no longer stops it. A brute is checked only half
         // as much, or two archers shooting in turn would hold his club back for ever; and in a rage he is not checked at all)
-        if (uu < 0.35 && !(d.rage > 0)) {
+        if (d.st) {
+          // (a stone-hurler is checked harder than anyone: a hit at any time before the boulder leaves his hands sets the
+          // throw back a good way and holds it there a third of a second, so that steady shooting keeps him from throwing)
+          if (uu < ST_LET) {
+            d.at = fl + Math.max(0, uu - 0.16);
+            d.hitch = 0.34;
+          }
+        } else if (uu < 0.35 && !(d.rage > 0)) {
           d.at = fl + Math.max(0, uu - (d.br ? 0.04 : 0.08));
           d.hitch = d.br ? 0.06 : 0.12;
         }
@@ -1140,7 +1318,7 @@ function gruntUpdate(dt) {
         if (d.vel.length() > 0.8) g.rotation.y = Math.atan2(-d.vel.x, -d.vel.z);
         if (d.club) {
           scene.attach(d.club);
-          d.club.scale.setScalar((d.br ? 1.3 : d.ar ? 1.12 : d.rn ? BUCKET : 1) * d.sz * (d.k || 1));
+          d.club.scale.setScalar((d.br ? 1.3 : d.ar ? 1.12 : d.rn ? BUCKET : 1) * d.sz * (d.k || 1) * (d.st ? Math.max(0.02, d.hasStone) : 1));
         }
         d.cv = V3((-g.position.x / r0) * 0.8, 1.6, (-g.position.z / r0) * 0.8);
         d.mats.forEach((m) => {
@@ -1163,7 +1341,13 @@ function gruntUpdate(dt) {
     d.pw = d.wob;
     d.rest = 0;
     d.fw = (d.fw || 0) + (d.wob - (d.fw || 0)) * Math.min(1, dt * (d.wob > (d.fw || 0) ? 14 : 30));
+    // (a brute is not knocked back far by an arrow. A stone-hurler is not moved at all: he stands exactly at the edge of
+    // his range, and any push took him over it, so that he broke off to step forward again. An arrow does interrupt his
+    // throw, but as it does a foot soldier's blow: early in the wind-up it knocks the throw back a little and holds it,
+    // and he reels and his arms sag for a moment before he takes it up again from where it was. His arms ease between
+    // the two (see STHROW's w), where at first they jumped, which looked like a flicker)
     if (d.br) d.vel.multiplyScalar(Math.max(0, 1 - dt * 12));
+    if (d.st && !d.flung) d.vel.set(0, 0, 0);
     // (d.fw above is the flinch: it eases in over a few frames instead of snapping to full on the frame of the hit)
     // hit-point bar: appears over an enemy once it has been hurt, always facing the camera. The fill slides down to its new level, and on the killing blow it drains to nothing before the bar goes
     if (d.hp < d.hp0 && (!d.dead || d.barV > 0.03)) {
@@ -1210,8 +1394,14 @@ function gruntUpdate(dt) {
       stag = (!d.br && d.wob > 0.8 && !(d.wA > 0.5 && d.at % 1 > 0.35)) || d.hold > 0 || d.flung || d.dead > 0 || d.wait,
       // (an archer in range but with something between him and his mark keeps coming, until he can see it)
       blind = d.ar && r <= d.rng && r > 4 && (navFresh(), !navClear(g.position.x, g.position.z, ox, oz, 1)),
-      walking = !stag && (r > d.rng || blind) && !(d.ar && !d.foe),
+      // Too far to strike. For those who fight from a distance (the archer, the stone-hurler) this has some give in it: he
+      // stops exactly at the edge of his range, and every arrow that hits him knocks him a little way back, over that edge.
+      // Without the give he would break off his throw to take half a step forward, on every hit: once he has stopped, he
+      // counts as in range until he is a good pace and a half outside it
+      far = r > d.rng + ((d.st || d.ar) && d.near ? 1.6 : 0),
+      walking = !stag && (far || blind) && !(d.ar && !d.foe),
       attacking = !stag && !walking && !(d.ar && !d.foe);
+    d.near = !far;
     // he comes in at a run, weaving from side to side, and turns to face wherever he is heading; once in range he squares up to the fire, bouncing on his feet
     {
       const nx = (ox - g.position.x) / r,
@@ -1234,14 +1424,14 @@ function gruntUpdate(dt) {
               : d.br
                 ? Math.sin(T * 2.4 + d.seed * 3) * 1.8 * (d.rageW || 0)
                 : // (a runner hardly weaves: he comes straight)
-                  Math.sin(T * 1.9 + d.seed * 3) * (d.rn ? 0.35 : 1.4),
+                  Math.sin(T * 1.9 + d.seed * 3) * (d.rn ? 0.35 : d.st ? 0.2 : 1.4),
         // (on a way round he weaves less, so the weave does not carry him into what he is going round)
         vx = wx * sp - wz * lat * (al ? 0.35 : 1),
         vz = wz * sp + wx * lat * (al ? 0.35 : 1);
       if (walking) {
         g.position.x += vx * bm * dt;
         g.position.z += vz * bm * dt;
-        d.ph += dt * (d.br ? 3.2 * (1 + 1.75 * (d.rageW || 0)) : d.pi ? (d.cr ? 8.5 : 11.5) : d.rn ? 16 : 10);
+        d.ph += dt * (d.br ? 3.2 * (1 + 1.75 * (d.rageW || 0)) : d.pi ? (d.cr ? 8.5 : 11.5) : d.rn ? 16 : d.st ? 4.2 : 10);
       }
       if (!d.flung && !d.dead) {
         // (a raging brute weaves as he runs but keeps turned square to whoever he is after, so his swings go at them)
@@ -1281,7 +1471,7 @@ function gruntUpdate(dt) {
     }
     const u = d.at % 1,
       wind = 0,
-      S = d.ar ? ARCH(u) : d.pi ? PATK[d.sk](u) : d.br ? BSTR[d.sk](u) : STRIKES[d.sk](u),
+      S = d.ar ? ARCH(u) : d.st ? STHROW(u, wa) : d.pi ? PATK[d.sk](u) : d.br ? BSTR[d.sk](u) : STRIKES[d.sk](u),
       smash = S.lean * wa,
       // (an archer keeps his stance for as long as he is shooting: he does not lower the bow and turn to face front
       // between one arrow and the next, as a club comes back to the shoulder between blows)
@@ -1289,7 +1479,10 @@ function gruntUpdate(dt) {
         ? 0
         : d.ar
           ? wa
-          : kf(u, [
+          : d.st
+            ? // (a stone-hurler's arms are always where his own pose puts them)
+              1
+            : kf(u, [
             [0, 0],
             [0.32, 1],
             [0.76, 1],
@@ -1301,6 +1494,12 @@ function gruntUpdate(dt) {
       lg = (S.leg || 0) * wa;
     if (d.ar) {
       if (attacking && d.lu < RELEASE && u >= RELEASE) foeShoot(d);
+    } else if (d.st) {
+      if (attacking && d.hasStone >= 1 && d.lu < ST_LET && u >= ST_LET) {
+        // (at a lamp, onto its dish; at the altar, into the foot of the flame)
+        stoneThrow(d, ox, oz, d.to && d.to.y !== undefined ? d.to.y - groundY(ox, oz) + 1.3 : Math.hypot(ox, oz) < 0.5 ? 0.8 : 0);
+        d.hasStone = 0;
+      }
     } else if (d.pi) {
       if (attacking && d.lu < S.hit && u >= S.hit)
         for (const h of S.both ? [B.handR, B.handL] : [d.sd > 0 ? B.handR : B.handL]) {
@@ -1432,7 +1631,7 @@ function gruntUpdate(dt) {
     }
     const t = T * 1.15 + d.seed * 2.1,
       P = idle(t),
-      Wk = d.br ? walk(d.ph) : run(d.ph),
+      Wk = d.br || d.st ? walk(d.ph) : run(d.ph),
       w = d.dead ? 0 : d.fw * (d.br ? 0.15 : 0.5),
       fl = d.flung ? 1 : 0,
       br = Math.sin(t * 2.1),
@@ -1564,6 +1763,24 @@ function gruntUpdate(dt) {
       B[n].quaternion.setFromEuler(EG);
     }
     B.handR.quaternion.setFromEuler(EG.set(wrist[0] * aw * (1 - f), wrist[1] * aw * (1 - f), 0));
+    if (d.st && !d.dead) {
+      const bk = d.club;
+      // (a new boulder comes up into his hands as they come down after a throw, and he is never without one for long)
+      if (d.hasStone < 1 && (!attacking || u > 0.72 || u < 0.12)) d.hasStone = Math.min(1, d.hasStone + dt * 3.5);
+      // the boulder: between his two hands, and a little further out along his arms than they are
+      g.updateMatrixWorld(true);
+      B.handL.getWorldPosition(ST_C);
+      B.handR.getWorldPosition(ST_H);
+      ST_C.add(ST_H).multiplyScalar(0.5);
+      // (out along his forearms: from between his elbows, through between his hands)
+      B.foreL.getWorldPosition(ST_S);
+      B.foreR.getWorldPosition(ST_H);
+      ST_S.add(ST_H).multiplyScalar(0.5);
+      bk.position.copy(ST_C).addScaledVector(ST_S.subVectors(ST_C, ST_S).normalize(), 0.22 * (d.k || 1));
+      bk.quaternion.copy(R.getWorldQuaternion(ST_Q));
+      bk.visible = d.hasStone > 0.02;
+      bk.scale.setScalar((d.k || 1) * Math.max(0.02, d.hasStone));
+    }
     if (d.rn && d.gout) {
       // the gout in the air: its head runs the arc in a third of a second, its tail a little behind, and where the head
       // comes down it bursts in a splash and a breath of steam

@@ -3806,9 +3806,9 @@ const FIRE = { hp: 100, max: 100, s: 1 },
   WAVES = [
     [['grunt', 2, 0, 0], ['grunt', 2, 0, 4], ['grunt', 2, 0, 8]],
     [['pish', 4, 1, 0], ['pish', 4, 3, 7], ['runner', 2, 2, 11]],
-    [['grunt', 3, 0, 0], ['defiler', 2, 2, 0], ['grunt', 3, 2, 3], ['archer', 2, 1, 4], ['defiler', 1, 0, 5]],
+    [['grunt', 3, 0, 0], ['defiler', 2, 2, 0], ['grunt', 3, 2, 3], ['archer', 2, 1, 4], ['defiler', 1, 0, 5], ['hurler', 1, 3, 6]],
     [['grunt', 3, 1, 0], ['brute', 1, 1, 2], ['runner', 3, 3, 4], ['grunt', 3, 1, 6]],
-    [['brute', 1, 0, 0], ['pish', 4, 2, 0], ['defiler', 2, 1, 4], ['archer', 3, 2, 6], ['pish', 4, 0, 8], ['brute', 1, 3, 10], ['defiler', 2, 3, 13]],
+    [['brute', 1, 0, 0], ['pish', 4, 2, 0], ['defiler', 2, 1, 4], ['archer', 3, 2, 6], ['hurler', 2, 1, 7], ['pish', 4, 0, 8], ['brute', 1, 3, 10], ['defiler', 2, 3, 13]],
   ],
   sideOf = (q) => WAVE.a0 + (q * Math.PI) / 2,
   sideName = (a) => (Math.abs(Math.cos(a)) > Math.abs(Math.sin(a)) ? (Math.cos(a) > 0 ? 'east' : 'west') : Math.sin(a) > 0 ? 'south' : 'north');
@@ -3841,6 +3841,20 @@ function waveDemon(kind, a) {
         puff(tmpA, 0x77726c, 22, 1.4, 1.2, -0.8, 0.3);
       }
     } else if (Math.hypot(P.x, P.z) < d.rng + 1) fireHurt(d.br ? 6 : d.rn ? (d.threw ? 4 : 0.6) : d.pi ? 1 : 1.5);
+  };
+  // where one of his boulders comes down (a stone-hurler's only): any lit lamp under it takes two blows, and the altar's
+  // fire, if it is that, a heavy one
+  d.onStone = (x, z) => {
+    for (const l of LAMPS)
+      if (l.lit && Math.hypot(l.x - x, l.z - z) < 1.9) {
+        l.dip = 1;
+        puff(tmpA.set(l.x, l.y + 1.5, l.z), 0xffb050, 10, 2.2, 0.3, 1);
+        if ((l.hits = (l.hits || 0) + 2) >= 4) {
+          lampOut(l);
+          puff(tmpA, 0x77726c, 22, 1.4, 1.2, -0.8, 0.3);
+        }
+      }
+    if (Math.hypot(x, z) < 2.6) fireHurt(5);
   };
   WAVE.live.push(d);
 }
@@ -3899,22 +3913,23 @@ function waveUpdate(dt) {
     let foe = null,
       lamp = null,
       slow = false;
-    if (!d.pi && !d.df && !d.rn)
+    if (!d.pi && !d.df && !d.rn && !d.st)
       for (const h of HEROES) if (h.hp > 0 && apart(h.group.position, P) < (d.br ? 9 : 6.5) && (!foe || apart(h.group.position, P) < apart(foe.group.position, P))) foe = h;
     for (const l of LAMPS)
       if (l.lit) {
         if (apart(l, P) < 5.5) slow = true;
-        if ((d.pi || d.rn) && (!lamp || apart(l, P) < apart(lamp, P))) lamp = l;
+        if ((d.pi || d.rn || d.st) && (!lamp || apart(l, P) < apart(lamp, P))) lamp = l;
       }
     d.slowK = slow && !d.df ? 0.7 : 1;
     // (a runner makes for whichever fire is nearest him, a lamp's or the altar's, and for nothing else)
-    if (d.rn && lamp && apart(lamp, P) > Math.hypot(P.x, P.z)) lamp = null;
+    // (and so does a stone-hurler, from his distance)
+    if ((d.rn || d.st) && lamp && apart(lamp, P) > Math.hypot(P.x, P.z)) lamp = null;
     // (an archer chooses his own mark and his own distance: see the archer, with the enemies)
     if (d.ar) continue;
     d.foe = foe;
     d.lamp = foe ? null : lamp;
     d.to = foe ? foe.group.position : lamp;
-    d.rng = foe ? (d.br ? 2.3 : 1.5) : lamp ? 1.3 : d.df ? d.def.reach : d.br ? 3.2 : d.pi || d.rn ? 2.2 : 2.6;
+    d.rng = d.st ? d.def.reach : foe ? (d.br ? 2.3 : 1.5) : lamp ? 1.3 : d.df ? d.def.reach : d.br ? 3.2 : d.pi || d.rn ? 2.2 : 2.6;
     // (a defiler has no blow: while its pot is tipped over the fire, the fire is fouled)
     if (d.df && d.pour > 0.5 && Math.hypot(P.x, P.z) < 4.5) fireHurt(2.5 * dt);
   }
