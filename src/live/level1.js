@@ -1175,6 +1175,15 @@ function seatMat(x, z, r = 0.56) {
     flat(add(scene, new THREE.BoxGeometry(1.38, 0.034, 1.18), PAVE.straw, [X, 0.05, Z]));
     sph(scene, 0.15, brass, [X + 1.05, 0.14, Z + 0.1], [1, 0.85, 1]);
     cyl(scene, 0.05, 0.07, 0.1, brass, [X + 1.05, 0.3, Z + 0.1]);
+    // and three smaller mats of the same make, east, west and south of the fire, for the brahmins (their seats are BSEATS)
+    for (const [x, z, w, d] of [
+      [2.7, 0, 1.05, 1.2],
+      [-2.7, 0, 1.05, 1.2],
+      [0, 2.7, 1.2, 1.05],
+    ]) {
+      flat(add(scene, new THREE.BoxGeometry(w, 0.03, d), PAVE.strawEdge, [x, 0.05, z]));
+      flat(add(scene, new THREE.BoxGeometry(w - 0.12, 0.034, d - 0.12), PAVE.straw, [x, 0.05, z]));
+    }
   }
   // (and its light reaches further across the worn ground)
   fireL.distance = 20;
@@ -1773,11 +1782,11 @@ let seatsTaken = 3,
   bSeat = 0,
   mSeat = 0;
 // the brahmins' places: close round the fire, either side of Vishwamitra and across from him, clear of where the brothers sit
+// (the sage has the north side of the fire; the three brahmins take the east, the west and the south)
 const BSEATS = [
-  [-3.3, -1.7],
-  [3.3, -1.7],
-  [-4, 0.9],
-  [4, 0.9],
+  [2.7, 0],
+  [-2.7, 0],
+  [0, 2.7],
 ];
 // the way from where a man stands to his seat: straight there, unless that would take him across the altar, when he goes round it.
 // A camp outside the fork gives the first part of the way itself: to its crossing, over it, and in
