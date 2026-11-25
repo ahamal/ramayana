@@ -1,5 +1,12 @@
 'use strict';
 // The character workshop: straw dummies and target boards to shoot at, the on-screen buttons, and the frame loop.
+// It stands on the same ground as Level 1: the same clear morning, the same grass, and (from altar.js) the same fire on its
+// plastered floor, looked at from the same height and distance
+setDay();
+TREE_MATS.trunk.color.set(0x7b5a3d);
+yaw = 0;
+dist = 28;
+pitch = 0.62;
 // ---------- practice dummies and target boards ----------
 for (let i = 0; i < 10; i++) {
   const a = (i / 10) * 6.283 + 0.15,
@@ -28,6 +35,8 @@ for (let i = 0; i < 7; i++) {
   cyl(g, 0.03, 0.03, 1.5, WOOD, [0, 0.72, -0.5], [0.45, 0, 0]);
   targets.push({ g, c: V3(g.position.x, 1.15, g.position.z), n: V3(-Math.cos(a), 0, -Math.sin(a)), wob: 0 });
 }
+// the Night button: the same night as the level's, coming on and going over a couple of seconds
+const DARK_ON = { on: false, k: 0 };
 function ui() {
   const mv = who !== 'sage' ? move : SG.move;
   $('arrows').style.display = who === 'rama' ? '' : 'none';
@@ -38,7 +47,7 @@ function ui() {
     .forEach((b) =>
       b.classList.toggle(
         'on',
-        b.dataset.w ? b.dataset.w === who : b.dataset.n ? (who !== 'sage' ? namaste : SG.namaste) : b.dataset.f ? latch : b.dataset.g ? FOLLOW : b.dataset.m === mv,
+        b.dataset.w ? b.dataset.w === who : b.dataset.n ? (who !== 'sage' ? namaste : SG.namaste) : b.dataset.f ? latch : b.dataset.g ? FOLLOW : b.dataset.c ? CALM : b.dataset.t ? DARK_ON.on : b.dataset.m === mv,
       ),
     );
 }
@@ -48,6 +57,8 @@ $('tabs').onclick = (e) => {
   else if (d.m) setMove(d.m);
   else if (d.n) toggleNam();
   else if (d.g) FOLLOW = !FOLLOW;
+  else if (d.c) CALM = !CALM;
+  else if (d.t) DARK_ON.on = !DARK_ON.on;
   else if (d.f) {
     latch = !latch;
     if (latch) press();
@@ -75,6 +86,11 @@ function frame(now) {
   heroUpdate(dt);
   shotsUpdate(dt);
   worldUpdate(dt);
+  hearthUpdate(dt);
+  if (DARK_ON.k !== (DARK_ON.on ? 1 : 0)) {
+    DARK_ON.k = Math.max(0, Math.min(1, DARK_ON.k + ((DARK_ON.on ? 1 : -1) * dt) / 2));
+    skyNight(DARK_ON.k);
+  }
   cameraUpdate(dt);
   composer.render();
   if (!shown && T > 0.8) {

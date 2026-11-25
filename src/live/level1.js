@@ -937,261 +937,7 @@ const FALL = V3(WX, 0, RIVER_FROM);
   const sheet = new THREE.Mesh(sg, waterMat(true));
   scene.add(sheet);
 }
-// ---------- the compound ----------
-{
-  // The fire's hearth is turned so a flat side, not a corner, faces Vishwamitra (and the camera).
-  // The six stone pillars that stood round it are taken away: there is nothing here but the fire (see the fire's ground, below)
-  fire.rotation.y = Math.PI / 4;
-  for (const m of [...scene.children]) if (m.material === STONE && Math.abs(Math.hypot(m.position.x, m.position.z) - 4.2) < 0.01) scene.remove(m);
-  for (const o of [...SOLIDS]) if (o.r === 0.4 && Math.abs(Math.hypot(o.x, o.z) - 4.2) < 0.01) SOLIDS.splice(SOLIDS.indexOf(o), 1);
-}
-// ---------- the fire's ground ----------
-// There is no altar here and no court: a fire on a small brick hearth, on the bare ground, and a man sitting by it. What marks
-// the place is only what use has done to it. The grass is worn away to bare earth round the fire, in a patch with no edge
-// and no shape, and fainter trodden ways lead off from it toward the roads and the houses, where feet go.
-// (Old stone, and anything built to be looked at, belongs out in the forest where the demons are: see the camps)
-const PAVE = {
-  // old red sandstone, weathered, in two shades; and the moss that grows on it
-  stone: toon(0xb56c4c, { rim: 0.08 }),
-  stone2: toon(0x9b563e, { rim: 0.08 }),
-  moss: toon(0x5f7a3c, { rim: 0.1 }),
-  leaf: toon(0x3f8a3a, { rim: 0.15 }),
-  bloom: toon(0xf2a11c, { rim: 0.2 }),
-  clay: toon(0x96603f, { rim: 0.06 }),
-  straw: toon(0xcbb67c, { rim: 0.05 }),
-  strawEdge: toon(0x9c8450, { rim: 0.05 }),
-};
-const HEARTH = { stone: toon(0x4a4038, { rim: 0.05 }), log: toon(0x5a3a22, { rim: 0.08 }), log2: toon(0x7a5230, { rim: 0.08 }) };
-// A picture of a patch of worn ground: the road's own earth colour, thick in the middle and thinning to nothing at a ragged
-// edge that wanders in and out, with a few thin places inside it where the grass still shows. Three are made, so that no two
-// patches next to each other are the same
-function wornPicture(seed, clean) {
-  const S = 256,
-    c = document.createElement('canvas');
-  c.width = c.height = S;
-  const g = c.getContext('2d'),
-    im = g.createImageData(S, S),
-    rnd = (x, y) => {
-      const v = Math.sin(x * 127.1 + y * 311.7 + seed * 74.7) * 43758.5453;
-      return v - Math.floor(v);
-    },
-    // a soft value that changes slowly from place to place
-    soft = (x, y, n) => {
-      const fx = (x / S) * n,
-        fy = (y / S) * n,
-        ix = Math.floor(fx),
-        iy = Math.floor(fy),
-        tx = fx - ix,
-        ty = fy - iy,
-        sx = tx * tx * (3 - 2 * tx),
-        sy = ty * ty * (3 - 2 * ty);
-      return (rnd(ix, iy) * (1 - sx) + rnd(ix + 1, iy) * sx) * (1 - sy) + (rnd(ix, iy + 1) * (1 - sx) + rnd(ix + 1, iy + 1) * sx) * sy;
-    };
-  for (let y = 0; y < S; y++)
-    for (let x = 0; x < S; x++) {
-      const dx = (x - S / 2) / (S / 2),
-        dy = (y - S / 2) / (S / 2),
-        a = Math.atan2(dy, dx),
-        // how far out the patch reaches in this direction
-        reach = clean ? 0.8 : 0.7 + 0.12 * Math.sin(a * 2 + seed) + 0.09 * Math.sin(a * 3 + seed * 2.3) + 0.06 * Math.sin(a * 7 + seed * 5.1),
-        t = Math.max(0, Math.min(1, (reach - Math.hypot(dx, dy)) / (clean ? 0.3 : 0.22) + (soft(x, y, 11) - 0.5) * (clean ? 0.1 : 0.45))),
-        cover = t * t * (3 - 2 * t) * (0.93 + 0.07 * soft(x, y, 5)),
-        v = 128 + 10 * soft(x, y, 22),
-        i = (y * S + x) * 4;
-      im.data[i] = v * 1.08;
-      im.data[i + 1] = v * 0.93;
-      im.data[i + 2] = v * 0.68;
-      im.data[i + 3] = 255 * cover;
-    }
-  g.putImageData(im, 0, 0);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-const WORN = [1.3, 4.1, 7.7].map((seed) => {
-  const m = toon(0xffffff, { map: wornPicture(seed), transparent: true, depthWrite: false, rim: 0 });
-  return m;
-});
-// a patch of worn ground at a place: so far across, drawn out long one way (long: how many times longer) and turned
-let wornN = 0;
-function worn(x, z, r, long = 1, turn = 0) {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), WORN[wornN++ % 3]);
-  m.rotation.set(-Math.PI / 2, turn + wornN * 2.1 * (long === 1 ? 1 : 0), 0, 'YXZ');
-  m.scale.set(r * long, r, 1);
-  m.position.set(x, groundY(x, z) + 0.035, z);
-  m.receiveShadow = true;
-  m.renderOrder = -1;
-  scene.add(m);
-}
-// a round mat of woven grass to sit on, with a darker bound edge
-function seatMat(x, z, r = 0.56) {
-  add(scene, new THREE.CylinderGeometry(r, r, 0.03, 20), PAVE.strawEdge, [x, 0.055, z]).castShadow = false;
-  add(scene, new THREE.CylinderGeometry(r - 0.07, r - 0.07, 0.034, 20), PAVE.straw, [x, 0.055, z]).castShadow = false;
-}
-{
-  // the round stone floor the fire used to stand on is taken up, and the hearth sits on the ground, a little larger than it was
-  const slab = scene.children.find((m) => m.geometry && m.geometry.parameters && m.geometry.parameters.radiusTop === 4.6);
-  if (slab) scene.remove(slab);
-  fire.scale.setScalar(1.5);
-  SOLIDS.push({ x: 0, z: 0, r: 1.1 });
-  // The fire is the one thing here made to be seen, so it is a real fire: a ring of blackened stones round the hearth, split
-  // logs leaning in against it, and over it a tall flame in three sheets, one inside another, far larger than the little flame
-  // the hearth had. On the ground under it lies a pool of its own warm light, which shows even in full day
-  HEARTH.flames = [
-    [0.42, 1.55, 0xff5a10],
-    [0.3, 1.15, 0xffa020],
-    [0.17, 0.75, 0xffe070],
-  ].map(([r, h, c]) => {
-    const m = new THREE.Mesh(
-      new THREE.ConeGeometry(r, h, 10, 4),
-      new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }),
-    );
-    m.geometry.translate(0, h / 2, 0);
-    m.position.y = 0.5;
-    scene.add(m);
-    return m;
-  });
-  {
-    const c = document.createElement('canvas');
-    c.width = c.height = 128;
-    const g = c.getContext('2d'),
-      gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-    gr.addColorStop(0, 'rgba(255,170,80,1)');
-    gr.addColorStop(0.35, 'rgba(255,140,50,.45)');
-    gr.addColorStop(1, 'rgba(255,120,40,0)');
-    g.fillStyle = gr;
-    g.fillRect(0, 0, 128, 128);
-    HEARTH.pool = new THREE.Mesh(
-      new THREE.PlaneGeometry(2, 2),
-      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: 0.5 }),
-    );
-    HEARTH.pool.rotation.x = -Math.PI / 2;
-    HEARTH.pool.position.y = 0.06;
-    HEARTH.pool.scale.setScalar(4.6);
-    scene.add(HEARTH.pool);
-  }
-  // The ground round the fire is one clean round clearing of bare earth with a soft edge, and nothing else lies on it
-  {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), toon(0xffffff, { map: wornPicture(2.2, true), transparent: true, depthWrite: false, rim: 0 }));
-    m.rotation.x = -Math.PI / 2;
-    m.scale.set(11.5, 11.5, 1);
-    m.position.set(0, 0.035, 0);
-    m.receiveShadow = true;
-    m.renderOrder = -1;
-    scene.add(m);
-  }
-  // The altar itself. Round the fire lies a floor made for the rite: a round of earth smoothed and plastered, with the
-  // rite's diagram drawn on it in rice flour: two rings at its edge, a ring of lotus petals, a double square with a gate in
-  // each side, and eight petals close round the hearth. The hearth stands in the middle on a low base of red sandstone
-  {
-    const S = 1024,
-      R = 5.2,
-      k = S / 2 / R,
-      c = document.createElement('canvas');
-    c.width = c.height = S;
-    const g = c.getContext('2d');
-    g.translate(S / 2, S / 2);
-    g.scale(k, k);
-    // the plastered round, a shade warmer than the earth about it, with an ochre band at its edge
-    g.fillStyle = 'rgba(172,126,84,.6)';
-    g.beginPath();
-    g.arc(0, 0, 4.95, 0, 6.2832);
-    g.fill();
-    g.lineCap = g.lineJoin = 'round';
-    g.strokeStyle = 'rgba(140,72,40,.8)';
-    g.lineWidth = 0.12;
-    g.beginPath();
-    g.arc(0, 0, 4.95, 0, 6.2832);
-    g.stroke();
-    // the diagram, in rice flour
-    g.strokeStyle = g.fillStyle = 'rgba(244,228,198,.58)';
-    g.lineWidth = 0.045;
-    const ring = (r) => {
-      g.beginPath();
-      g.arc(0, 0, r, 0, 6.2832);
-      g.stroke();
-    };
-    const P = (r, t) => [r * Math.cos(t), r * Math.sin(t)];
-    // (a ring of n petals from radius r0 out to r1; w is how much of its share of the ring each one fills)
-    const petals = (n, r0, r1, w, off) => {
-      for (let i = 0; i < n; i++) {
-        const a = ((i + off) / n) * 6.2832,
-          d = (6.2832 / n) * w,
-          rm = r0 + (r1 - r0) * 0.6;
-        g.beginPath();
-        g.moveTo(...P(r0, a - d));
-        g.quadraticCurveTo(...P(rm, a - d * 0.9), ...P(r1, a));
-        g.quadraticCurveTo(...P(rm, a + d * 0.9), ...P(r0, a + d));
-        g.stroke();
-      }
-    };
-    ring(4.62);
-    ring(4.45);
-    petals(24, 3.72, 4.28, 0.46, 0);
-    ring(3.72);
-    // the square with a gate in each side, drawn double, a dot in each corner
-    for (let i = 0; i < 4; i++) {
-      g.save();
-      g.rotate((i * Math.PI) / 2);
-      for (const o of [0, 0.16]) {
-        g.beginPath();
-        g.moveTo(-2.5 + o, 2.5 - o);
-        g.lineTo(-0.6 - o, 2.5 - o);
-        g.lineTo(-0.6 - o, 2.95 - o);
-        g.lineTo(0.6 + o, 2.95 - o);
-        g.lineTo(0.6 + o, 2.5 - o);
-        g.lineTo(2.5 - o, 2.5 - o);
-        g.stroke();
-      }
-      g.beginPath();
-      g.arc(2.08, 2.08, 0.08, 0, 6.2832);
-      g.fill();
-      g.restore();
-    }
-    // eight broad petals round the hearth, a dot between each pair
-    ring(1.72);
-    petals(8, 1.72, 2.2, 0.42, 0.5);
-    for (let i = 0; i < 8; i++) {
-      g.beginPath();
-      g.arc(...P(2.0, (i / 8) * 6.2832), 0.05, 0, 6.2832);
-      g.fill();
-    }
-    const tex = new THREE.CanvasTexture(c);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 8;
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * R * 1.414, 2 * R * 1.414), toon(0xffffff, { map: tex, transparent: true, depthWrite: false, rim: 0 }));
-    m.rotation.x = -Math.PI / 2;
-    m.position.set(0, 0.042, 0);
-    m.receiveShadow = true;
-    scene.add(m);
-    // the base under the hearth
-    add(scene, new THREE.BoxGeometry(2.5, 0.08, 2.5), PAVE.stone2, [0, 0.04, 0]);
-    add(scene, new THREE.BoxGeometry(2.0, 0.14, 2.0), PAVE.stone, [0, 0.07, 0]);
-    SOLIDS.push({ x: 0, z: 0, r: 1.4 });
-  }
-  // Vishwamitra's own seat by the fire: a plain square mat of kusha grass with a bound edge, and his brass water pot beside it
-  {
-    const flat = (m) => ((m.castShadow = false), m),
-      X = 0,
-      Z = -2,
-      brass = toon(0xc0903c, { rim: 0.35 });
-    flat(add(scene, new THREE.BoxGeometry(1.5, 0.03, 1.3), PAVE.strawEdge, [X, 0.05, Z]));
-    flat(add(scene, new THREE.BoxGeometry(1.38, 0.034, 1.18), PAVE.straw, [X, 0.05, Z]));
-    sph(scene, 0.15, brass, [X + 1.05, 0.14, Z + 0.1], [1, 0.85, 1]);
-    cyl(scene, 0.05, 0.07, 0.1, brass, [X + 1.05, 0.3, Z + 0.1]);
-    // and three smaller mats of the same make, east, west and south of the fire, for the brahmins (their seats are BSEATS)
-    for (const [x, z, w, d] of [
-      [2.7, 0, 1.05, 1.2],
-      [-2.7, 0, 1.05, 1.2],
-      [0, 2.7, 1.2, 1.05],
-    ]) {
-      flat(add(scene, new THREE.BoxGeometry(w, 0.03, d), PAVE.strawEdge, [x, 0.05, z]));
-      flat(add(scene, new THREE.BoxGeometry(w - 0.12, 0.034, d - 0.12), PAVE.straw, [x, 0.05, z]));
-    }
-  }
-  // (and its light reaches further across the worn ground)
-  fireL.distance = 20;
-}
+// (the compound and the fire's ground, which stood here, are in altar.js: the sandbox has the same fire and floor)
 // every lot is now complete: each becomes one batch
 for (const l of LOTS) {
   const m = new THREE.InstancedMesh(l.geo, l.mat, l.length),
@@ -1903,6 +1649,7 @@ function camp(x, z, guards, prisoners, watch) {
       if (Math.hypot(hp.x - d.g.position.x, hp.z - d.g.position.z) > d.rng + 0.8) return;
       const [lo, hi] = d.def.dmg;
       h.hp = Math.max(0, h.hp - Math.round(lo + Math.random() * (hi - lo)));
+      heroHit(h, d.g.position.x, d.g.position.z);
       puff(tmpA.set(hp.x, 1.2, hp.z), 0xff6a50, 12, 2.6, 0.3, 2);
     };
     return d;
@@ -3095,15 +2842,7 @@ function sceneryUpdate(dt) {
     puff(tmpA.set(FALL.x + R(-RW + 0.6, RW - 0.6), 0.1 - DEEP, FALL.z + R(0.2, 1.2)), 0xeaf6ff, 1, 1.4, 0.7, 2);
   // the fire: its three sheets of flame each leaping and leaning in their own time, the pool of light under it breathing with
   // them; a thread of smoke going up from its tip, and now and then an ember
-  HEARTH.flames.forEach((m, i) => {
-    const k = 1 + 0.16 * Math.sin(T * (9 + i * 2.3) + i) + 0.09 * Math.sin(T * (17.3 + i * 3.1));
-    m.scale.set(1 + 0.08 * Math.sin(T * 7 + i * 2), k, 1 + 0.08 * Math.cos(T * 6.1 + i)).multiplyScalar(FIRE.s);
-    m.rotation.z = Math.sin(T * 3.1 + i * 1.7) * 0.07;
-    m.rotation.x = Math.cos(T * 2.6 + i * 2.2) * 0.06;
-  });
-  HEARTH.pool.material.opacity = 0.26 + 0.05 * Math.sin(T * 11) + 0.03 * Math.sin(T * 6.3);
-  if (Math.random() < dt * 22) puff(tmpA.set(R(-0.15, 0.15), 2.1, R(-0.15, 0.15)), 0x77726c, 1, 0.25, 3.6, -0.8, 0.22);
-  if (Math.random() < dt * 7) puff(tmpA.set(R(-0.3, 0.3), 1.4, R(-0.3, 0.3)), 0xffa040, 1, 0.6, 1.4, -1.8, 0.1);
+  hearthUpdate(dt, FIRE.s);
   campUpdate(dt);
   arriveUpdate(dt);
   orderUpdate();
@@ -3953,7 +3692,7 @@ function nightStart() {
   NIGHT.t = 0;
   NIGHT.lock = LOCK = true;
   // (the bow is already up and drawn, from the holding of N; on a dev start it is not, and he is given it so)
-  if (!SKYSHOT) SKYSHOT = { h: RAMA, draw: 1, nock: true };
+  if (!SKYSHOT) SKYSHOT = { h: SEL, draw: 1, nock: true };
 }
 // Rama's draw, the arrow going up, its burst, and the sparks coming down to the lamps and the altar
 function nightArrow(dt) {
@@ -3964,7 +3703,7 @@ function nightArrow(dt) {
     const pull = STOCK.at === RITE && STOCK.hold,
       d = Math.max(0, Math.min(1, (STOCK.k - 0.12) / 0.88));
     if (pull) {
-      if (!SKYSHOT) SKYSHOT = { h: RAMA, draw: 0, nock: true };
+      if (!SKYSHOT) SKYSHOT = { h: SEL, draw: 0, nock: true };
       NIGHT.lock = LOCK = true;
       SKYSHOT.draw = d;
     } else if (SKYSHOT) {
@@ -3983,7 +3722,8 @@ function nightArrow(dt) {
     // the ring has closed: he looses
     if (SKYSHOT.nock) {
       SKYSHOT.nock = false;
-      RAMA.hL.y > 0 ? NIGHT.top.copy(RAMA.hL) : NIGHT.top.copy(RAMA.group.position).setY(RAMA.group.position.y + 2.3);
+      const by = SKYSHOT.h;
+      by.hL.y > 0 ? NIGHT.top.copy(by.hL) : NIGHT.top.copy(by.group.position).setY(by.group.position.y + 2.3);
       NIGHT.arrow = glow(0xffa040, 1.6);
       NIGHT.arrow.position.copy(NIGHT.top);
       scene.add(NIGHT.arrow);
@@ -4045,44 +3785,9 @@ function nightUpdate(dt) {
   // (the day goes at the arrow's burst, and comes back the same way at dawn)
   const dir = NIGHT.dawn ? -1 : NIGHT.go ? 1 : 0;
   if (!dir || (dir > 0 ? NIGHT.k >= 1 : NIGHT.k <= 0)) return;
-  const U = SKY.material.uniforms,
-    C = (h) => new THREE.Color(h);
-  // (what the day looked like, kept the moment it begins to go, and what the night looks like)
-  if (!NIGHT.from)
-    NIGHT.from = {
-      a: U.uA.value.clone(),
-      b: U.uB.value.clone(),
-      c: U.uC.value.clone(),
-      g: U.uGlow.value.clone(),
-      sun: SUN.material.color.clone(),
-      fog: scene.fog.color.clone(),
-      hs: HEMI.color.clone(),
-      hg: HEMI.groundColor.clone(),
-      hi: HEMI.intensity,
-      kc: key.color.clone(),
-      ki: key.intensity,
-      fi: fill.intensity,
-      bt: bloom.threshold,
-      bs: bloom.strength,
-    };
+  // (the look of it, day to night, is skyNight's, in altar.js: the sandbox turns to the same night)
   NIGHT.k = Math.max(0, Math.min(1, NIGHT.k + (dir * dt) / NIGHT_T));
-  const F = NIGHT.from,
-    e = NIGHT.k * NIGHT.k * (3 - 2 * NIGHT.k),
-    mix = (a, b) => a + (b - a) * e;
-  U.uA.value.lerpVectors(F.a, tmpA.set(0.42, 0.24, 0.34), e);
-  U.uB.value.lerpVectors(F.b, tmpA.set(0.1, 0.1, 0.24), e);
-  U.uC.value.lerpVectors(F.c, tmpA.set(0.02, 0.03, 0.09), e);
-  U.uGlow.value.lerpVectors(F.g, tmpA.set(0.5, 0.55, 0.75), e);
-  SUN.material.color.lerpColors(F.sun, C(0xcfd8ff), e);
-  scene.fog.color.lerpColors(F.fog, C(0x141a34), e);
-  HEMI.color.lerpColors(F.hs, C(0x7f8fd0), e);
-  HEMI.groundColor.lerpColors(F.hg, C(0x1a1a2c), e);
-  HEMI.intensity = mix(F.hi, 0.85);
-  key.color.lerpColors(F.kc, C(0x9fb4ff), e);
-  key.intensity = mix(F.ki, 1.0);
-  fill.intensity = mix(F.fi, 0.3);
-  bloom.threshold = mix(F.bt, 0.85);
-  bloom.strength = mix(F.bs, 0.5);
+  skyNight(NIGHT.k);
 }
 // ---------- the waves ----------
 // The night is five waves. Each comes out of the forest from one side or more (a side is chosen afresh every night), and a few
@@ -4101,9 +3806,9 @@ const FIRE = { hp: 100, max: 100, s: 1 },
   WAVES = [
     [['grunt', 2, 0, 0], ['grunt', 2, 0, 4], ['grunt', 2, 0, 8]],
     [['pish', 4, 1, 0], ['pish', 4, 3, 7]],
-    [['grunt', 3, 0, 0], ['defiler', 2, 2, 0], ['grunt', 3, 2, 3], ['defiler', 1, 0, 5]],
+    [['grunt', 3, 0, 0], ['defiler', 2, 2, 0], ['grunt', 3, 2, 3], ['archer', 2, 1, 4], ['defiler', 1, 0, 5]],
     [['grunt', 3, 1, 0], ['brute', 1, 1, 2], ['grunt', 3, 1, 6]],
-    [['brute', 1, 0, 0], ['pish', 4, 2, 0], ['defiler', 2, 1, 4], ['pish', 4, 0, 8], ['brute', 1, 3, 10], ['defiler', 2, 3, 13]],
+    [['brute', 1, 0, 0], ['pish', 4, 2, 0], ['defiler', 2, 1, 4], ['archer', 3, 2, 6], ['pish', 4, 0, 8], ['brute', 1, 3, 10], ['defiler', 2, 3, 13]],
   ],
   sideOf = (q) => WAVE.a0 + (q * Math.PI) / 2,
   sideName = (a) => (Math.abs(Math.cos(a)) > Math.abs(Math.sin(a)) ? (Math.cos(a) > 0 ? 'east' : 'west') : Math.sin(a) > 0 ? 'south' : 'north');
@@ -4123,6 +3828,7 @@ function waveDemon(kind, a) {
       const hp = d.foe.group.position;
       if (apart(hp, P) > d.rng + 0.8) return;
       d.foe.hp = Math.max(0, d.foe.hp - Math.round(lo + Math.random() * (hi - lo)));
+      heroHit(d.foe, P.x, P.z);
       puff(tmpA.set(hp.x, hp.y + 1.2, hp.z), 0xff6a50, 12, 2.6, 0.3, 2);
     } else if (d.lamp) {
       const l = d.lamp;
@@ -4189,6 +3895,8 @@ function waveUpdate(dt) {
         if (d.pi && (!lamp || apart(l, P) < apart(lamp, P))) lamp = l;
       }
     d.slowK = slow && !d.df ? 0.7 : 1;
+    // (an archer chooses his own mark and his own distance: see the archer, with the enemies)
+    if (d.ar) continue;
     d.foe = foe;
     d.lamp = foe ? null : lamp;
     d.to = foe ? foe.group.position : lamp;
@@ -4219,7 +3927,7 @@ function waveUpdate(dt) {
       } else {
         // the last of them is dead: dawn. The day comes back, the sage opens his eyes, and the gathering is counted
         W.st = 'off';
-        W.msg = 'Dawn. The fire still burns.';
+        W.msg = '';
         NIGHT.dawn = true;
         NIGHT.done = true;
         sageEyes(false);
@@ -4249,11 +3957,12 @@ function woodGain(n) {
 }
 // which empty platform Rama is standing by, if any; the sign held over it on the screen; and the ring, filling while he holds
 function buildUpdate(dt) {
-  const P = RAMA.group.position;
-  STOCK.at = (SEL === RAMA && !LOCK && !talking() && LAMPS.find((l) => !l.built && Math.hypot(P.x - l.x, P.z - l.z) < 2.4)) || null;
+  // (all of this is for whichever brother is being played, Rama or Lakshmana)
+  const P = SEL.group.position;
+  STOCK.at = (!LOCK && !talking() && LAMPS.find((l) => !l.built && Math.hypot(P.x - l.x, P.z - l.z) < 2.4)) || null;
   // When every lamp stands, Rama standing on any of the four signs gets the same sign over his head, and Space held there
   // is his draw. Which sign he began the night from is kept in RITE.sign
-  const on = !STOCK.at && SEL === RAMA && nightReady() && SIGNS_AT.find((q) => Math.hypot(P.x - q.x, P.z - q.z) < 1.5);
+  const on = !STOCK.at && nightReady() && SIGNS_AT.find((q) => Math.hypot(P.x - q.x, P.z - q.z) < 1.5);
   if (on) {
     RITE.x = on.x;
     RITE.z = on.z;
@@ -4555,7 +4264,7 @@ const COINS = [],
 // after another, each worth its share
 function coinsHome() {
   for (const c of COINS) {
-    c.to = RAMA;
+    c.to = SEL;
     c.far = true;
     c.t = 0;
   }
@@ -4573,7 +4282,7 @@ function coinsHome() {
       g.position.set(at[0] + R(-1, 1), groundY(at[0], at[1]) + 1.2, at[1] + R(-1, 1));
       g.visible = false;
       scene.add(g);
-      COINS.push({ g, gl, vx: 0, vz: 0, vy: 0, down: true, to: RAMA, far: true, t: 0, wait: i * 0.14, worth: Math.floor(n / m) + (i < n % m ? 1 : 0) });
+      COINS.push({ g, gl, vx: 0, vz: 0, vy: 0, down: true, to: SEL, far: true, t: 0, wait: i * 0.14, worth: Math.floor(n / m) + (i < n % m ? 1 : 0) });
     }
   }
   STOCK.pend = STOCK.pendS = 0;
@@ -4760,10 +4469,13 @@ let shown = 0,
 //                             fire, and the brothers standing just west of the hermitage
 //   level1.html?skip=talk     that, and Vishwamitra's talk is over too: Rama has the Agneyastra and the brothers stand by
 //                             the altar, free to move
+//   level1.html?skip=night    that, and the four lamps stand built as well, and the night begins by itself a moment after
+//                             the level opens: for trying out what comes in the dark. (NIGHT.lab is set, for anything that
+//                             should be different on such a night)
 // With nothing after the name, the level starts at the beginning as usual
 {
   const skip = new URLSearchParams(location.search).get('skip');
-  if (skip === 'rescue' || skip === 'talk') {
+  if (skip === 'rescue' || skip === 'talk' || skip === 'night') {
     const c = CAMPS[0];
     c.guards.forEach((d) => grunts.includes(d) && banish(d));
     c.roused = c.cried = c.seen = c.thanked = c.rescued = true;
@@ -4778,12 +4490,25 @@ let shown = 0,
       toWood(p, woodN++);
       p.g.position.set(p.wood.home[0], 0, p.wood.home[1]);
     });
-    const at = skip === 'talk' ? [SEATS.rama, SEATS.lak] : [V3(-42, 0, 1), V3(-44, 0, 2.2)];
+    const at = skip !== 'rescue' ? [SEATS.rama, SEATS.lak] : [V3(-42, 0, 1), V3(-44, 0, 2.2)];
     HEROES.forEach((h, i) => {
       h.group.position.copy(at[i]);
       if (h.post) h.post.copy(at[i]);
     });
-    if (skip === 'talk') {
+    if (skip === 'night') {
+      NIGHT.lab = true;
+      // (each lamp is taken as built and its putting-together as over, so that it stands whole on the first frame)
+      for (const l of LAMPS) {
+        l.built = true;
+        l.t = LAMP_T + 1;
+      }
+      const iv = setInterval(() => {
+        if (T < 1.5 || !LAMPS.every((l) => l.ready)) return;
+        clearInterval(iv);
+        nightStart();
+      }, 100);
+    }
+    if (skip !== 'rescue') {
       ARR.step = 'done';
       ARR.talked = true;
       ARR.bow = false;
@@ -4802,12 +4527,13 @@ if (new URLSearchParams(location.search).has('dev')) {
   addEventListener('keydown', (e) => e.code === 'KeyB' && !e.repeat && nightStart());
   const now = new URLSearchParams(location.search).get('skip') || '',
     row = document.createElement('div');
-  // (three small words in the top right corner, faint until the pointer is on them; the one the level was started at is brighter)
+  // (four small words in the top right corner, faint until the pointer is on them; the one the level was started at is brighter)
   row.style.cssText = 'position:fixed;right:14px;top:10px;z-index:40;display:flex;gap:2px;align-items:center';
   for (const [label, skip] of [
     ['Start', ''],
     ['Rescue', 'rescue'],
     ['Talk', 'talk'],
+    ['Night', 'night'],
   ]) {
     const b = document.createElement('button'),
       dim = skip === now ? 0.75 : 0.35;

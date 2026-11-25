@@ -54,19 +54,23 @@ function makeGrunt(d, seed) {
     gold = toon(0xe0a02a, { emissive: 0x3a2000, rim: 0.5 }),
     R = makeRig(),
     vr = br ? [(Math.random() * 3) | 0, (Math.random() * 4) | 0, Math.random() < 0.5, Math.random() < 0.5, Math.random() < 0.4] : [],
-    skinC = br ? [0x2f4f8f, 0x35467f, 0x2a5a86][vr[0]] : 0x4b3f5c,
+    ar = !!d.ar,
+    skinC = br ? [0x2f4f8f, 0x35467f, 0x2a5a86][vr[0]] : ar ? 0x5c4450 : 0x4b3f5c,
     skin = toon(skinC, { vertexColors: true, rim: 0.45 }),
     sk = toon(skinC, { rim: 0.45 }),
-    cloth = toon(br ? [0xb5601a, 0x8f1f1a, 0x9a7a1e, 0x1f5a55][vr[1]] : 0x5a1410, { vertexColors: true }),
+    cloth = toon(br ? [0xb5601a, 0x8f1f1a, 0x9a7a1e, 0x1f5a55][vr[1]] : ar ? 0x74201c : 0x5a1410, { vertexColors: true }),
     iron = toon(0x2c2a30, { rim: 0.5 }),
     boneC = toon(0xd8cdb0, { rim: 0.4 }),
     hairC = toon(0x16101c, { rim: 0.25 }),
     eyeC = new THREE.MeshBasicMaterial({ color: 0xffa020 }),
+    bronze = toon(0x6a4526, { rim: 0.6 }),
+    bronze2 = toon(0x3a2616, { rim: 0.4 }),
     WOOD = toon(0x7a4a22),
     DARK = toon(0x15101a);
   {
     const k = (d.k || 1) * SC;
-    R.group.scale.set((br ? 1.12 : 1.0) * k, 0.9 * k, (br ? 1.16 : 1.04) * k);
+    // (the archer is the same foot soldier stood up tall: no squatter than a man, where they are short and broad)
+    R.group.scale.set((br ? 1.12 : ar ? 0.96 : 1.0) * k, (ar ? 1.0 : 0.9) * k, (br ? 1.16 : ar ? 0.96 : 1.04) * k);
   }
   R.group.position.y = -0.04 * SC;
   g.add(R.group);
@@ -75,7 +79,7 @@ function makeGrunt(d, seed) {
     R.on('chest', sph(new THREE.Group(), 0.19, sk, [0, 0, 0], [1.22, 0.85, 0.92]).parent, [0, 1.36, 0.02]);
     for (const s of [-1, 1]) R.on('chest', sph(new THREE.Group(), 0.11, sk, [0, 0, 0], [1.1, 0.95, 1.05]).parent, [s * 0.215, 1.46, -0.02]);
   } // the brute: a great belly, a slab of chest and heaped shoulders
-  R.skin(V.body.geometry, skin);
+  const body = R.skin(V.body.geometry, skin);
   R.skin(dhotiGeo, cloth);
   {
     const b = R.on('hips', new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.024, 10, 36), iron), [0, 1.03, 0.004]);
@@ -110,7 +114,28 @@ function makeGrunt(d, seed) {
       a = R3('fore' + S),
       e = R3('hand' + S);
     m.quaternion.setFromUnitVectors(V3(0, 0, 1), V3(e[0] - a[0], e[1] - a[1], 0).normalize());
-    R.on('fore' + S, m, L3(a, e, 0.75));
+    if (!ar) R.on('fore' + S, m, L3(a, e, 0.75));
+    else {
+      // the archer's arms and legs are armoured: a long bronze bracer on each forearm and a greave on each shin, each
+      // bound top and bottom with a darker band, and a gold ring round the upper arm
+      for (const [bn, to, t, r0, r1, len] of [
+        ['fore', 'hand', 0.52, 0.05, 0.043, 0.15],
+        ['shin', 'foot', 0.5, 0.06, 0.05, 0.27],
+      ]) {
+        const a2 = R3(bn + S),
+          e2 = R3(to + S),
+          q = new THREE.Group();
+        q.quaternion.setFromUnitVectors(V3(0, 1, 0), V3(a2[0] - e2[0], a2[1] - e2[1], a2[2] - e2[2]).normalize());
+        cyl(q, r0, r1, len, bronze, [0, 0, 0]);
+        for (const y of [-1, 1]) tor(q, y > 0 ? r0 + 0.004 : r1 + 0.004, 0.008, bronze2, [0, (y * len) / 2, 0], [Math.PI / 2, 0, 0]);
+        R.on(bn + S, q, L3(a2, e2, t));
+      }
+      const a2 = R3('arm' + S),
+        e2 = R3('fore' + S),
+        q = new THREE.Mesh(new THREE.TorusGeometry(0.062, 0.012, 8, 24), gold);
+      q.quaternion.setFromUnitVectors(V3(0, 0, 1), V3(e2[0] - a2[0], e2[1] - a2[1], e2[2] - a2[2]).normalize());
+      R.on('arm' + S, q, L3(a2, e2, 0.5));
+    }
     if (br)
       for (const [on, bn, to, t, rad] of [
         [vr[2], 'arm', 'fore', 0.5, 0.073],
@@ -130,7 +155,46 @@ function makeGrunt(d, seed) {
   add(head, new THREE.BoxGeometry(0.19, 0.04, 0.06), sk, [0, 0.032, 0.098], [0.25, 0, 0]);
   sph(head, 0.024, sk, [0, -0.028, 0.122], [1.4, 0.8, 0.8]);
   add(head, new THREE.BoxGeometry(0.11, 0.022, 0.02), DARK, [0, -0.095, 0.118]);
-  if (!br) {
+  if (ar) {
+    // The archer is a rakshasa of Lanka's army, and no hunter: the foot soldier's own dusky hide, horns, tusks and burning
+    // eyes, but a soldier's bearing and a soldier's bronze. His head is bare; a gold ring hangs in each ear
+    // (his head is the foot soldier's own size. The body it sits on is narrower and taller than theirs, and on average a
+    // little smaller, which shrank and narrowed the head with it; this puts it back)
+    head.scale.set(1.12, 0.97, 1.16);
+    for (const e of [-1, 1]) tor(head, 0.03, 0.009, gold, [e * 0.14, -0.07, 0.0], [0, Math.PI / 2, 0]);
+    // The armour. A cuirass of bronze scales in three courses (chest, belly, and a short skirt of plates over the hips),
+    // each course lapping the one below and edged with a darker band; a leather strap across it from his left shoulder; a
+    // broad belt with a gold boss at the front and a tongue of gold-edged cloth hanging from it; and on his right shoulder
+    // alone one great guard of gilded bronze with a spike, which is what marks him out from far off
+    const course = (bn, y, r0, r1, h) => {
+      const q = R.on(bn, new THREE.Group(), [0, y, 0.008]);
+      q.scale.set(1, 1, 0.74);
+      add(q, new THREE.CylinderGeometry(r0, r1, h, 20, 1, true), bronze);
+      tor(q, r1 + 0.003, 0.01, bronze2, [0, -h / 2, 0], [Math.PI / 2, 0, 0]);
+      for (let i = 1; i < 3; i++) tor(q, r0 + ((r1 - r0) * i) / 3 + 0.002, 0.004, bronze2, [0, h / 2 - (h * i) / 3, 0], [Math.PI / 2, 0, 0]);
+    };
+    course('hips', 0.99, 0.172, 0.21, 0.15);
+    course('spine', 1.14, 0.168, 0.176, 0.19);
+    course('chest', 1.335, 0.2, 0.178, 0.23);
+    const st = R.on('chest', new THREE.Group(), [0, 1.3, 0.008]);
+    st.rotation.z = 0.75;
+    tor(st, 0.212, 0.016, toon(0x4a2c18, { rim: 0.2 }), [0, 0, 0], [Math.PI / 2, 0, 0], [1, 0.72, 0.62]);
+    sph(R.on('hips', new THREE.Group(), [0, 1.03, 0.135]), 0.05, gold, [0, 0, 0], [1.1, 1, 0.5]);
+    {
+      const t = R.on('hips', new THREE.Group(), [0, 0.86, 0.15]);
+      // (its own plain cloth: the dhoti's is coloured point by point, which a plain box is not)
+      add(t, new THREE.BoxGeometry(0.11, 0.3, 0.012), toon(0x8a2a20, { rim: 0.15 }), [0, 0, 0], [0.06, 0, 0]);
+      add(t, new THREE.BoxGeometry(0.115, 0.03, 0.014), gold, [0, -0.135, 0.008], [0.06, 0, 0]);
+    }
+    {
+      const pg = R.on('chest', new THREE.Group(), [-0.235, 1.5, 0]);
+      pg.rotation.z = 0.35;
+      sph(pg, 0.115, gold, [0, 0, 0], [1.25, 0.72, 1.2]);
+      sph(pg, 0.105, bronze, [-0.05, -0.05, 0], [1.2, 0.5, 1.25]);
+      tor(pg, 0.11, 0.012, bronze2, [0, -0.02, 0], [Math.PI / 2, 0, 0], [1.25, 1.2, 1]);
+      cyl(pg, 0.003, 0.03, 0.12, boneC, [-0.03, 0.11, 0], [0, 0, 0.5]);
+    }
+  } else if (!br) {
     sph(head, 0.132, hairC, [0, 0.03, -0.045], [1.06, 1.05, 1]);
     sph(head, 0.11, hairC, [0, -0.09, -0.1], [1.25, 1.35, 0.8]);
   } else if (vr[3]) tor(head, 0.022, 0.005, gold, [0, -0.052, 0.138]);
@@ -140,6 +204,8 @@ function makeGrunt(d, seed) {
     sph(head, 0.005, DARK, [s * 0.05, -0.002, 0.1225], [0.55, 1.1, 0.4]);
     tusk(head, s, 0.05, -0.088, 0.118, 0.03, 1.25 * Math.PI, 2.35 * Math.PI, 0.016, boneC);
     if (br) tusk(head, s, 0.1, 0.045, -0.005, 0.095, 1.5 * Math.PI, 2.3 * Math.PI, 0.038, boneC);
+    // (the archer's horns are curved like the brute's, a little smaller)
+    else if (ar) tusk(head, s, 0.095, 0.05, -0.005, 0.085, 1.5 * Math.PI, 2.35 * Math.PI, 0.033, boneC);
     else cyl(head, 0.003, 0.03, 0.17, boneC, [s * 0.1, 0.14, 0], [0, 0, s * -0.55]);
     cyl(head, 0.002, 0.03, 0.1, sk, [s * 0.145, 0.005, -0.01], [0, 0, s * -1.25], [1, 1, 0.5]);
   }
@@ -150,33 +216,90 @@ function makeGrunt(d, seed) {
     R.bone.handR.add(grip);
     grip.add(club);
     sph(grip, 0.046, sk, [dir.x * 0.048, dir.y * 0.048, 0], [1.15, 1.4, 1.1], [0, 0, -Math.PI / 4]);
-    cyl(club, 0.018, 0.015, 0.22, WOOD, [0, 0.03, 0]);
-    cyl(club, 0.058, 0.026, 0.36, WOOD, [0, 0.32, 0]);
-    sph(club, 0.058, WOOD, [0, 0.5, 0], [1, 0.6, 1]);
-    for (let i = 0; i < 8; i++) {
-      const a = i * 2.4,
-        y = 0.24 + i * 0.03;
-      cyl(club, 0.002, 0.014, 0.04, iron, [Math.cos(a) * 0.055, y, Math.sin(a) * 0.055], [0, -a, -Math.PI / 2]);
+    if (ar) {
+      // The archer's bow is his own thing in the world, as Rama's is, and not fixed in a hand: each frame it is put in his
+      // left hand and turned along his aim (see the archer, below), so the hands can be brought to it and to its string.
+      // In it +y runs up the stave and +z is the way the arrow goes. A dark recurved bow bound with gold at the grip, each
+      // tip a serpent's head in gold; a string that follows his drawing hand; and an iron-headed arrow
+      const horn = toon(0x2a1a1c, { rim: 0.4 });
+      R.bone.handR.remove(grip);
+      add(club, new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V3(0, -0.56, BOW_Z + 0.015), V3(0, -0.46, BOW_Z - 0.02), V3(0, -0.2, 0.02), V3(0, 0, 0.05), V3(0, 0.2, 0.02), V3(0, 0.46, BOW_Z - 0.02), V3(0, 0.56, BOW_Z + 0.015)]), 28, 0.014, 6), horn);
+      for (const y of [-1, 1]) {
+        const h = new THREE.Group();
+        h.position.set(0, y * 0.57, BOW_Z + 0.03);
+        h.rotation.x = y * -0.3;
+        club.add(h);
+        sph(h, 0.026, gold, [0, 0, 0.012], [0.9, 0.75, 1.5]);
+        cyl(h, 0.004, 0.018, 0.045, gold, [0, -0.004, 0.055], [Math.PI / 2, 0, 0]);
+        tor(club, 0.016, 0.006, gold, [0, y * 0.5, BOW_Z - 0.01], [Math.PI / 2, 0, 0]);
+      }
+      for (const y of [-0.07, 0.07]) tor(club, 0.018, 0.007, gold, [0, y, 0.045], [Math.PI / 2, 0, 0]);
+      cyl(club, 0.019, 0.019, 0.12, toon(0x6a1a1a, { rim: 0.2 }), [0, 0, 0.047]);
+      const sg = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([0, -0.5, BOW_Z, 0, 0, BOW_Z, 0, 0.5, BOW_Z], 3)),
+        str = new THREE.Line(sg, new THREE.LineBasicMaterial({ color: 0xd8cdb0 })),
+        arrow = new THREE.Group();
+      str.frustumCulled = false;
+      club.add(str, arrow);
+      cyl(arrow, 0.007, 0.007, 0.72, DARK, [0, 0, 0.36], [Math.PI / 2, 0, 0]);
+      cyl(arrow, 0.001, 0.02, 0.08, iron, [0, 0, 0.76], [Math.PI / 2, 0, 0]);
+      for (const r of [0, 1.05, 2.1]) add(arrow, new THREE.BoxGeometry(0.003, 0.04, 0.09), DARK, [0, 0, 0.05], [0, 0, r]);
+      arrow.visible = false;
+      d.bow = { str, arrow };
+      // (an archer's arms: a tenth longer and thicker than the foot soldier's, bracers and all)
+      R.bone.armL.scale.setScalar(1.1);
+      R.bone.armR.scale.setScalar(1.1);
+      // (the hands are brought to bow and string by this, as Rama's are)
+      d.ik = new CCDIKSolver(body, [
+        { target: BI.tgtL, effector: BI.handL, links: [{ index: BI.foreL }, { index: BI.armL }], iteration: 14 },
+        { target: BI.tgtR, effector: BI.handR, links: [{ index: BI.foreR }, { index: BI.armR }], iteration: 14 },
+      ]);
+      d.pre = {};
+      // and a quiver at his right hip, tipped forward so the arrows' ends come to his hand, full of black-fletched arrows
+      const q = R.on('hips', new THREE.Group(), [-0.215, 0.93, -0.02]);
+      q.rotation.set(0.42, 0, 0.1);
+      cyl(q, 0.055, 0.042, 0.42, toon(0x5a3a22, { rim: 0.15 }), [0, 0, 0]);
+      for (const y of [-0.17, 0.0, 0.19]) tor(q, 0.05 + (y + 0.17) * 0.02, 0.008, bronze, [0, y, 0], [Math.PI / 2, 0, 0]);
+      for (let i = 0; i < 5; i++) {
+        const x = Math.cos(i * 1.257) * 0.022,
+          z = Math.sin(i * 1.257) * 0.022;
+        cyl(q, 0.005, 0.005, 0.2, DARK, [x, 0.3, z]);
+        add(q, new THREE.BoxGeometry(0.004, 0.07, 0.03), DARK, [x, 0.37, z], [0, i, 0]);
+      }
+    } else {
+      cyl(club, 0.018, 0.015, 0.22, WOOD, [0, 0.03, 0]);
+      cyl(club, 0.058, 0.026, 0.36, WOOD, [0, 0.32, 0]);
+      sph(club, 0.058, WOOD, [0, 0.5, 0], [1, 0.6, 1]);
+      for (let i = 0; i < 8; i++) {
+        const a = i * 2.4,
+          y = 0.24 + i * 0.03;
+        cyl(club, 0.002, 0.014, 0.04, iron, [Math.cos(a) * 0.055, y, Math.sin(a) * 0.055], [0, -a, -Math.PI / 2]);
+      }
+      for (const y of [0.16, 0.47]) tor(club, y < 0.3 ? 0.03 : 0.055, 0.007, iron, [0, y, 0], [Math.PI / 2, 0, 0]);
     }
-    for (const y of [0.16, 0.47]) tor(club, y < 0.3 ? 0.03 : 0.055, 0.007, iron, [0, y, 0], [Math.PI / 2, 0, 0]);
-    club.quaternion.setFromUnitVectors(V3(0, 1, 0), V3(0, 0.25, 1).normalize());
+    if (!ar) club.quaternion.setFromUnitVectors(V3(0, 1, 0), V3(0, 0.25, 1).normalize());
     if (br) {
       club.scale.setScalar(1.3);
       head.scale.setScalar(0.88);
     }
     club.position.copy(dir).multiplyScalar(0.055);
+    if (ar) {
+      scene.add(club);
+      club.position.copy(g.position);
+      club.scale.setScalar(1.12 * (d.k || 1));
+    }
     d.club = club;
     d.grip = grip;
     d.clubP = club.position.clone();
     d.clubQ = club.quaternion.clone();
   }
   d.mats = new Set();
-  g.traverse((o) => {
-    if (o.isMesh) {
-      o.castShadow = true;
-      d.mats.add(o.material);
-    }
-  });
+  for (const root of ar ? [g, d.club] : [g])
+    root.traverse((o) => {
+      if (o.isMesh) {
+        o.castShadow = true;
+        d.mats.add(o.material);
+      }
+    });
   d.mat = skin;
   d.mat2 = sk;
   d.base = skin.color.clone();
@@ -378,6 +501,8 @@ const FOES = {
   brute: { hp: 1000, dmg: [100, 120], speed: 2.2, reach: 6.0, swing: 1.7, radius: 0.75, mass: 12, aimY: 1.82, barY: 3.55 },
   pish: { hp: 100, dmg: [20, 26], speed: 3.0, reach: 4.8, swing: 1.4, radius: 0.34, mass: 1, aimY: 0.45, barY: 1.15 },
   defiler: { hp: 100, dmg: [20, 26], speed: 3.2, reach: 2.5, swing: 2.6, radius: 0, mass: 0, aimY: 1.55, barY: 2.35 },
+  // the archer stands off (reach is how near he comes before he stops and shoots) and looses one arrow every `swing` seconds
+  archer: { hp: 90, dmg: [22, 30], speed: 2.5, reach: 12, swing: 2.3, radius: 0.38, mass: 1, aimY: 1.1, barY: 2.1 },
 };
 // a level may name the spot (at) instead of the angle; the enemy then simply stands there, with no flash of arrival
 // how many enemies may be about at once: a level with several camps raises it
@@ -386,7 +511,8 @@ function spawn(a, kind, at) {
   const pi = kind === 'pish',
     br = kind === 'brute';
   if (grunts.length >= SPAWN_MAX) return;
-  const r = 11 + Math.random() * 2.5,
+  // (an archer arrives well out, beyond his own bowshot, and walks in to it)
+  const r = kind === 'archer' ? 19 + Math.random() * 3 : 11 + Math.random() * 2.5,
     g = new THREE.Group();
   if (at) g.position.copy(at);
   else g.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
@@ -403,8 +529,9 @@ function spawn(a, kind, at) {
     flung: false,
     ft: 0,
     summoned: true,
-    k: br ? 1 : pi ? 0.9 + Math.random() * 0.2 : 0.88 + Math.random() * 0.3,
+    k: br ? 1 : pi ? 0.9 + Math.random() * 0.2 : kind === 'archer' ? 0.9 + Math.random() * 0.12 : 0.88 + Math.random() * 0.3,
     br,
+    ar: kind === 'archer',
     def: FOES[kind] || FOES.grunt,
   };
   dummies.push(d);
@@ -767,6 +894,108 @@ const BSTR = [
     };
   },
 ];
+// ---------- the archer ----------
+// The same foot soldier, lean, with a bow where the club would be. He does not come to the fire: he makes for whichever
+// brother is nearest, stops a good bowshot off (or nearer, if something stands between them), and shoots. One shot takes his
+// whole `swing`: the bow comes up, the string comes back over about a third of it, he looses at RELEASE, and the bow comes
+// down. The arrow flies straight at where the brother stood when it left the string, so a brother who keeps moving is missed;
+// and anything that stops a walker stops an arrow, so a tree is cover.
+// He stands to shoot as Rama does, and by the same means. His whole body turns side-on, left side to his mark; both arms go
+// out level, the right forearm folded; his head turns along his left arm. Then his hands are put where they must be: the
+// left on the bow's grip, out along the line of aim from his left shoulder, and the right on the string, which it brings
+// back along that line as he draws, in front of his chest and never through it. The bow itself is set in his left hand and
+// turned along the aim, and the string and the arrow follow his right hand.
+const BOW_Z = -0.16,
+  RELEASE = 0.62,
+  ARCH = (u) => ({
+    dr: kf(u, [
+      [0, 0],
+      [0.3, 0],
+      [0.58, 1],
+      [RELEASE, 1],
+      [RELEASE + 0.03, 0],
+      [1, 0],
+    ]),
+    // (rl: his drawing hand away at the quiver for the next arrow, after the shot)
+    rl: kf(u, [
+      [0, 0],
+      [RELEASE + 0.08, 0],
+      [0.84, 1],
+      [0.9, 1],
+      [1, 0],
+    ]),
+    a: [0, 0, -0.78],
+    f: [0, 0, 0],
+    aL: [0, 0, 0.78],
+    fL: [0, 0, 0],
+    w: [0, 0],
+    tw: 0,
+    lean: -0.88,
+  }),
+  AR_UP = new THREE.Vector3(0, 1, 0),
+  [AR_A, AR_T, AR_L, AR_R, AR_X, AR_Y, AR_Z] = [0, 0, 0, 0, 0, 0, 0].map(() => new THREE.Vector3()),
+  [AR_Q, AR_Q2] = [new THREE.Quaternion(), new THREE.Quaternion()],
+  AR_M = new THREE.Matrix4(),
+  // (how fast his arrow flies)
+  FOE_SPEED = 21,
+  FOE_SHOTS = [],
+  FOE_SHAFT = new THREE.CylinderGeometry(0.009, 0.009, 1.0, 5).rotateX(Math.PI / 2).translate(0, 0, -0.3),
+  FOE_TRAIL = new THREE.CylinderGeometry(0.017, 0.001, 2.4, 5).rotateX(Math.PI / 2).translate(0, 0, -1.5),
+  FOE_SHAFT_M = new THREE.MeshBasicMaterial({ color: 0x1c1418 }),
+  // (a plain red streak, not one that adds its light: over bright grass in daylight an added one all but vanishes)
+  FOE_TRAIL_M = new THREE.MeshBasicMaterial({ color: 0xff5a2a, transparent: true, opacity: 0.8, depthWrite: false, fog: false });
+const heroUp = (h) => (h.hp === undefined || h.hp > 0) && h.group.visible;
+function foeShoot(d) {
+  if (!d.foe) return;
+  const m = new THREE.Group(),
+    q = d.foe.group.position,
+    [lo, hi] = d.def.dmg;
+  d.club.localToWorld(m.position.set(0, 0, 0.1));
+  const v = V3(q.x, q.y + 1.15, q.z).sub(m.position).normalize();
+  m.add(new THREE.Mesh(FOE_SHAFT, FOE_SHAFT_M), new THREE.Mesh(FOE_TRAIL, FOE_TRAIL_M));
+  m.lookAt(tmpA.copy(m.position).add(v));
+  scene.add(m);
+  // (the string's snap: a burst of sparks off the bow)
+  puff(m.position, 0xffa040, 14, 2.6, 0.3, 0, 0.12);
+  FOE_SHOTS.push({ m, v: v.multiplyScalar(FOE_SPEED), far: 0, dmg: Math.round(lo + Math.random() * (hi - lo)) });
+}
+function foeShotsUpdate(dt) {
+  if (!FOE_SHOTS.length) return;
+  navFresh();
+  for (let i = FOE_SHOTS.length - 1; i >= 0; i--) {
+    const a = FOE_SHOTS[i],
+      P = a.m.position;
+    let gone = false;
+    // (in two steps a frame, so that a fast arrow does not step over a man)
+    for (let k = 0; k < 2 && !gone; k++) {
+      P.addScaledVector(a.v, dt / 2);
+      // (and sheds sparks behind it as it flies)
+      if (Math.random() < dt * 22) puff(P, 0xff9a3a, 1, 0.5, 0.3, 1.5, 0.09);
+      a.far += (FOE_SPEED * dt) / 2;
+      for (const h of HEROES) {
+        const q = h.group.position;
+        if (!heroUp(h) || Math.hypot(P.x - q.x, P.z - q.z) > 0.45 || Math.abs(P.y - q.y - 1.05) > 1.05) continue;
+        // it has struck a brother
+        if (h.hp !== undefined) h.hp = Math.max(0, h.hp - a.dmg);
+        heroHit(h, P.x - a.v.x, P.z - a.v.z);
+        puff(P, 0xff6a50, 12, 2.6, 0.3, 2);
+        gone = true;
+        break;
+      }
+      if (gone) break;
+      const c = navCell(P.x, P.z);
+      // (or the ground, or something standing, or it has simply flown its distance)
+      if (P.y < groundY(P.x, P.z) + 0.05 || a.far > 40 || (a.far > 1.5 && c >= 0 && NAV.wall[c] && P.y < groundY(P.x, P.z) + 2.4)) {
+        puff(P, 0xcbb48a, 5, 1.2, 0.3, 2, 0.1);
+        gone = true;
+      }
+    }
+    if (gone) {
+      scene.remove(a.m);
+      FOE_SHOTS.splice(i, 1);
+    }
+  }
+}
 // A brute loses his temper, briefly: for about a second and a half he comes on at nearly three times his pace (6.4, clearly
 // quicker than the brothers' 5), weaving, and lays about him left and right: a sweep from his right, a backhand from his left,
 // and again. After it he cannot lose his temper again for a few seconds
@@ -781,6 +1010,7 @@ function rageOn(d) {
 let HOLD_FOES = false;
 function gruntUpdate(dt) {
   if (HOLD_FOES) return;
+  foeShotsUpdate(dt);
   for (const d of grunts) {
     // one that a level has put to sleep (far off, standing idle, out of sight) costs nothing until it is woken
     if (d.asleep) continue;
@@ -791,7 +1021,7 @@ function gruntUpdate(dt) {
       R = d.rig.group;
     if (d.hp === undefined) {
       d.hp0 = d.hp = d.def.hp;
-      d.rng = d.def.reach + (d.pi ? (d.seed % 1) * 0.8 : d.df ? (d.seed % 1) * 0.6 : 0);
+      d.rng = d.def.reach + (d.pi ? (d.seed % 1) * 0.8 : d.df ? (d.seed % 1) * 0.6 : d.ar ? (d.seed % 1) * 3 : 0);
       d.pw = 0;
       d.wW = 0;
       d.wA = 0;
@@ -832,7 +1062,7 @@ function gruntUpdate(dt) {
         if (d.vel.length() > 0.8) g.rotation.y = Math.atan2(-d.vel.x, -d.vel.z);
         if (d.club) {
           scene.attach(d.club);
-          d.club.scale.setScalar((d.br ? 1.3 : 1) * d.sz * (d.k || 1));
+          d.club.scale.setScalar((d.br ? 1.3 : d.ar ? 1.12 : 1) * d.sz * (d.k || 1));
         }
         d.cv = V3((-g.position.x / r0) * 0.8, 1.6, (-g.position.z / r0) * 0.8);
         d.mats.forEach((m) => {
@@ -889,19 +1119,28 @@ function gruntUpdate(dt) {
     }
     // what he is making for: the altar fire, unless a level has given him something else (d.to, a point that may move).
     // d.wait keeps him standing where he is, doing nothing, until the level lets him go
+    // (an archer is after the nearest brother still standing, wherever he is)
+    if (d.ar && !d.dead) {
+      let best = null;
+      for (const h of HEROES) if (heroUp(h) && (!best || g.position.distanceToSquared(h.group.position) < g.position.distanceToSquared(best.group.position))) best = h;
+      d.foe = best;
+      d.to = best ? best.group.position : null;
+    }
     const ox = d.to ? d.to.x : 0,
       oz = d.to ? d.to.z : 0,
       r = Math.hypot(g.position.x - ox, g.position.z - oz) || 1,
       stag = (!d.br && d.wob > 0.8 && !(d.wA > 0.5 && d.at % 1 > 0.35)) || d.hold > 0 || d.flung || d.dead > 0 || d.wait,
-      walking = !stag && r > d.rng,
-      attacking = !stag && !walking;
+      // (an archer in range but with something between him and his mark keeps coming, until he can see it)
+      blind = d.ar && r <= d.rng && r > 4 && (navFresh(), !navClear(g.position.x, g.position.z, ox, oz, 1)),
+      walking = !stag && (r > d.rng || blind) && !(d.ar && !d.foe),
+      attacking = !stag && !walking && !(d.ar && !d.foe);
     // he comes in at a run, weaving from side to side, and turns to face wherever he is heading; once in range he squares up to the fire, bouncing on his feet
     {
       const nx = (ox - g.position.x) / r,
         nz = (oz - g.position.z) / r,
         // the way he walks: straight at it when the way is clear, and otherwise round what is in the way. (Not for those in
         // the air, which nothing on the ground stops)
-        A = walking && !d.df ? navAim(g.position, ox, oz, d.rng + 0.6) : null,
+        A = walking && !d.df ? navAim(g.position, ox, oz, d.ar ? 1 : d.rng + 0.6) : null,
         al = A && A.via ? Math.hypot(A.x - g.position.x, A.z - g.position.z) || 1 : 0,
         wx = al ? (A.x - g.position.x) / al : nx,
         wz = al ? (A.z - g.position.z) / al : nz,
@@ -963,11 +1202,15 @@ function gruntUpdate(dt) {
     }
     const u = d.at % 1,
       wind = 0,
-      S = d.pi ? PATK[d.sk](u) : d.br ? BSTR[d.sk](u) : STRIKES[d.sk](u),
+      S = d.ar ? ARCH(u) : d.pi ? PATK[d.sk](u) : d.br ? BSTR[d.sk](u) : STRIKES[d.sk](u),
       smash = S.lean * wa,
+      // (an archer keeps his stance for as long as he is shooting: he does not lower the bow and turn to face front
+      // between one arrow and the next, as a club comes back to the shoulder between blows)
       aw = d.df
         ? 0
-        : kf(u, [
+        : d.ar
+          ? wa
+          : kf(u, [
             [0, 0],
             [0.32, 1],
             [0.76, 1],
@@ -977,7 +1220,9 @@ function gruntUpdate(dt) {
       Ap = d.pi ? {} : S.aL ? { armR: S.a, foreR: S.f, armL: S.aL, foreL: S.fL } : { armR: S.a, foreR: S.f },
       wrist = S.w,
       lg = (S.leg || 0) * wa;
-    if (d.pi) {
+    if (d.ar) {
+      if (attacking && d.lu < RELEASE && u >= RELEASE) foeShoot(d);
+    } else if (d.pi) {
       if (attacking && d.lu < S.hit && u >= S.hit)
         for (const h of S.both ? [B.handR, B.handL] : [d.sd > 0 ? B.handR : B.handL]) {
           h.getWorldPosition(tmpA);
@@ -1214,6 +1459,13 @@ function gruntUpdate(dt) {
         if (Ap[n]) c[q] = c[q] * (1 - aw) + Ap[n][q] * aw;
         if (Dp) c[q] = c[q] * (1 - f) + (dp ? dp[q] : 0);
       }
+      // (an archer shooting turns head and shoulders along his bow arm, and holds his head level: the foot soldier's is
+      // tipped back, to look out of his stoop)
+      if (d.ar && !d.dead) {
+        const y = { spine: 0.12, chest: 0.2, neck: 0.35, head: 0.75 }[n];
+        if (y) c[1] += y * aw;
+        if (n === 'head') c[0] += 0.4 * aw;
+      }
       if (n === 'hips') c[1] += tw * 0.2;
       else if (n === 'spine') c[1] += tw * 0.35;
       else if (n === 'chest') c[1] += tw * 0.45;
@@ -1223,6 +1475,77 @@ function gruntUpdate(dt) {
       B[n].quaternion.setFromEuler(EG);
     }
     B.handR.quaternion.setFromEuler(EG.set(wrist[0] * aw * (1 - f), wrist[1] * aw * (1 - f), 0));
+    if (d.ar && !d.dead) {
+      const bow = d.club,
+        // (an arrow is on the string from the moment his hand is back from the quiver until it is loosed)
+        drawn = aw > 0.8 && (u < RELEASE || u > 0.97);
+      // side-on, and the drawing forearm folded, before the hands are placed
+      R.rotation.y = -1.5708 * aw;
+      B.foreR.quaternion.slerp(foldR, aw);
+      g.updateMatrixWorld(true);
+      AR_A.set(ox - g.position.x, 0, oz - g.position.z).normalize();
+      if (aw > 0.01) {
+        for (const n of ['armL', 'foreL', 'armR', 'foreR']) d.pre[n] = (d.pre[n] || new THREE.Quaternion()).copy(B[n].quaternion);
+        // (the aim as his own frame has it; places for the hands are in that frame, as the rig's lengths are)
+        AR_T.copy(AR_A).applyQuaternion(R.getWorldQuaternion(AR_Q).invert());
+        R.worldToLocal(B.armL.getWorldPosition(AR_L));
+        AR_L.addScaledVector(AR_T, 0.475);
+        AR_L.z += 0.09;
+        B.tgtL.position.copy(AR_L);
+        AR_L.addScaledVector(AR_T, -(0.2 + S.dr * 0.44));
+        AR_L.z += 0.1;
+        AR_L.y += 0.02;
+        // Or it is on its way to the quiver at his right hip and back, between shots. It does not go there straight, which
+        // would take it through his own chest: it swings out in front of him and round (a curve through a point well
+        // before his chest), down to the arrows' ends, which stand forward of his hip
+        {
+          const t = S.rl,
+            k = 1 - t;
+          B.tgtR.position.set(
+            k * k * AR_L.x + 2 * t * k * 0.1 + t * t * -0.27,
+            k * k * AR_L.y + 2 * t * k * 1.3 + t * t * 1.2,
+            k * k * AR_L.z + 2 * t * k * 0.46 + t * t * 0.15,
+          );
+        }
+        g.updateMatrixWorld(true);
+        d.ik.update();
+        for (const n of ['armL', 'foreL', 'armR', 'foreR']) {
+          AR_Q.copy(B[n].quaternion);
+          B[n].quaternion.copy(d.pre[n]).slerp(AR_Q, aw);
+        }
+        g.updateMatrixWorld(true);
+      }
+      // the bow: upright and along the aim when he shoots; otherwise carried low at his side, pointing down and forward
+      B.handL.getWorldPosition(AR_L);
+      B.handR.getWorldPosition(AR_R);
+      if (aw > 0.5) {
+        AR_Z.copy(AR_A);
+        AR_X.crossVectors(AR_UP, AR_Z).normalize();
+        AR_Y.crossVectors(AR_Z, AR_X).normalize();
+      } else {
+        AR_Y.set(Math.sin(g.rotation.y), 0, Math.cos(g.rotation.y)).multiplyScalar(0.8).addScaledVector(AR_UP, -0.6).normalize();
+        AR_X.crossVectors(AR_Y, AR_Z.set(Math.cos(g.rotation.y), 0, -Math.sin(g.rotation.y))).normalize();
+        AR_Z.crossVectors(AR_X, AR_Y).normalize();
+      }
+      bow.quaternion.slerp(AR_Q2.setFromRotationMatrix(AR_M.makeBasis(AR_X, AR_Y, AR_Z)), Math.min(1, dt * 12));
+      bow.position.copy(AR_L);
+      bow.updateMatrixWorld(true);
+      // the string comes to his drawing hand, and the arrow lies from that hand to the grip
+      const sp = d.bow.str.geometry.attributes.position;
+      if (drawn) {
+        bow.worldToLocal(AR_R);
+        sp.setXYZ(1, AR_R.x, AR_R.y, AR_R.z);
+        d.bow.arrow.position.copy(AR_R);
+        d.bow.arrow.quaternion.setFromUnitVectors(AR_Z.set(0, 0, 1), AR_T.set(0, 0.035, 0.05).sub(AR_R).normalize());
+      } else sp.setXYZ(1, 0, 0, BOW_Z);
+      sp.needsUpdate = true;
+      d.bow.arrow.visible = drawn;
+      // (as he draws, sparks spit from the arrow's head, more the further the string is back: it is how a shot is seen coming)
+      if (drawn && S.dr > 0.15 && Math.random() < dt * 34 * S.dr) puff(d.bow.arrow.localToWorld(AR_T.set(0, 0, 0.78)), 0xffa040, 1, 0.9, 0.3, -1.6, 0.1);
+    } else if (d.ar) {
+      // (dead: no arrow)
+      d.bow.arrow.visible = false;
+    }
     if (d.br && !d.dead) {
       const s1 = Math.sin(d.ph) * d.wW;
       R.rotation.z = s1 * 0.055;

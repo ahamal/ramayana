@@ -207,6 +207,7 @@ addEventListener('keydown', (e) => {
     e.preventDefault();
   } else if (e.code === 'KeyN') toggleNam();
   else if (e.code === 'KeyG') FOLLOW = !FOLLOW;
+  else if (e.code === 'KeyH') CALM = !CALM;
   else return;
   ui();
 });
@@ -561,6 +562,8 @@ let SEL = RAMA,
   CUR = RAMA,
   AUTO = false,
   FOLLOW = false,
+  // (CALM: the brother you are not playing holds his fire and goes after no one. The H key, or a page's own button)
+  CALM = false,
   // how far from the fire anyone may walk, and who Tab cycles through: a level may change both
   BOUND = 13,
   PLAYABLE = ['rama', 'lak', 'sage'];
@@ -635,6 +638,8 @@ function brain(h, dt) {
     best = cur;
     bd = cd;
   }
+  // (told to hold his fire, he has no one in mind)
+  if (CALM) best = null;
   h.tgt = best;
   IN.at = best && bd <= h.range ? best : null;
   IN.fire = !!IN.at;
@@ -727,6 +732,40 @@ function keysIn() {
   IN.at = null;
   IN.fire = false;
 }
+// A brother struck. Kept small, so that it is felt and not watched: he is knocked a hand's breadth back from where the
+// blow came from, his head snaps back and comes forward again, and for a fifth of a second his body is flushed a dull red.
+// (fx, fz: where the blow came from, if that is known)
+const HIT_T = 0.22,
+  HIT_Q = new THREE.Quaternion(),
+  HIT_X = new THREE.Vector3(1, 0, 0);
+function heroHit(h, fx, fz) {
+  h.hit = HIT_T;
+  if (fx === undefined) return;
+  const P = h.group.position,
+    l = Math.hypot(P.x - fx, P.z - fz) || 1;
+  P.x += ((P.x - fx) / l) * 0.12;
+  P.z += ((P.z - fz) / l) * 0.12;
+}
+function hitFx(h, dt) {
+  if (!(h.hit > 0) && !h.hitOn) return;
+  h.hit = Math.max(0, (h.hit || 0) - dt);
+  const k = h.hit / HIT_T,
+    e = k * k;
+  h.bone.head.quaternion.multiply(HIT_Q.setFromAxisAngle(HIT_X, -0.3 * e));
+  // (the flush is on his own skin and cloth only; what they glowed with before is kept, and given back)
+  if (!h.hitMats) {
+    h.hitMats = [];
+    h.group.traverse((o) => {
+      if (o.isSkinnedMesh && o.material.emissive && !h.hitMats.includes(o.material)) {
+        o.material.userData.em0 = o.material.emissive.clone();
+        h.hitMats.push(o.material);
+      }
+    });
+  }
+  for (const m of h.hitMats) m.emissive.copy(m.userData.em0).add(HIT_C.setRGB(0.42 * e, 0.06 * e, 0.04 * e));
+  h.hitOn = h.hit > 0;
+}
+const HIT_C = new THREE.Color();
 function heroUpdate(dt) {
   saveHero(SEL);
   const one = (h, auto) => {
@@ -739,6 +778,7 @@ function heroUpdate(dt) {
     } else if (auto) brain(h, dt);
     else keysIn();
     heroStep(dt);
+    hitFx(h, dt);
     // his feet are on the ground, whatever its height where he now stands
     h.group.position.y = groundY(h.group.position.x, h.group.position.z);
     saveHero(h);
