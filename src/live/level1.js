@@ -475,7 +475,7 @@ function tree(x, z, s, kind) {
 for (const t of OLD_TREES) tree(t.x, t.z, Math.min(1.3, t.s * 0.75), [0, 2, 1][(Math.random() * 3) | 0]);
 // trees stand in groves with open ground between them, not evenly everywhere. None on the road, in the camp, or in the clearing;
 // just on the camera's side of the road, and on the near side of the clearing, only small ones that do not hide the brothers
-for (let i = 0; i < 420; i++) {
+for (let i = 0; i < 500; i++) {
   const x = R(X0 - 22, EX + 38),
     z = R(ZN - 30, ZS + 4),
     c = Math.hypot(x, z),
@@ -489,7 +489,7 @@ for (let i = 0; i < 420; i++) {
     kind = wet ? (k < 0.5 ? 3 : k < 0.75 ? 0 : 2) : k < 0.42 ? 0 : k < 0.68 ? 2 : k < 0.9 ? 1 : 3;
   tree(x, z, small ? R(0.5, 0.7) : R(0.6, 1.1), kind);
 }
-// bushes: few, and never scattered singly. One clump sits at the foot of about every third tree, as undergrowth,
+// bushes: few, and never scattered singly. One clump sits at the foot of about every second tree, as undergrowth,
 // and some more stand in small groups a little back from the road
 function bush(x, z, r) {
   if (nearRiver(x, z, 0.6) || onRoad(x, z, 3.4) || inCamp(x, z, 7) || inHut(x, z, 0) || inCourt(x, z, 1)) return;
@@ -499,9 +499,9 @@ function bush(x, z, r) {
   }
 }
 WOODS.forEach((t, i) => {
-  if (i % 3 === 0) bush(t.x + R(-1.2, 1.2), t.z + R(0.6, 1.6), R(0.45, 0.8));
+  if (i % 2 === 0) bush(t.x + R(-1.2, 1.2), t.z + R(0.6, 1.6), R(0.45, 0.8));
 });
-for (let i = 0; i < 22; i++) {
+for (let i = 0; i < 30; i++) {
   const x = R(X0, -14),
     z = roadZ(x) + (i % 2 ? 1 : -1) * R(4.5, 7.5);
   for (let k = 0; k < 3; k++) bush(x + R(-1.4, 1.4), z + R(-1, 1), R(0.4, 0.75));
@@ -760,15 +760,15 @@ for (let i = 0; i < 170; i++) {
   // They do not grow just anywhere, only where such things do:
   // round the foot of most trees, in their shade;
   for (const t of [...WOODS, ...TREES])
-    if (Math.random() < 0.7)
-      patch(t.x, t.z, 4 + ((Math.random() * 4) | 0), 0.9 + t.s * 0.7, Math.random() < 0.35 ? 2 + ((Math.random() * 2) | 0) : 0);
+    if (Math.random() < 0.9)
+      patch(t.x, t.z, 6 + ((Math.random() * 5) | 0), 0.9 + t.s * 0.7, Math.random() < 0.35 ? 2 + ((Math.random() * 2) | 0) : 0);
   // along both verges of the road, in broken stretches;
   for (let i = 2; i < ROADLINE.length - 2; i++) {
     const p = ROADLINE[i],
       q = ROADLINE[i + 1],
       l = Math.hypot(q.x - p.x, q.z - p.z) || 1;
     for (const side of [-1, 1])
-      if (Math.random() < l * 0.16) {
+      if (Math.random() < l * 0.24) {
         const off = side * R(2.7, 3.7);
         patch(p.x - ((q.z - p.z) / l) * off, p.z + ((q.x - p.x) / l) * off, 3 + ((Math.random() * 3) | 0), 0.7, Math.random() < 0.3 ? 2 : 0);
       }
@@ -780,7 +780,7 @@ for (let i = 0; i < 170; i++) {
         q = line[i + 1],
         l = Math.hypot(q.x - p.x, q.z - p.z) || 1;
       for (const side of [-1, 1])
-        if (Math.random() < 0.5) {
+        if (Math.random() < 0.68) {
           const off = side * R(RW + 1.4, RW + 2.8);
           patch(p.x - ((q.z - p.z) / l) * off, p.z + ((q.x - p.x) / l) * off, 3 + ((Math.random() * 3) | 0), 0.7, Math.random() < 0.25 ? 2 : 0);
         }
@@ -1076,8 +1076,106 @@ function seatMat(x, z, r = 0.56) {
     m.renderOrder = -1;
     scene.add(m);
   }
-  // Vishwamitra's own seat by the fire
-  seatMat(0, -2, 0.62);
+  // The altar itself. Round the fire lies a floor made for the rite: a round of earth smoothed and plastered, with the
+  // rite's diagram drawn on it in rice flour: two rings at its edge, a ring of lotus petals, a double square with a gate in
+  // each side, and eight petals close round the hearth. The hearth stands in the middle on a low base of red sandstone
+  {
+    const S = 1024,
+      R = 5.2,
+      k = S / 2 / R,
+      c = document.createElement('canvas');
+    c.width = c.height = S;
+    const g = c.getContext('2d');
+    g.translate(S / 2, S / 2);
+    g.scale(k, k);
+    // the plastered round, a shade warmer than the earth about it, with an ochre band at its edge
+    g.fillStyle = 'rgba(172,126,84,.6)';
+    g.beginPath();
+    g.arc(0, 0, 4.95, 0, 6.2832);
+    g.fill();
+    g.lineCap = g.lineJoin = 'round';
+    g.strokeStyle = 'rgba(140,72,40,.8)';
+    g.lineWidth = 0.12;
+    g.beginPath();
+    g.arc(0, 0, 4.95, 0, 6.2832);
+    g.stroke();
+    // the diagram, in rice flour
+    g.strokeStyle = g.fillStyle = 'rgba(244,228,198,.58)';
+    g.lineWidth = 0.045;
+    const ring = (r) => {
+      g.beginPath();
+      g.arc(0, 0, r, 0, 6.2832);
+      g.stroke();
+    };
+    const P = (r, t) => [r * Math.cos(t), r * Math.sin(t)];
+    // (a ring of n petals from radius r0 out to r1; w is how much of its share of the ring each one fills)
+    const petals = (n, r0, r1, w, off) => {
+      for (let i = 0; i < n; i++) {
+        const a = ((i + off) / n) * 6.2832,
+          d = (6.2832 / n) * w,
+          rm = r0 + (r1 - r0) * 0.6;
+        g.beginPath();
+        g.moveTo(...P(r0, a - d));
+        g.quadraticCurveTo(...P(rm, a - d * 0.9), ...P(r1, a));
+        g.quadraticCurveTo(...P(rm, a + d * 0.9), ...P(r0, a + d));
+        g.stroke();
+      }
+    };
+    ring(4.62);
+    ring(4.45);
+    petals(24, 3.72, 4.28, 0.46, 0);
+    ring(3.72);
+    // the square with a gate in each side, drawn double, a dot in each corner
+    for (let i = 0; i < 4; i++) {
+      g.save();
+      g.rotate((i * Math.PI) / 2);
+      for (const o of [0, 0.16]) {
+        g.beginPath();
+        g.moveTo(-2.5 + o, 2.5 - o);
+        g.lineTo(-0.6 - o, 2.5 - o);
+        g.lineTo(-0.6 - o, 2.95 - o);
+        g.lineTo(0.6 + o, 2.95 - o);
+        g.lineTo(0.6 + o, 2.5 - o);
+        g.lineTo(2.5 - o, 2.5 - o);
+        g.stroke();
+      }
+      g.beginPath();
+      g.arc(2.08, 2.08, 0.08, 0, 6.2832);
+      g.fill();
+      g.restore();
+    }
+    // eight broad petals round the hearth, a dot between each pair
+    ring(1.72);
+    petals(8, 1.72, 2.2, 0.42, 0.5);
+    for (let i = 0; i < 8; i++) {
+      g.beginPath();
+      g.arc(...P(2.0, (i / 8) * 6.2832), 0.05, 0, 6.2832);
+      g.fill();
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * R * 1.414, 2 * R * 1.414), toon(0xffffff, { map: tex, transparent: true, depthWrite: false, rim: 0 }));
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(0, 0.042, 0);
+    m.receiveShadow = true;
+    scene.add(m);
+    // the base under the hearth
+    add(scene, new THREE.BoxGeometry(2.5, 0.08, 2.5), PAVE.stone2, [0, 0.04, 0]);
+    add(scene, new THREE.BoxGeometry(2.0, 0.14, 2.0), PAVE.stone, [0, 0.07, 0]);
+    SOLIDS.push({ x: 0, z: 0, r: 1.4 });
+  }
+  // Vishwamitra's own seat by the fire: a plain square mat of kusha grass with a bound edge, and his brass water pot beside it
+  {
+    const flat = (m) => ((m.castShadow = false), m),
+      X = 0,
+      Z = -2,
+      brass = toon(0xc0903c, { rim: 0.35 });
+    flat(add(scene, new THREE.BoxGeometry(1.5, 0.03, 1.3), PAVE.strawEdge, [X, 0.05, Z]));
+    flat(add(scene, new THREE.BoxGeometry(1.38, 0.034, 1.18), PAVE.straw, [X, 0.05, Z]));
+    sph(scene, 0.15, brass, [X + 1.05, 0.14, Z + 0.1], [1, 0.85, 1]);
+    cyl(scene, 0.05, 0.07, 0.1, brass, [X + 1.05, 0.3, Z + 0.1]);
+  }
   // (and its light reaches further across the worn ground)
   fireL.distance = 20;
 }
@@ -1584,11 +1682,13 @@ function prisoner(x, z, i, job, ends) {
   // bound: the stake he is tied to, and three turns of rope round his chest and the stake together.
   // (the stake stands in the ground, not on him, so it stays behind when he walks off)
   // At work: the thing he works with, which he drops when he is freed: a hoe in his hand, or a sack across his shoulders
-  let ropes = [];
+  let ropes = [],
+    stake = null,
+    solid = null;
   if (!job) {
-    cyl(scene, 0.055, 0.07, 1.5, WOOD, [x, groundY(x, z) + 0.75, z - 0.27]);
+    stake = cyl(scene, 0.055, 0.07, 1.5, WOOD, [x, groundY(x, z) + 0.75, z - 0.27]);
     ropes = [0.36, 0.43, 0.5].map((y) => tor(g, 0.23, 0.016, ROPE, [0, y, -0.1], [Math.PI / 2, 0, 0], [1, 1.2, 1]));
-    SOLIDS.push({ x, z, r: 0.34 });
+    SOLIDS.push((solid = { x, z, r: 0.34 }));
   } else if (job === 'dig') {
     const hoe = new THREE.Group();
     cyl(hoe, 0.018, 0.02, 1.3, WOOD, [0, 0, 0.45], [Math.PI / 2, 0, 0]);
@@ -1642,6 +1742,8 @@ function prisoner(x, z, i, job, ends) {
       // along it to the sage's house, and to his own place on the grass in front of it
       path: job ? [] : [[x + 2.5, roadZ(x + 2.5) + (i - 1) * 0.7], [-48, roadZ(-48) + (i - 1) * 0.7], VSEATS[i]],
     };
+  p.stake = stake;
+  p.solid = solid;
   pose(p);
   PRISONERS.push(p);
   return p;
@@ -1932,8 +2034,8 @@ function campUpdate(dt) {
       say(
         [
           { who: 'Villager', face: f[0], text: 'You came! We thought no one would.' },
-          { who: 'Elder', face: f[1], text: 'They dragged us from the hermitage at dawn, to spill our blood on the sage’s altar. Bless you both.' },
-          { who: 'Rama', face: photo(RAMA), text: 'Go to Vishwamitra. You will be safe by his fire.' },
+          { who: 'Elder', face: f[1], text: 'We cut wood for the sage Vishwamitra. They took us at dawn, out among the trees. Bless you both.' },
+          { who: 'Rama', face: photo(RAMA), text: 'Then go back to your work, friends. His fire must burn through the night.' },
           // (all of them together, as they turn to go)
           { who: 'Villagers', face: f[f.length - 1], text: 'Jai Shree Ram!' },
         ],
@@ -2012,10 +2114,21 @@ function campUpdate(dt) {
         continue;
       }
       p.g.visible = true;
+      // the stake he was tied to: once he has walked off it sinks slowly into the ground and is gone, and no longer bars the way
+      if (p.stake && p.go) {
+        p.stake.position.y -= dt * 0.55;
+        if ((p.stakeT = (p.stakeT || 0) + dt) > 3) {
+          scene.remove(p.stake);
+          p.stake = null;
+          const i = SOLIDS.indexOf(p.solid);
+          if (i >= 0) SOLIDS.splice(i, 1);
+        }
+      }
       // freed: first he gets to his feet (or straightens from his work); only when all of that camp are standing do they bow together.
       // They hold the bow a moment (at the first camp, while they give their thanks), then lower their hands and walk to
       // Vishwamitra's hermitage, where they sit down facing the fire
       p.up = Math.min(1, p.up + dt / 0.45);
+      if (p.wood) woodNight(p);
       if (p.wood) p.jobW += ((p.wood.bent ? 1 : 0) - p.jobW) * Math.min(1, dt * 5);
       else p.jobW = Math.max(0, p.jobW - dt / 0.4);
       let want;
@@ -2024,20 +2137,25 @@ function campUpdate(dt) {
         if (allUp) p.nam = Math.min(1, p.nam + dt / 0.7);
         if (p.nam >= 1 && !talking() && (p.hold += dt) > (c.first ? 0.8 : 1.6) + p.wait) {
           p.go = true;
+          // the men from the camp by the road are the sage's woodcutters: they walk home along the road and go straight back to work
+          if (c.first && !p.wood) {
+            toWood(p, woodN++);
+            p.path = [...p.path.slice(0, -1), p.wood.home];
+          }
           if (!p.path.length) {
             // (out by the camp's own way to its crossing and in, then on to his seat)
             const via = c.via || [],
               from = via.length ? { x: via[via.length - 1][0], z: via[via.length - 1][1] } : P;
-            // (once the order to gather wood has been given, a freed man goes straight to that work instead of to a seat)
+            // (any other freed villager goes straight to gathering wood)
             // The brahmins come to Vishwamitra's fire and sit close round it. The masons come in and wait by the east house.
             if (p.look === 'brahmin') p.path = [...via, ...route(from, BSEATS[bSeat++ % BSEATS.length])];
             else if (p.look === 'mason') {
               p.stand = true;
               p.path = [...via, [30 + (mSeat % 3) * 1.6, 9 + ((mSeat++ / 3) | 0) * 1.5]];
-            } else if (ORDER.done) {
+            } else {
               toWood(p, woodN++);
               p.path = [...via, ...route(from, p.wood.home)];
-            } else p.path = [...via, ...route(from, VSEATS[Math.min(VSEATS.length - 1, seatsTaken++)])];
+            }
           }
         }
         // on his feet he turns to whoever freed him
@@ -2068,6 +2186,13 @@ function campUpdate(dt) {
           p.ph += v / 0.45;
         }
         want = Math.atan2(dx, dz);
+        // (with something between him and the next point of his way, he goes round it. The end of the way may itself be
+        // hard by a tree or a wall, so the last stretch of the line is not counted as blocked)
+        p.via = false;
+        if (moving) {
+          const A = navAim(P, w[0], w[1], 1.8);
+          if ((p.via = A.via)) want = Math.atan2(A.x - P.x, A.z - P.z);
+        }
         // (at his tree he faces it)
         if (!w && p.wood && p.wood.s !== 'drop' && p.wood.s !== 'fetch') want = Math.atan2(p.wood.spot[2].x - P.x, p.wood.spot[2].z - P.z);
         if (!w && p.wk < 0.05) {
@@ -2079,7 +2204,7 @@ function campUpdate(dt) {
       pose(p);
       p.g.rotation.y +=
         Math.atan2(Math.sin(want - p.g.rotation.y), Math.cos(want - p.g.rotation.y)) *
-        Math.min(1, dt * (p.go ? (p.path.length === 1 ? 5 : 2.2) : 3)) *
+        Math.min(1, dt * (p.go ? (p.path.length === 1 || p.via ? 5 : 2.2) : 3)) *
         p.up;
     }
   }
@@ -2092,13 +2217,60 @@ function campUpdate(dt) {
 const STICK = [toon(0x7a4a22, { rim: 0.1 }), toon(0x8a5a2c, { rim: 0.1 })],
   AXEM = toon(0x55585e, { rim: 0.3 });
 let woodN = 0,
-  FELL = null;
-// where he goes to cut (the nearest two, and up to two more if they are close by; men at the same tree stand on different sides of it): one of the trees nearest the wood store, standing a pace from its trunk on the store's side
-// (tree: the tree itself, so that he can face it)
+  FELL;
+// Where the men cut. The trees nearest the wood store (the nearest two, and up to two more if they are close by), and before
+// any of them a tree already down: a felled trunk lying by its stump at the forest's edge, between the store and the nearest
+// standing tree. The first man works at that; men at the same tree stand on different sides of it
+FELL = [...WOODS, ...TREES]
+  .sort((a, b) => Math.hypot(a.x - WOODSHED[0], a.z - WOODSHED[1]) - Math.hypot(b.x - WOODSHED[0], b.z - WOODSHED[1]))
+  .filter((t, k) => k < 2 || Math.hypot(t.x - WOODSHED[0], t.z - WOODSHED[1]) < 24)
+  .slice(0, 4);
+{
+  const n = FELL[0],
+    l = Math.hypot(WOODSHED[0] - n.x, WOODSHED[1] - n.z) || 1,
+    // (toward the store from that tree, and as far as it takes to lie clear of every other trunk)
+    dx = (WOODSHED[0] - n.x) / l,
+    dz = (WOODSHED[1] - n.z) / l,
+    clear = (x, z) => [...WOODS, ...TREES].every((t) => Math.hypot(t.x - x, t.z - z) > 3.2),
+    d = [4, 5.5, 7, 8.5].find((d) => clear(n.x + dx * d, n.z + dz * d)) || 4,
+    x = n.x + dx * d,
+    z = n.z + dz * d,
+    // it lies across the way to the store, a little askew
+    yaw = Math.atan2(dx, dz) + Math.PI / 2 + 0.25,
+    ux = Math.sin(yaw + Math.PI / 2),
+    uz = Math.cos(yaw + Math.PI / 2),
+    g = new THREE.Group(),
+    BARK = toon(0x6a4a30, { rim: 0.1 }),
+    CUT = toon(0xd8b888, { rim: 0.1 });
+  g.position.set(x, groundY(x, z), z);
+  g.rotation.y = yaw;
+  scene.add(g);
+  // the trunk, thick end toward the stump, resting on the ground; its cut end pale
+  cyl(g, 0.33, 0.24, 5.6, BARK, [0.5, 0.31, 0], [0, 0, Math.PI / 2]);
+  cyl(g, 0.3, 0.3, 0.03, CUT, [-2.31, 0.31, 0], [0, 0, Math.PI / 2]);
+  // the stump it came from, a pace off, cut pale across the top, with a few chips about it
+  cyl(g, 0.36, 0.42, 0.5, BARK, [-3.3, 0.25, 0.35]);
+  cyl(g, 0.33, 0.33, 0.03, CUT, [-3.3, 0.51, 0.35]);
+  for (let i = 0; i < 7; i++) add(g, new THREE.BoxGeometry(0.12, 0.02, 0.07), CUT, [-3.3 + R(-0.9, 0.9), 0.02, 0.35 + R(-0.9, 0.9)], [0, R(0, 6), 0]);
+  // the stubs of its boughs, lopped short
+  cyl(g, 0.05, 0.08, 1.1, BARK, [1.3, 0.75, 0.15], [0.35, 0, -0.5]);
+  cyl(g, 0.045, 0.07, 0.9, BARK, [2.2, 0.6, -0.3], [-0.9, 0, -0.3]);
+  cyl(g, 0.04, 0.06, 0.8, BARK, [0.2, 0.62, -0.28], [-0.8, 0, 0.4]);
+  for (const o of [-1.6, -0.5, 0.6, 1.7, 2.8]) SOLIDS.push({ x: x + ux * o, z: z + uz * o, r: 0.42 });
+  // (as a place to cut: low marks that the axe bites near the ground; ax is the way it lies, side the store's side of it)
+  FELL.unshift({ x, z, s: 0.4, low: true, ax: [ux, uz], side: [dx, dz] });
+}
+// (tree: the tree itself, or the point on the fallen trunk, so that he can face it)
 const woodSpot = (i) => {
-  FELL = FELL || [...WOODS, ...TREES].sort((a, b) => Math.hypot(a.x - WOODSHED[0], a.z - WOODSHED[1]) - Math.hypot(b.x - WOODSHED[0], b.z - WOODSHED[1])).filter((t, k) => k < 2 || Math.hypot(t.x - WOODSHED[0], t.z - WOODSHED[1]) < 24).slice(0, 4);
-  const t = FELL[i % FELL.length],
-    a = Math.atan2(WOODSHED[0] - t.x, WOODSHED[1] - t.z) + R(-0.9, 0.9),
+  const t = FELL[i % FELL.length];
+  if (t.low) {
+    // at the fallen trunk he stands beside it, somewhere along its length, on the store's side
+    const o = R(-1.4, 2.2),
+      px = t.x + t.ax[0] * o,
+      pz = t.z + t.ax[1] * o;
+    return [px + t.side[0] * 0.9, pz + t.side[1] * 0.9, { x: px, z: pz, low: true }];
+  }
+  const a = Math.atan2(WOODSHED[0] - t.x, WOODSHED[1] - t.z) + R(-0.9, 0.9),
     d = 0.75 + 0.45 * t.s;
   return [t.x + Math.sin(a) * d, t.z + Math.cos(a) * d, t];
 };
@@ -2116,11 +2288,42 @@ function toWood(p, i) {
   axe.visible = false;
   p.wood = { axe, s: 'fetch', t: 0, i, spot: woodSpot(i), home: [WOODSHED[0] - 3.6 + (i % 3) * 1.3, WOODSHED[1] + 3.6 + (i % 2) * 0.9], bundle: b, bent: false };
 }
+// No one gathers wood in the dark. When the day goes, each man drops what he is doing and runs for the villagers' house in
+// the south-west, nearly twice as fast as he walks, and is gone in at its door. At dawn he comes out again, walks to the
+// store, takes up an axe and goes back to his tree
+const HUT_DOOR = [SW_HOUSE[0] + Math.sin(SW_HOUSE[2]) * 5.5, SW_HOUSE[1] + Math.cos(SW_HOUSE[2]) * 5.5];
+function woodNight(p) {
+  const W = p.wood,
+    dark = NIGHT.go && !NIGHT.dawn;
+  if (dark && !W.in) {
+    W.in = true;
+    W.s = 'home';
+    W.t = 0;
+    W.bent = false;
+    W.bundle.visible = W.axe.visible = false;
+    W.pace0 = p.pace;
+    p.pace *= 1.9;
+    p.path = route(p.g.position, [HUT_DOOR[0] + R(-0.5, 0.5), HUT_DOOR[1] + R(-0.5, 0.5)]);
+  } else if (!dark && W.in && W.s === 'in') {
+    W.in = false;
+    p.g.visible = true;
+    p.pace = W.pace0;
+    W.s = 'fetch';
+    W.t = 0;
+    p.path = [W.home];
+  }
+}
 // (called each frame while he stands at the end of his way: at the forest's edge, or back at the store)
 function woodStep(p, dt) {
   const W = p.wood,
     P = p.g.position;
   W.t += dt;
+  if (W.s === 'home' || W.s === 'in') {
+    // (at the door: in, and out of sight)
+    p.g.visible = false;
+    W.s = 'in';
+    return;
+  }
   if (W.s === 'fetch') {
     // at the store he takes an axe, and goes out with it
     if (W.t < 0.5) return;
@@ -2141,12 +2344,12 @@ function woodStep(p, dt) {
       const dx = t.x - P.x,
         dz = t.z - P.z,
         l = Math.hypot(dx, dz) || 1;
-      puff(tmpA.set(t.x - (dx / l) * 0.3, groundY(t.x, t.z) + 0.95, t.z - (dz / l) * 0.3), 0xd9b98a, 7, 2.4, 0.45, 6, 0.12);
+      puff(tmpA.set(t.x - (dx / l) * 0.3, groundY(t.x, t.z) + (t.low ? 0.45 : 0.95), t.z - (dz / l) * 0.3), 0xd9b98a, 7, 2.4, 0.45, 6, 0.12);
     }
     W.u = u;
     // he works at it for a while, then he straightens...
-    if (W.t > 7) W.bent = false;
-    if (W.t > 7.5) {
+    if (W.t > 24) W.bent = false;
+    if (W.t > 24.5) {
       // ...and sets off back with the bundle up on his shoulders
       W.s = 'back';
       p.job = 'carry';
@@ -2162,7 +2365,7 @@ function woodStep(p, dt) {
   } else if (W.t > 0.45) {
     W.bundle.visible = false;
     // (wood brought in feeds the fire; what the fire gives back for it is counted at the end of the night)
-    STOCK.pend += 5;
+    STOCK.pend += 1;
     W.axe.visible = true;
     puff(tmpA.set(P.x, 0.2, P.z), 0xcbb48a, 5, 1, 0.4, 2);
     W.s = 'out';
@@ -2172,57 +2375,10 @@ function woodStep(p, dt) {
 }
 
 // ---------- the men's orders ----------
-// After Vishwamitra's talk, the men freed from the first camp are sitting by the wood store. Walk up to them and Rama sets them to
-// gathering wood for the night; they get up and go to the wood store. Before they go they tell him of the two other camps, north
-// and south, and that there is time to reach only one before dark. The player chooses by going: the first camp a brother comes
-// near becomes the objective
+// The two far camps (stone masons in the east, brahmins in the south) are not part of this first day: freeing them is for the
+// next. Nothing here sends the player to them, and no choice between them is asked for. (ORDER is kept for the code that reads it)
 const ORDER = { done: false, pick: null };
-function orderUpdate() {
-  // the choice is made by going: whichever of the two camps a brother comes near first is the one he has chosen
-  if (ORDER.done && !ORDER.pick) {
-    const near = (c) => HEROES.some((h) => apart(h.group.position, c) < 30);
-    if (near(CAMPS[1])) ORDER.pick = 'east';
-    else if (near(CAMPS[2])) ORDER.pick = 'south';
-    // There is only the one day. Once he has set out for one camp, the other is emptied: its demons and their captives are
-    // gone from it, moved on, and nothing is left there but the cold camp
-    if (ORDER.pick) {
-      const c = CAMPS[ORDER.pick === 'east' ? 2 : 1];
-      c.gone = true;
-      for (const d of c.guards) {
-        const i = grunts.indexOf(d);
-        if (i >= 0) grunts.splice(i, 1);
-        d.g.visible = false;
-      }
-      for (const p of c.prisoners) p.g.visible = false;
-    }
-  }
-  if (ORDER.asked || !ARR.talked || LOCK || talking()) return;
-  const men = CAMPS[0].prisoners,
-    P = SEL.group.position;
-  if (!men.some((p) => p.sit >= 1 && apart(P, p.g.position) < 5)) return;
-  ORDER.asked = true;
-  LOCK = true;
-  const f = men.map((p) => snap(p.rig.bone.head, p.g.rotation.y, null)),
-    elder = f[1] || f[0];
-  say(
-    [
-      { who: 'Rama', face: photo(RAMA), text: 'Rest is over, friends. The fire must burn through the night. Gather all the wood you can.' },
-      { who: 'Elder', face: elder, text: 'Gladly, prince. But hear this first: they hold two more camps, with our people in both.' },
-      { who: 'Villager', face: f[0], text: 'Stone masons in the east, past the river. Brahmins in the south, over the crossing. At dusk they are moved.' },
-      { who: 'Elder', face: elder, text: 'There is one day. You can save only one. Choose well, prince.' },
-    ],
-    () => {
-      LOCK = false;
-      ORDER.done = true;
-      // off they go to the wood store, each to his own place beside it
-      men.forEach((p) => {
-        toWood(p, woodN++);
-        p.path = route(p.g.position, p.wood.home);
-        p.wait = 0;
-      });
-    },
-  );
-}
+function orderUpdate() {}
 
 // ---------- arriving at the hermitage ----------
 // When the brother you are playing comes near the altar with no enemy about, the scene takes over:
@@ -2230,11 +2386,11 @@ function orderUpdate() {
 //   wait           (before it starts) until a brother comes near the altar
 //   brothersSit    both walk to their places before the fire, sit and bow
 //   hush           a moment after both are down...
-//   sageOm         ...Vishwamitra, eyes shut, asks his question; his eyes open and the brothers answer
+//   sageOm         ...Vishwamitra, eyes shut, makes them wait through one long Om
 //   sageRises      he gets to his feet, unhurried
 //   sageComes      and walks round the fire to them
 //   sageGreets     he stops before the two of them, facing both
-//   sageTalks      he turns to Rama, raises his hand and gives him the Agneyastra: the fire
+//   sageTalks      he asks, they answer, and he turns to Rama, raises his hand and gives him the Agneyastra: the fire
 //                  passes from his palm to Rama, who sits still to receive it
 //   sageReturns    the brothers rise and the level is the player's again, while he goes back to his seat by the fire and sits
 //   sageOffers     he settles onto his own spot
@@ -2347,30 +2503,17 @@ function arriveUpdate(dt) {
       to('hush');
     }
   } else if (A.step === 'hush') {
-    // He keeps them waiting a moment, eyes shut, and asks his question without opening them. Then they open, and the brothers
-    // answer him where they sit, still bowed: Rama humbly, Lakshmana sure of himself
+    // then he keeps them waiting. His eyes close, and he says one long Om before anything else happens: patience.
+    // The brothers hold their bow all through it, and until he has come over and begins to speak
     if (A.t > 1.5) {
       sageEyes(true);
-      const f = snap(V.bone.head, V.group.rotation.y, null);
-      say(
-        [
-          { who: 'Vishwamitra', face: f, text: 'So Dasharatha sent you boys to help me?' },
-          {
-            who: 'Rama',
-            face: photo(RAMA),
-            text: 'We are only your pupils, Gurudev. Tell us what must be done, and we will try to be worthy of it.',
-            on: () => sageEyes(false),
-          },
-          { who: 'Lakshmana', face: photo(LAK), text: 'Let the demons come. Not one of them will reach your fire.' },
-        ],
-        () => to('sageRises'),
-      );
+      say([{ who: 'Vishwamitra', face: snap(V.bone.head, V.group.rotation.y, null), text: 'Om…' }], () => to('sageRises'));
       to('sageOm');
     }
   } else if (A.step === 'sageRises') {
-    // a breath of stillness after they have answered, and then he gets up
-    if (A.t > 0.9) {
-      sageEyes(false);
+    // a short stillness after the Om. His eyes open near the end of it, and then he gets up
+    if (A.t > 0.8) sageEyes(false);
+    if (A.t > 1.3) {
       SG.at = V.group.position.clone();
       to('sageComes');
     }
@@ -2385,11 +2528,14 @@ function arriveUpdate(dt) {
     }
   } else if (A.step === 'sageGreets') {
     // (he stands a moment facing the two of them before he speaks)
-    if (A.t > 1.3) {
+    if (A.t > 0.6) {
       A.bow = false;
       const f = snap(V.bone.head, V.group.rotation.y, null);
       say(
         [
+          { who: 'Vishwamitra', face: f, text: 'So Dasharatha sent you boys to help me?' },
+          { who: 'Rama', face: photo(RAMA), text: 'We are only your pupils, Gurudev. Tell us what must be done, and we will try to be worthy of it.' },
+          { who: 'Lakshmana', face: photo(LAK), text: 'Let the demons come. Not one of them will reach your fire.' },
           {
             who: 'Vishwamitra',
             face: f,
@@ -2403,7 +2549,7 @@ function arriveUpdate(dt) {
               giveAstra(1);
             },
           },
-          { who: 'Vishwamitra', face: f, text: 'Use it, Rama, when the bow alone will not do.' },
+          { who: 'Vishwamitra', face: f, text: 'Use it when the bow alone will not do.' },
         ],
         () => {
           A.via = A.via2 = false;
@@ -2778,7 +2924,7 @@ function sceneryUpdate(dt) {
   // them; a thread of smoke going up from its tip, and now and then an ember
   HEARTH.flames.forEach((m, i) => {
     const k = 1 + 0.16 * Math.sin(T * (9 + i * 2.3) + i) + 0.09 * Math.sin(T * (17.3 + i * 3.1));
-    m.scale.set(1 + 0.08 * Math.sin(T * 7 + i * 2), k, 1 + 0.08 * Math.cos(T * 6.1 + i));
+    m.scale.set(1 + 0.08 * Math.sin(T * 7 + i * 2), k, 1 + 0.08 * Math.cos(T * 6.1 + i)).multiplyScalar(FIRE.s);
     m.rotation.z = Math.sin(T * 3.1 + i * 1.7) * 0.07;
     m.rotation.x = Math.cos(T * 2.6 + i * 2.2) * 0.06;
   });
@@ -2794,6 +2940,8 @@ function sceneryUpdate(dt) {
   talkUpdate(dt);
   tipsUpdate();
   heroBars(dt);
+  foeBars();
+  aimMarks(dt);
   coinsUpdate(dt);
   SKY.position.copy(cam.position);
   SUN.position.copy(cam.position).add(SUN0);
@@ -2814,7 +2962,9 @@ pitch = 0.62;
 // low and a high view, and zooms only so far in and out
 CAMLIM.yaw = [-0.6, 0.6];
 CAMLIM.pitch = [0.5, 1.2];
-CAMLIM.dist = [12, 30];
+CAMLIM.dist = [12, 35];
+// the map for finding a way round things covers the level's own ground
+NAV.box = [X0, ZN, EX, ZS];
 
 // ---------- health and mana ----------
 // the camp's demons can hurt the brothers, but nothing yet happens at zero. Rama's astras draw on his mana, which comes back slowly
@@ -2835,12 +2985,16 @@ function goal() {
   const C = CAMPS;
   if (ARR.step === 'wait') return C[0].seen && !C[0].rescued ? 'Free the villagers.' : 'Follow the road to Vishwamitra’s hermitage.';
   if (!ARR.talked) return '';
-  if (!ORDER.done) return 'Speak to the men by the wood store.';
-  if (!ORDER.pick) return 'Free the masons in the east, or the brahmins in the south.';
-  const c = C[ORDER.pick === 'east' ? 1 : 2];
-  if (!c.prisoners.every((p) => p.free)) return ORDER.pick === 'east' ? 'Free the stone masons, east past the river.' : 'Free the brahmins, south over the crossing.';
-  const lit = LAMPS.filter((l) => l.lit).length;
-  return lit < LAMPS.length ? `Build the lamps and light them with the Agneyastra. ${lit} of ${LAMPS.length}` : '';
+  // one thing at a time: first the lamps are to be built, and only when all stand are they to be lit. The astra's name and
+  // the count are picked out in gold, so they do not run into the rest of the line
+  const n = LAMPS.length,
+    built = LAMPS.filter((l) => l.built).length,
+    lit = LAMPS.filter((l) => l.lit).length,
+    gold = (t) => `<em style="font-style:normal;color:#ffd08a">${t}</em>`;
+  if (built < n) return `Build the lamps. ${gold(built + ' of ' + n)}`;
+  // every lamp stands, dark: the night is his to begin when he is ready
+  if (NIGHT.on) return WAVE.msg;
+  return !LAMPS.every((l) => l.ready) ? '' : 'Call the night from any of the four symbols.';
 }
 
 // ---------- the party: a card for each brother, to switch between them and to show how they are ----------
@@ -3006,8 +3160,10 @@ const ASTRA = { have: [0], armed: 0, last: 0, slots: [] },
 }
 // Rama's kind of arrow: the global while he is the one being played, otherwise kept in his saved state
 function setRamaKind(k) {
+  // (both, always: his saved state is what is loaded back whenever the heroes are switched or set up, and a kind chosen
+  // before that, as on a dev start, was otherwise lost while the icon went on showing it)
+  if (RAMA.s) RAMA.s.kind = k;
   if (SEL === RAMA) kind = k;
-  else RAMA.s.kind = k;
 }
 // choose a kind. why: 'spent' when an astra has put itself away. Returns false if it could not be chosen
 function armAstra(k, why) {
@@ -3097,7 +3253,20 @@ const GIFT = { T: 2.6, from: V3(), hand: V3() },
   GIFT.beam = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 10, 24, 1, true), m());
   GIFT.ring = new THREE.Mesh(new THREE.RingGeometry(0.88, 1, 64), m());
   GIFT.ring.rotation.x = -Math.PI / 2;
-  GIFT.all = [GIFT.beam, GIFT.ring];
+  // the column's dressing: three thin hoops of light that climb it one after another, narrowing as they rise
+  GIFT.hoops = [0, 1, 2].map(() => {
+    const h = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 48), m());
+    h.rotation.x = -Math.PI / 2;
+    return h;
+  });
+  // and the fire itself: four small flames, each a bright heart in a halo, the same as float over Rama afterwards
+  GIFT.orbs = [0, 1, 2, 3].map(() => {
+    const o = { g: glow(0xffffff, 1), c: glow(0xfff2c0, 1) };
+    o.g.visible = o.c.visible = false;
+    scene.add(o.g, o.c);
+    return o;
+  });
+  GIFT.all = [GIFT.beam, GIFT.ring, ...GIFT.hoops];
   GIFT.all.forEach((o) => {
     o.visible = false;
     o.frustumCulled = false;
@@ -3127,14 +3296,22 @@ function astraFx(dt) {
   // the tongues of flame: each takes 0.9 s to cross from his palm to Rama's chest, rising in an arc on the way and swinging
   // out to one side or the other (both by an amount that suits how far apart the two are)
   for (let j = 0; j < 4; j++) {
-    const u = (t - j * 0.22) / 0.9;
+    const u = (t - j * 0.22) / 0.9,
+      orb = GIFT.orbs[j];
+    orb.g.visible = orb.c.visible = u >= 0 && u <= 1;
     if (u < 0 || u > 1) continue;
     const e = u * u * (3 - 2 * u),
       side = (j % 2 ? 1 : -1) * Math.sin(Math.PI * u) * Math.min(0.9, far * 0.3);
     if (u < dt / 0.9 + 1e-3) flash(F, col, 10);
     tmpA.set(F.x + dx * e - (dz / far) * side, F.y + (P.y + ch - F.y) * e + Math.sin(Math.PI * u) * Math.min(2.2, far * 0.45), F.z + dz * e + (dx / far) * side);
-    puff(tmpA, col, 5, 0.5, 0.55, -0.6, 0.25);
-    puff(tmpA, 0xfff0c0, 1, 0.2, 0.3, 0, 0.1);
+    // the flame itself, flickering as it flies (swelling as it leaves the palm, and again as it reaches him), and its trail
+    const fl = (0.75 + 0.5 * Math.sin(Math.PI * u)) * (1 + 0.14 * Math.sin(T * 19 + j * 2.1));
+    orb.g.position.copy(tmpA);
+    orb.c.position.copy(tmpA);
+    orb.g.material.color.set(col);
+    orb.g.scale.setScalar(0.85 * fl);
+    orb.c.scale.setScalar(0.32 * fl);
+    puff(tmpA, col, 3, 0.5, 0.45, -0.6, 0.25);
     // as each arrives it flares at his chest
     if (u + dt / 0.9 > 1) {
       flash(tmpA.set(P.x, P.y + ch, P.z), col, 8);
@@ -3150,8 +3327,23 @@ function astraFx(dt) {
   GIFT.beam.position.set(P.x, P.y + 5, P.z);
   GIFT.beam.scale.set(0.75, 1, 0.75);
   GIFT.beam.material.opacity = 0.25 * k;
+  GIFT.hoops.forEach((h, i) => {
+    const u = (t * 0.8 + i / 3) % 1;
+    h.position.set(P.x, P.y + 0.2 + u * 5.2, P.z);
+    h.scale.setScalar(0.95 - 0.3 * u);
+    h.material.opacity = 0.75 * k * Math.sin(Math.PI * u);
+  });
+  // and sparks winding up round it, two threads on opposite sides
+  if (k > 0.2)
+    for (let i = 0; i < 2; i++) {
+      const a = t * 7 + i * Math.PI,
+        u = (t * 0.9 + i * 0.5) % 1;
+      puff(tmpA.set(P.x + Math.cos(a) * 0.8, P.y + 0.3 + u * 4.6, P.z + Math.sin(a) * 0.8), i ? 0xfff0c0 : col, 1, 0.15, 0.28, -0.4, 0.12);
+    }
   if (ASTRA.fx <= 0) {
     GIFT.all.forEach((o) => (o.visible = false));
+    GIFT.orbs.forEach((o) => (o.g.visible = o.c.visible = false));
+    // (it is his now, but not put on the bow for him: he chooses it himself)
     puff(tmpA.set(P.x, P.y + ch, P.z), col, 30, 2.6, 0.7, 1, 0.3);
   }
 }
@@ -3212,7 +3404,7 @@ const TEJAS_ICON =
   WOOD_ICON =
   '<svg viewBox="0 0 20 20"><g fill="none" stroke="#f0dcb4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5 L 13 4.2 a2.3 2.3 0 0 1 2 4.2 L 5.5 12.7"/><circle cx="4.5" cy="10.6" r="2.3"/><path d="M6 15.8 L 15.5 11.5 a2.3 2.3 0 0 1 2 4.2" opacity=".7"/></g></svg>';
 const PED = 0.3,
-  LAMP_COST = 10,
+  LAMP_COST = 2,
   // how long a lamp takes to put itself together once paid for, and how long each piece is in the air
   LAMP_T = 0.8,
   PIECE_T = 0.22,
@@ -3327,13 +3519,13 @@ const LAMPS = [
   // built: paid for and going up. ready: all its pieces are in, and it can be lit
   return { x, y: y + PED, z, G, parts, ghost, flame, light, built: false, ready: false, t: 0, lit: false, glow: 0, seed: Math.random() * 9 };
 });
-// an Agneyastra landing: whatever it did before, and any cold lamp within three paces of where it lands is lit
-{
-  const hit = KINDS[1].hit;
-  KINDS[1].hit = (p, d) => {
-    hit(p, d);
-    for (const l of LAMPS) if (Math.hypot(p.x - l.x, p.z - l.z) < 4.5) lampLight(l);
-  };
+// (a lamp is lit only by the arrow that ends the day: no arrow aimed at one lights it, and the aim does not snap to one)
+function lampOut(l) {
+  l.lit = false;
+  l.hits = 0;
+  l.glow = 0;
+  l.flame.visible = false;
+  if (l.light) l.light.intensity = 0;
 }
 function lampLight(l) {
   if (l.lit || !l.ready) return;
@@ -3349,33 +3541,38 @@ function lampLight(l) {
 // ring round it, and beside it what would be built and what it costs. Building is a hold, not a tap: while Space (or the mouse,
 // on the sign) is held the ring fills round the key, and when it closes the wood is spent and the lamp puts itself together.
 // Let go early and the ring runs back; nothing is spent. With too little wood the cost shows red and the sign shakes
-const STOCK = { n: 40, pend: 0, el: null, sign: null, ring: null, at: null, hold: false, k: 0 },
-  RING_LEN = 2 * Math.PI * 20,
-  HOLD_T = 0.35;
+const COST_HTML = `<span style="width:14px;height:14px;display:block">${TEJAS_ICON}</span><i style="font-style:normal;line-height:1;font-variant-numeric:lining-nums">${LAMP_COST}</i>`,
+  MOON_ICON =
+    '<svg width="22" height="22" viewBox="0 0 22 22" style="display:block"><path fill="#f0dcb4" d="M14.6 2.6 A 8.6 8.6 0 1 0 19.4 14.2 A 7 7 0 0 1 14.6 2.6 Z"/></svg>';
+const STOCK = { n: 10, pend: 0, el: null, sign: null, ring: null, at: null, hold: false, k: 0 },
+  RING_LEN = 2 * Math.PI * 23.5,
+  HOLD_T = 0.8;
 {
   const el = document.createElement('div');
   // (the count of Tejas keeps the bottom right corner)
   el.style.cssText =
     'position:fixed;right:16px;bottom:16px;z-index:14;display:flex;align-items:center;gap:9px;padding:7px 18px 7px 9px;border-radius:999px;' +
-    'background:rgba(22,22,24,.88);color:#fff3df;font:700 21px var(--f)';
-  el.innerHTML = `<span style="width:28px;height:28px;display:block">${TEJAS_ICON}</span><b style="font-weight:400;line-height:1;font-variant-numeric:lining-nums;position:relative;top:-1px">0</b>`;
+    'background:rgba(22,22,24,.88);color:#fff3df;font:700 19px var(--f)';
+  el.innerHTML = `<span style="width:28px;height:28px;display:block">${TEJAS_ICON}</span><b style="font-weight:700;line-height:1;font-variant-numeric:lining-nums;position:relative;top:-1px">0</b>`;
   document.body.append(el);
   STOCK.el = el;
   const sg = document.createElement('div');
+  // (one dark disc, like the arrow's across the screen, with the cost in it; the ring that fills runs round its edge.
+  // Nothing else: the key is named on the instruction line, and the ghost of the lamp shows what will be built)
   sg.style.cssText =
-    'position:fixed;left:0;top:0;z-index:13;display:none;align-items:center;gap:9px;padding:5px 14px 5px 5px;border-radius:30px;cursor:pointer;white-space:nowrap;user-select:none;' +
-    'color:#fff3df;background:rgba(22,22,24,.8);font:600 17px var(--f)';
+    'position:fixed;left:0;top:0;z-index:13;display:none;align-items:center;justify-content:center;width:52px;height:52px;cursor:pointer;white-space:nowrap;user-select:none;' +
+    'color:#fff3df;font:700 14px var(--f)';
   sg.innerHTML =
-    // the key: a dark disc, a faint ring round it, and over that the ring that fills, starting from the top
-    `<svg width="48" height="48" viewBox="0 0 48 48" style="flex:none;display:block"><circle cx="24" cy="24" r="20" fill="#1a1a1c" stroke="rgba(255,210,150,.25)" stroke-width="3"/>` +
-    `<circle cx="24" cy="24" r="20" fill="none" stroke="#ffd08a" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="${RING_LEN}" stroke-dashoffset="${RING_LEN}" transform="rotate(-90 24 24)"/>` +
-    `<text x="24" y="27" text-anchor="middle" font-family="Cormorant Garamond,Georgia,serif" font-weight="700" font-size="9.5" letter-spacing="1" fill="#ffd08a">SPACE</text></svg>` +
-    `<span style="display:flex;align-items:center;gap:5px"><span style="width:16px;height:16px;display:block">${TEJAS_ICON}</span><i style="font-style:normal">${LAMP_COST}</i></span>`;
+    `<svg width="52" height="52" viewBox="0 0 52 52" style="position:absolute;left:0;top:0"><circle cx="26" cy="26" r="26" fill="rgba(22,22,24,.88)"/>` +
+    // (a faint ring marks where the one that fills will run)
+    `<circle cx="26" cy="26" r="23.5" fill="none" stroke="rgba(255,208,138,.2)" stroke-width="5"/>` +
+    `<circle cx="26" cy="26" r="23.5" fill="none" stroke="#ffd08a" stroke-width="5" stroke-linecap="round" stroke-dasharray="${RING_LEN}" stroke-dashoffset="${RING_LEN}" transform="rotate(-90 26 26)"/></svg>` +
+    `<span style="position:relative;display:flex;align-items:center;gap:4px">${COST_HTML}</span>`;
   document.body.append(sg);
   STOCK.sign = sg;
-  STOCK.ring = sg.querySelectorAll('circle')[1];
+  STOCK.ring = sg.querySelectorAll('circle')[2];
   const hold = (on) => {
-    if (on && STOCK.at && STOCK.n < LAMP_COST) {
+    if (on && STOCK.at && !STOCK.at.rite && STOCK.n < LAMP_COST) {
       for (const o of [sg, el]) o.animate([{ translate: '0' }, { translate: '-4px' }, { translate: '4px' }, { translate: '0' }], { duration: 220 });
       return;
     }
@@ -3391,15 +3588,476 @@ const STOCK = { n: 40, pend: 0, el: null, sign: null, ring: null, at: null, hold
   addEventListener(
     'keydown',
     (e) => {
-      if (e.code !== 'Space' || !STOCK.at || talking()) return;
+      if ((e.code !== 'Space' && e.code !== 'KeyF') || !STOCK.at || talking()) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       if (!e.repeat) hold(true);
     },
     true,
   );
-  addEventListener('keyup', (e) => e.code === 'Space' && hold(false));
+  addEventListener('keyup', (e) => (e.code === 'Space' || e.code === 'KeyF') && hold(false));
+  // by a lamp's place or on one of the four signs the mouse's fire is the same hold: the click is taken here, before it can
+  // loose an arrow
+  addEventListener(
+    'pointerdown',
+    (e) => {
+      if (e.button !== 0 || e.target !== cv || !STOCK.at || talking()) return;
+      e.stopImmediatePropagation();
+      hold(true);
+    },
+    true,
+  );
   woodGain(0);
+}
+// ---------- the night begins ----------
+// The night is the player's to start, from wherever he is. When all the lamps stand (dark: they do not light themselves) he
+// holds N, and a ring fills over Rama's head as it does to build. Rama looses a fire arrow straight up. High over him it
+// bursts, and from the burst a spark falls to every lamp and lights it, one after another, and one to the altar, where the
+// fire leaps and Vishwamitra's eyes close. Nobody says anything. As it bursts the day goes, quickly: the sky down to a deep
+// blue with an ember of red left at the horizon, the sun's disc paling to a moon, the light on the ground thin and blue
+const NIGHT = { on: false, go: false, k: 0, from: null, key: false, t: -1, arrow: null, top: V3(), sparks: [] },
+  RITE = { x: 0, y: 0, z: 0, rite: true, sign: '' },
+  SIGNS_AT = [],
+  RITE_R = 9,
+  NIGHT_T = 5,
+  // (how long Space is held on the crescent: the length of his draw)
+  RITE_T = 1.7,
+  RISE_T = 0.65,
+  RISE_H = 24;
+function nightReady() {
+  return !NIGHT.on && (!LOCK || NIGHT.lock) && !talking() && ARR.talked && LAMPS.every((l) => l.ready);
+}
+// the four signs: four plastered rounds at the four quarters of the altar, made as its floor is: the same plastered earth,
+// the same ochre edge and rice-flour line. Each has a sign drawn on it in rice flour: the conch to the south, the trident to
+// the north, the lotus to the west and the mace to the east. Standing on any one of them, Rama may begin the night
+{
+  const INK = 'rgba(244,228,198,.72)',
+    WASH = 'rgba(244,228,198,.2)';
+  const SIGNS = {
+    shankha(g) {
+      g.beginPath();
+      g.moveTo(-8, -64);
+      g.bezierCurveTo(50, -62, 64, 0, 8, 72);
+      g.bezierCurveTo(-18, 32, -54, 12, -48, -22);
+      g.bezierCurveTo(-44, -48, -28, -62, -8, -64);
+      g.fill();
+      g.stroke();
+      // (the whorls at its crown, and the lip of its mouth)
+      g.beginPath();
+      g.moveTo(-34, -48);
+      g.quadraticCurveTo(-4, -34, 28, -52);
+      g.moveTo(-46, -30);
+      g.quadraticCurveTo(-4, -10, 42, -34);
+      g.moveTo(-47, -8);
+      g.quadraticCurveTo(-16, 8, 12, -4);
+      g.moveTo(12, -4);
+      g.quadraticCurveTo(30, 30, 8, 72);
+      g.stroke();
+    },
+    trishul(g) {
+      g.lineWidth = 7;
+      g.beginPath();
+      g.moveTo(0, 74);
+      g.lineTo(0, -50);
+      g.moveTo(0, -12);
+      g.bezierCurveTo(-36, -10, -40, -34, -30, -62);
+      g.moveTo(0, -12);
+      g.bezierCurveTo(36, -10, 40, -34, 30, -62);
+      g.moveTo(-13, 2);
+      g.lineTo(13, 2);
+      g.stroke();
+      // (the three points)
+      g.fillStyle = INK;
+      for (const [x, y, k] of [
+        [0, -50, 1],
+        [-30, -62, 0.7],
+        [30, -62, 0.7],
+      ]) {
+        g.beginPath();
+        g.moveTo(x, y - 26 * k);
+        g.quadraticCurveTo(x + 13 * k, y - 4 * k, x, y + 4 * k);
+        g.quadraticCurveTo(x - 13 * k, y - 4 * k, x, y - 26 * k);
+        g.fill();
+      }
+    },
+    padma(g) {
+      // (the outer petals first, so that the nearer ones lie over them)
+      for (const [a, L, w] of [
+        [-1.3, 62, 17],
+        [1.3, 62, 17],
+        [-0.68, 72, 19],
+        [0.68, 72, 19],
+        [0, 82, 21],
+      ]) {
+        g.save();
+        g.translate(0, 36);
+        g.rotate(a);
+        g.beginPath();
+        g.moveTo(0, 0);
+        g.bezierCurveTo(w * 1.5, -L * 0.3, w, -L * 0.75, 0, -L);
+        g.bezierCurveTo(-w, -L * 0.75, -w * 1.5, -L * 0.3, 0, 0);
+        g.fill();
+        g.stroke();
+        g.restore();
+      }
+      g.beginPath();
+      g.moveTo(-40, 52);
+      g.quadraticCurveTo(0, 66, 40, 52);
+      g.stroke();
+    },
+    gada(g) {
+      g.rotate(0.5);
+      g.lineWidth = 7;
+      g.beginPath();
+      g.moveTo(0, 74);
+      g.lineTo(0, -8);
+      g.moveTo(-11, -8);
+      g.lineTo(11, -8);
+      g.stroke();
+      g.lineWidth = 5;
+      g.beginPath();
+      g.ellipse(0, -38, 25, 29, 0, 0, 6.2832);
+      g.fill();
+      g.stroke();
+      // (the ribs of its head, and the knobs at either end)
+      g.lineWidth = 3;
+      g.beginPath();
+      g.ellipse(0, -38, 10, 29, 0, 0, 6.2832);
+      g.moveTo(0, -67);
+      g.lineTo(0, -9);
+      g.stroke();
+      g.fillStyle = INK;
+      g.beginPath();
+      g.arc(0, -72, 6, 0, 6.2832);
+      g.arc(0, 76, 6, 0, 6.2832);
+      g.fill();
+    },
+  };
+  for (const [name, x, z] of [
+    ['shankha', 0, RITE_R],
+    ['trishul', 0, -RITE_R],
+    ['padma', -RITE_R, 0],
+    ['gada', RITE_R, 0],
+  ]) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const g = c.getContext('2d');
+    g.translate(128, 128);
+    g.fillStyle = 'rgba(172,126,84,.6)';
+    g.beginPath();
+    g.arc(0, 0, 118, 0, 6.2832);
+    g.fill();
+    g.strokeStyle = 'rgba(140,72,40,.8)';
+    g.lineWidth = 8;
+    g.stroke();
+    g.strokeStyle = 'rgba(244,228,198,.58)';
+    g.lineWidth = 3.5;
+    g.beginPath();
+    g.arc(0, 0, 100, 0, 6.2832);
+    g.stroke();
+    g.strokeStyle = INK;
+    g.fillStyle = WASH;
+    g.lineWidth = 4;
+    g.lineCap = g.lineJoin = 'round';
+    g.scale(0.92, 0.92);
+    SIGNS[name](g);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 2.7), toon(0xffffff, { map: tex, transparent: true, depthWrite: false, rim: 0 }));
+    p.rotation.x = -Math.PI / 2;
+    p.position.set(x, groundY(x, z) + 0.045, z);
+    p.receiveShadow = true;
+    scene.add(p);
+    SIGNS_AT.push({ name, x, z, y: groundY(x, z) });
+  }
+}
+function nightStart() {
+  if (NIGHT.on) return;
+  NIGHT.on = true;
+  NIGHT.t = 0;
+  NIGHT.lock = LOCK = true;
+  // (the bow is already up and drawn, from the holding of N; on a dev start it is not, and he is given it so)
+  if (!SKYSHOT) SKYSHOT = { h: RAMA, draw: 1, nock: true };
+}
+// Rama's draw, the arrow going up, its burst, and the sparks coming down to the lamps and the altar
+function nightArrow(dt) {
+  if (NIGHT.t < 0) {
+    // Before the night: holding Space on the crescent is his draw. While it is held he stands, turns to the camera and raises the bow straight up
+    // (see SKYSHOT, with the heroes), and the string comes back as the ring fills. Let go early and the ring runs back, the
+    // string eases forward, and the bow comes down
+    const pull = STOCK.at === RITE && STOCK.hold,
+      d = Math.max(0, Math.min(1, (STOCK.k - 0.12) / 0.88));
+    if (pull) {
+      if (!SKYSHOT) SKYSHOT = { h: RAMA, draw: 0, nock: true };
+      NIGHT.lock = LOCK = true;
+      SKYSHOT.draw = d;
+    } else if (SKYSHOT) {
+      SKYSHOT.draw = d;
+      if (STOCK.k <= 0) {
+        SKYSHOT = null;
+        if (NIGHT.lock) LOCK = NIGHT.lock = false;
+      }
+    }
+    return;
+  }
+  NIGHT.t += dt;
+  const t = NIGHT.t,
+    SHOT_T = 0;
+  if (SKYSHOT) {
+    // the ring has closed: he looses
+    if (SKYSHOT.nock) {
+      SKYSHOT.nock = false;
+      RAMA.hL.y > 0 ? NIGHT.top.copy(RAMA.hL) : NIGHT.top.copy(RAMA.group.position).setY(RAMA.group.position.y + 2.3);
+      NIGHT.arrow = glow(0xffa040, 1.6);
+      NIGHT.arrow.position.copy(NIGHT.top);
+      scene.add(NIGHT.arrow);
+      flash(NIGHT.top, 0xffa040, 8);
+    } else SKYSHOT.draw = Math.max(0, SKYSHOT.draw - dt * 14);
+    // (the bow stays up a moment after the arrow has gone, then he has his hands back)
+    if (t > 0.6) {
+      SKYSHOT = null;
+      if (NIGHT.lock) LOCK = NIGHT.lock = false;
+    }
+  }
+  const A = NIGHT.arrow;
+  if (A) {
+    const k = Math.min(1, (t - SHOT_T) / RISE_T);
+    A.position.y = NIGHT.top.y + RISE_H * (1 - (1 - k) * (1 - k));
+    puff(A.position, 0xffb050, 2, 0.5, 0.5, -0.5, 0.3);
+    if (k >= 1) {
+      // the burst: the day begins to go, and a spark sets out for each lamp, the nearer ones first, and one for the altar
+      scene.remove(A);
+      NIGHT.arrow = null;
+      NIGHT.top.copy(A.position);
+      NIGHT.go = true;
+      flash(NIGHT.top, 0xffc070, 40);
+      puff(NIGHT.top, 0xffb050, 60, 6, 0.9, -1, 0.6);
+      const to = [...LAMPS].sort((a, b) => Math.hypot(a.x - NIGHT.top.x, a.z - NIGHT.top.z) - Math.hypot(b.x - NIGHT.top.x, b.z - NIGHT.top.z));
+      [...to, null].forEach((l, i) => {
+        const g = glow(0xffa040, 0.9);
+        g.position.copy(NIGHT.top);
+        scene.add(g);
+        NIGHT.sparks.push({ g, l, t: -i * 0.07, to: l ? V3(l.x, l.y + 1.5, l.z) : V3(0, 1.2, 0) });
+      });
+    }
+  }
+  for (const q of [...NIGHT.sparks]) {
+    q.t += dt;
+    if (q.t < 0) continue;
+    const k = Math.min(1, q.t / 0.55),
+      e = k * k;
+    q.g.position.lerpVectors(NIGHT.top, q.to, e);
+    // (it swings out a little on its way down)
+    q.g.position.y += Math.sin(k * Math.PI) * 2.5;
+    if (Math.random() < dt * 40) puff(q.g.position, 0xffb050, 1, 0.4, 0.4, -0.5, 0.25);
+    if (k >= 1) {
+      scene.remove(q.g);
+      NIGHT.sparks.splice(NIGHT.sparks.indexOf(q), 1);
+      if (q.l) lampLight(q.l);
+      else {
+        // at the altar the fire leaps, and the sage's eyes close: the rite has begun
+        sageEyes(true);
+        flash(tmpA.set(0, 1.4, 0), 0xffa040, 22);
+        puff(tmpA, 0xffb050, 40, 3, 0.7, -2, 0.35);
+      }
+    }
+  }
+}
+function nightUpdate(dt) {
+  nightArrow(dt);
+  waveUpdate(dt);
+  // (the day goes at the arrow's burst, and comes back the same way at dawn)
+  const dir = NIGHT.dawn ? -1 : NIGHT.go ? 1 : 0;
+  if (!dir || (dir > 0 ? NIGHT.k >= 1 : NIGHT.k <= 0)) return;
+  const U = SKY.material.uniforms,
+    C = (h) => new THREE.Color(h);
+  // (what the day looked like, kept the moment it begins to go, and what the night looks like)
+  if (!NIGHT.from)
+    NIGHT.from = {
+      a: U.uA.value.clone(),
+      b: U.uB.value.clone(),
+      c: U.uC.value.clone(),
+      g: U.uGlow.value.clone(),
+      sun: SUN.material.color.clone(),
+      fog: scene.fog.color.clone(),
+      hs: HEMI.color.clone(),
+      hg: HEMI.groundColor.clone(),
+      hi: HEMI.intensity,
+      kc: key.color.clone(),
+      ki: key.intensity,
+      fi: fill.intensity,
+      bt: bloom.threshold,
+      bs: bloom.strength,
+    };
+  NIGHT.k = Math.max(0, Math.min(1, NIGHT.k + (dir * dt) / NIGHT_T));
+  const F = NIGHT.from,
+    e = NIGHT.k * NIGHT.k * (3 - 2 * NIGHT.k),
+    mix = (a, b) => a + (b - a) * e;
+  U.uA.value.lerpVectors(F.a, tmpA.set(0.42, 0.24, 0.34), e);
+  U.uB.value.lerpVectors(F.b, tmpA.set(0.1, 0.1, 0.24), e);
+  U.uC.value.lerpVectors(F.c, tmpA.set(0.02, 0.03, 0.09), e);
+  U.uGlow.value.lerpVectors(F.g, tmpA.set(0.5, 0.55, 0.75), e);
+  SUN.material.color.lerpColors(F.sun, C(0xcfd8ff), e);
+  scene.fog.color.lerpColors(F.fog, C(0x141a34), e);
+  HEMI.color.lerpColors(F.hs, C(0x7f8fd0), e);
+  HEMI.groundColor.lerpColors(F.hg, C(0x1a1a2c), e);
+  HEMI.intensity = mix(F.hi, 0.85);
+  key.color.lerpColors(F.kc, C(0x9fb4ff), e);
+  key.intensity = mix(F.ki, 1.0);
+  fill.intensity = mix(F.fi, 0.3);
+  bloom.threshold = mix(F.bt, 0.85);
+  bloom.strength = mix(F.bs, 0.5);
+}
+// ---------- the waves ----------
+// The night is five waves. Each comes out of the forest from one side or more (a side is chosen afresh every night), and a few
+// seconds before it does the instruction line says from where and a dull glow shows there among the trees. Between waves
+// there is a short quiet, in which the fire recovers a little.
+//   rakshasas and brutes make for the fire and strike it, but turn on a brother who comes near them
+//   pishachas make for the nearest burning lamp and claw it out (four blows); with none left burning, for the fire
+//   defilers fly straight to the fire and pour their filth on it
+// A burning lamp slows every demon near it. One that has been put out can be lit again with a fire arrow.
+// The fire is what is lost: every blow and every pouring takes from it, and it burns lower as it is hurt. If it goes out the
+// rite is broken and the level is over. When the last wave is dead the day comes back, and the day's gathering is counted
+const FIRE = { hp: 100, max: 100, s: 1 },
+  WAVE = { i: -1, st: 'off', t: 0, msg: '', a0: 0, q: [], live: [] },
+  WAVE_R = 30,
+  // each wave: [kind, how many, side (in quarter turns from the night's first side), seconds after the wave begins]
+  WAVES = [
+    [['grunt', 2, 0, 0], ['grunt', 2, 0, 4], ['grunt', 2, 0, 8]],
+    [['pish', 4, 1, 0], ['pish', 4, 3, 7]],
+    [['grunt', 3, 0, 0], ['defiler', 2, 2, 0], ['grunt', 3, 2, 3], ['defiler', 1, 0, 5]],
+    [['grunt', 3, 1, 0], ['brute', 1, 1, 2], ['grunt', 3, 1, 6]],
+    [['brute', 1, 0, 0], ['pish', 4, 2, 0], ['defiler', 2, 1, 4], ['pish', 4, 0, 8], ['brute', 1, 3, 10], ['defiler', 2, 3, 13]],
+  ],
+  sideOf = (q) => WAVE.a0 + (q * Math.PI) / 2,
+  sideName = (a) => (Math.abs(Math.cos(a)) > Math.abs(Math.sin(a)) ? (Math.cos(a) > 0 ? 'east' : 'west') : Math.sin(a) > 0 ? 'south' : 'north');
+SPAWN_MAX = 70;
+function waveDemon(kind, a) {
+  const b = a + R(-0.16, 0.16),
+    r = WAVE_R + R(-2, 2),
+    d = spawn(0, kind, V3(Math.cos(b) * r, 0, Math.sin(b) * r));
+  if (!d) return;
+  d.wave = true;
+  d.g.rotation.y = Math.atan2(-d.g.position.x, -d.g.position.z);
+  // the moment a blow of his lands: on the brother he is fighting, on the lamp he is at, or on the fire
+  d.onHit = () => {
+    const P = d.g.position,
+      [lo, hi] = d.def.dmg;
+    if (d.foe) {
+      const hp = d.foe.group.position;
+      if (apart(hp, P) > d.rng + 0.8) return;
+      d.foe.hp = Math.max(0, d.foe.hp - Math.round(lo + Math.random() * (hi - lo)));
+      puff(tmpA.set(hp.x, hp.y + 1.2, hp.z), 0xff6a50, 12, 2.6, 0.3, 2);
+    } else if (d.lamp) {
+      const l = d.lamp;
+      if (!l.lit || apart(l, P) > d.rng + 0.8) return;
+      puff(tmpA.set(l.x, l.y + 1.5, l.z), 0xffb050, 8, 2, 0.3, 1);
+      if ((l.hits = (l.hits || 0) + 1) >= 4) {
+        lampOut(l);
+        puff(tmpA, 0x77726c, 22, 1.4, 1.2, -0.8, 0.3);
+      }
+    } else if (Math.hypot(P.x, P.z) < d.rng + 1) fireHurt(d.br ? 6 : d.pi ? 1 : 1.5);
+  };
+  WAVE.live.push(d);
+}
+function fireHurt(n) {
+  if (FIRE.hp <= 0 || NIGHT.dawn) return;
+  FIRE.hp = Math.max(0, FIRE.hp - n);
+  if (n >= 1) puff(tmpA.set(R(-0.4, 0.4), 1.2, R(-0.4, 0.4)), 0x5a6a3a, 8, 2, 0.5, 1, 0.3);
+  if (FIRE.hp > 0) return;
+  // the fire is out: the rite is broken
+  NIGHT.lost = LOCK = true;
+  WAVE.st = 'off';
+  WAVE.msg = '';
+  HEARTH.flames.forEach((m) => (m.visible = false));
+  puff(tmpA.set(0, 1, 0), 0x77726c, 60, 2, 1.6, -1, 0.5);
+  const o = document.createElement('div');
+  o.style.cssText =
+    'position:fixed;inset:0;z-index:55;display:grid;place-items:center;background:rgba(12,12,14,0);transition:background 1.2s;color:#f1e4cc;text-align:center;font:500 30px/1.4 Georgia,serif';
+  o.innerHTML =
+    '<div>The fire is out.<br><span style="font-size:20px;opacity:.75">The rite is broken.</span><br><a href="' +
+    location.href +
+    '" style="display:inline-block;margin-top:22px;padding:10px 22px;border-radius:999px;background:rgba(22,22,24,.88);color:#ffd08a;text-decoration:none;font:600 18px var(--f)">Try again</a></div>';
+  document.body.append(o);
+  requestAnimationFrame(() => (o.style.background = 'rgba(12,12,14,.72)'));
+}
+function waveUpdate(dt) {
+  // the fire burns as high as it is whole
+  FIRE.s += (0.3 + 0.7 * (FIRE.hp / FIRE.max) - FIRE.s) * Math.min(1, dt * 3);
+  fireL.intensity = 9 * (0.35 + 0.65 * (FIRE.hp / FIRE.max));
+  if (NIGHT.lost || NIGHT.done) return;
+  const W = WAVE;
+  if (W.st === 'off') {
+    // (the first wave is given a little while after dark has come)
+    if (NIGHT.go && NIGHT.k >= 1 && !NIGHT.dawn) {
+      W.a0 = Math.random() * 6.283;
+      W.st = 'lull';
+      W.t = 4;
+    }
+    return;
+  }
+  W.t -= dt;
+  // each demon of the night is told, every frame, what he is after
+  W.live = W.live.filter((d) => grunts.includes(d) && !d.dead);
+  for (const d of W.live) {
+    if (d.hp === undefined) continue;
+    const P = d.g.position;
+    let foe = null,
+      lamp = null,
+      slow = false;
+    if (!d.pi && !d.df)
+      for (const h of HEROES) if (h.hp > 0 && apart(h.group.position, P) < (d.br ? 9 : 6.5) && (!foe || apart(h.group.position, P) < apart(foe.group.position, P))) foe = h;
+    for (const l of LAMPS)
+      if (l.lit) {
+        if (apart(l, P) < 5.5) slow = true;
+        if (d.pi && (!lamp || apart(l, P) < apart(lamp, P))) lamp = l;
+      }
+    d.slowK = slow && !d.df ? 0.7 : 1;
+    d.foe = foe;
+    d.lamp = foe ? null : lamp;
+    d.to = foe ? foe.group.position : lamp;
+    d.rng = foe ? (d.br ? 2.3 : 1.5) : lamp ? 1.3 : d.df ? d.def.reach : d.br ? 3.2 : d.pi ? 2.2 : 2.6;
+    // (a defiler has no blow: while its pot is tipped over the fire, the fire is fouled)
+    if (d.df && d.pour > 0.5 && Math.hypot(P.x, P.z) < 4.5) fireHurt(2.5 * dt);
+  }
+  if (W.st === 'lull') {
+    FIRE.hp = Math.min(FIRE.max, FIRE.hp + dt * 1.2);
+    if (W.t <= 0) {
+      W.i++;
+      W.q = WAVES[W.i].map((g) => [...g]);
+      W.st = 'fight';
+      W.t = 0;
+    }
+  } else if (W.st === 'fight') {
+    // (W.t runs down from nothing: -W.t is how long the wave has been going)
+    for (const g of [...W.q])
+      if (-W.t >= g[3]) {
+        W.q.splice(W.q.indexOf(g), 1);
+        for (let i = 0; i < g[1]; i++) waveDemon(g[0], sideOf(g[2]));
+      }
+    if (!W.q.length && !W.live.length) {
+      if (W.i < WAVES.length - 1) {
+        W.msg = '';
+        W.st = 'lull';
+        W.t = 6;
+      } else {
+        // the last of them is dead: dawn. The day comes back, the sage opens his eyes, and the gathering is counted
+        W.st = 'off';
+        W.msg = 'Dawn. The fire still burns.';
+        NIGHT.dawn = true;
+        NIGHT.done = true;
+        sageEyes(false);
+        coinsHome();
+        // (and with the day the lamps go out, a wisp of smoke from each)
+        for (const l of LAMPS)
+          if (l.lit) {
+            lampOut(l);
+            puff(tmpA.set(l.x, l.y + 1.5, l.z), 0x77726c, 12, 1, 1, -0.8, 0.3);
+          }
+        setTimeout(() => (W.msg = ''), 7000);
+      }
+    }
+  }
 }
 // The end of a night: what was gathered that day is counted into Tejas all at once
 function nightTally() {
@@ -3417,11 +4075,32 @@ function woodGain(n) {
 function buildUpdate(dt) {
   const P = RAMA.group.position;
   STOCK.at = (SEL === RAMA && !LOCK && !talking() && LAMPS.find((l) => !l.built && Math.hypot(P.x - l.x, P.z - l.z) < 2.4)) || null;
+  // When every lamp stands, Rama standing on any of the four signs gets the same sign over his head, and Space held there
+  // is his draw. Which sign he began the night from is kept in RITE.sign
+  const on = !STOCK.at && SEL === RAMA && nightReady() && SIGNS_AT.find((q) => Math.hypot(P.x - q.x, P.z - q.z) < 1.5);
+  if (on) {
+    RITE.x = on.x;
+    RITE.z = on.z;
+    RITE.y = on.y + 0.75;
+    RITE.sign = on.name;
+    STOCK.at = RITE;
+  }
+  nightUpdate(dt);
   const l = STOCK.at,
     sg = STOCK.sign;
+  // (what the sign shows: a lamp's cost, or the moon)
+  if (l && sg.rite !== !!l.rite) {
+    sg.rite = !!l.rite;
+    sg.lastChild.innerHTML = l.rite ? MOON_ICON : COST_HTML;
+  }
   if (!l) STOCK.hold = false;
-  STOCK.k = STOCK.hold ? Math.min(1, STOCK.k + dt / HOLD_T) : Math.max(0, STOCK.k - dt * 4);
-  if (l && STOCK.k >= 1) {
+  STOCK.k = STOCK.hold ? Math.min(1, STOCK.k + dt / (l && l.rite ? RITE_T : HOLD_T)) : Math.max(0, STOCK.k - dt * 4);
+  if (l && l.rite && STOCK.k >= 1) {
+    STOCK.hold = false;
+    STOCK.k = 0;
+    STOCK.at = null;
+    nightStart();
+  } else if (l && STOCK.k >= 1) {
     // the ring has closed: the wood is spent and the lamp begins to put itself together
     woodGain(-LAMP_COST);
     l.built = true;
@@ -3439,8 +4118,9 @@ function buildUpdate(dt) {
   if (!STOCK.at) return;
   tmpA.set(l.x, l.y + 2.0, l.z).project(cam);
   sg.style.transform = `translate(-50%,-100%) translate(${((tmpA.x + 1) / 2) * innerWidth}px,${((1 - tmpA.y) / 2) * innerHeight}px) scale(${1 + 0.06 * STOCK.k})`;
-  const poor = STOCK.n < LAMP_COST;
-  sg.querySelector('i').style.color = poor ? '#ff8a7a' : '#fff3df';
+  const poor = !l.rite && STOCK.n < LAMP_COST,
+    num = sg.querySelector('i');
+  if (num) num.style.color = poor ? '#ff8a7a' : '#fff3df';
   sg.style.opacity = poor ? 0.8 : 1;
 }
 // A lamp putting itself together: the foot comes down onto the platform, then the stem onto the foot, then the dish, then the
@@ -3466,6 +4146,7 @@ function assemble(l, dt) {
   }
   if (l.t >= LAMP_T) {
     l.ready = true;
+    // (it stands dark: Rama lights them all at once, with the arrow that ends the day)
     puff(tmpA.set(l.x, l.y + 1.5, l.z), 0xffe2a8, 14, 1.6, 0.6, -0.6, 0.35);
   }
 }
@@ -3526,7 +4207,7 @@ function tipsUpdate() {
       : k === 'build'
         ? STOCK.n < LAMP_COST
           ? 'A lamp needs more Tejas than you have.'
-          : 'Hold <kbd>Space</kbd> to construct the lamp.'
+          : 'Hold <kbd>Space</kbd> or the mouse to construct the lamp.'
         : k === 'agni'
           ? 'Press <kbd>2</kbd> to draw the Agneyastra, then click to loose it.'
           : '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to move. Click to shoot. Hold the right mouse button to turn the view. <kbd>Esc</kbd> for the menu.',
@@ -3575,7 +4256,8 @@ function heroBars(dt) {
   }
   O.forEach((o, i) => {
     // (each swells in and dies away rather than popping)
-    const want = !k || i >= n || !RAMA.group.visible ? 0 : i < can ? 1 : 0;
+    // (and only while he has the bow up: at rest there is nothing over his head)
+    const want = !k || i >= n || !RAMA.group.visible || SKYSHOT || !(RAMA.s && RAMA.s.wAim > 0.3) ? 0 : i < can ? 1 : 0;
     o.s += (want - o.s) * Math.min(1, dt * 8);
     o.g.visible = o.c.visible = o.s > 0.02;
     if (!o.g.visible) return;
@@ -3594,13 +4276,127 @@ function heroBars(dt) {
     if (o.s > 0.8 && Math.random() < dt * 5) puff(o.g.position, KINDS[k || 1].color, 1, 0.5, 0.2, -1.5, 0.12);
   });
 }
+// ---------- what the aim is on ----------
+// The pointer stays the ordinary hand. What the next arrow will go to is shown in the world instead, flat on the ground:
+//   a demon the aim has snapped to   a broken ring round its feet, red, turning slowly; bigger round a brute
+//   an unlit lamp it has snapped to  the same ring round the lamp's foot, in the fire's orange
+//   anywhere                         the soft glow at the aim point itself, always there
+// The ring closes in onto a new target from a little wider, so the eye catches the change. All of it is hidden during
+// scenes and talk, and while the pointer is off the world
+const MARK = { ring: new THREE.Group(), on: null, k: 0, a: 0 };
+{
+  const m = (color, opacity) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, fog: false, side: THREE.DoubleSide });
+  MARK.ringM = m(0xe04a38, 0);
+  // (four arcs with gaps between them)
+  for (let i = 0; i < 4; i++) {
+    const a = new THREE.Mesh(new THREE.RingGeometry(0.95, 1, 20, 1, i * (Math.PI / 2) + 0.2, Math.PI / 2 - 0.4), MARK.ringM);
+    a.rotation.x = -Math.PI / 2;
+    MARK.ring.add(a);
+  }
+  MARK.ring.renderOrder = 3;
+  MARK.ring.traverse((o) => (o.frustumCulled = false));
+  scene.add(MARK.ring);
+}
+function aimMarks(dt) {
+  const show = AIMED.on && !LOCK && !talking() && SEL.hp > 0,
+    d = show && AIMED.lock && !AIMED.lock.dead ? AIMED.lock : null,
+    lamp = show && !d ? AIMED.snap : null,
+    tgt = d || lamp || null,
+    ease = Math.min(1, dt * 12);
+  // a new target: the ring starts a little wide and closes onto it
+  if (tgt !== MARK.on) {
+    MARK.on = tgt;
+    if (tgt) MARK.k = 0;
+  }
+  MARK.k = Math.min(1, MARK.k + dt / 0.18);
+  MARK.a += ((tgt ? 0.65 : 0) - MARK.a) * ease;
+  MARK.ringM.opacity = MARK.a;
+  MARK.ring.visible = MARK.a > 0.02;
+  if (tgt) {
+    const x = d ? d.g.position.x : lamp.x,
+      z = d ? d.g.position.z : lamp.z,
+      r = d ? (d.def.radius || 0.4) * 1.5 + 0.12 : 0.85;
+    MARK.ringM.color.set(d ? 0xe04a38 : 0xff8a2a);
+    MARK.ring.position.set(x, groundY(x, z) + 0.1, z);
+    MARK.ring.scale.setScalar(r * (1.2 - 0.2 * MARK.k * (2 - MARK.k)));
+    MARK.ring.rotation.y += dt * 0.9;
+  }
+  // the glow at the aim point: there all the time the player is aiming, not only while he shoots, and soft
+  reticle.visible = show;
+  reticle.material.opacity = 0.4;
+}
+
+// ---------- the demons' health bars ----------
+// Drawn the same way as the brothers', a flat bar on the screen over the demon's head, but a little different to look at:
+// square-ended, a touch thinner, on a darker track and in a deeper red, so a demon's bar is not taken for a brother's. They are
+// placed after the camera has moved so it does not trail. (The bars the enemies make for themselves in the scene are kept
+// hidden; their eased level, d.barV, is still what is shown.) A brute's is wider, a pishacha's narrower. Far off they fade out
+const FOE_BARS = [];
+function foeBars() {
+  for (let i = FOE_BARS.length - 1; i >= 0; i--)
+    if (!grunts.includes(FOE_BARS[i].d)) {
+      FOE_BARS[i].el.remove();
+      FOE_BARS.splice(i, 1);
+    }
+  for (const d of grunts) {
+    if (!d.bar) continue;
+    d.bar.g.visible = false;
+    if (!d.hpEl) {
+      const el = document.createElement('div');
+      el.style.cssText = `position:fixed;left:0;top:0;z-index:11;width:${d.br ? 42 : d.pi ? 26 : 32}px;height:4px;border-radius:1px;background:rgba(22,12,18,.8);overflow:hidden;pointer-events:none;display:none`;
+      el.innerHTML = '<s style="display:block;height:100%;width:100%;background:#b8321f"></s>';
+      document.body.append(el);
+      d.hpEl = el;
+      FOE_BARS.push({ d, el });
+    }
+    const el = d.hpEl,
+      P = d.g.position,
+      on = d.hp < d.hp0 && (!d.dead || d.barV > 0.03) && d.g.visible;
+    if (on) {
+      tmpA.set(P.x, P.y + d.def.barY * (d.pi || d.df ? 1 : d.k || 1), P.z);
+      const far = tmpA.distanceTo(cam.position);
+      tmpA.project(cam);
+      if (tmpA.z < 1 && far < 80) {
+        el.style.display = 'block';
+        el.style.opacity = Math.min(1, (80 - far) / 25);
+        el.firstChild.style.width = 100 * Math.max(0, d.barV) + '%';
+        el.style.transform = `translate(-50%,-50%) translate(${((tmpA.x + 1) / 2) * innerWidth}px,${((1 - tmpA.y) / 2) * innerHeight}px)`;
+        continue;
+      }
+    }
+    el.style.display = 'none';
+  }
+}
 // ---------- coins ----------
 // A brute carries a coin. When he dies it jumps out of him, falls and lies turning on the ground where it came down, shining a
-// little; the first brother to walk up to it draws it to him, and it is counted
+// little; the first brother to come anywhere near draws it to him, and it is counted
 const COINS = [],
-  COIN_WORTH = 10,
+  COIN_WORTH = 2,
   COIN_M = toon(0xa9a393, { rim: 0.15 }),
   COIN_G = new THREE.CylinderGeometry(0.26, 0.26, 0.06, 20);
+// The end of the day (and of the night): every coin not yet claimed flies to Rama, wherever he is. Those lying on the ground
+// go from where they lie; what the woodcutters have earned by their gathering comes from the wood store, a few coins one
+// after another, each worth its share
+function coinsHome() {
+  for (const c of COINS) {
+    c.to = RAMA;
+    c.far = true;
+    c.t = 0;
+  }
+  const n = STOCK.pend,
+    m = Math.min(n, 12);
+  STOCK.pend = 0;
+  for (let i = 0; i < m; i++) {
+    const g = new THREE.Group(),
+      gl = glow(0xfff0c8, 0.55);
+    add(g, COIN_G, COIN_M, [0, 0, 0], [Math.PI / 2, 0, 0]);
+    g.add(gl);
+    g.position.set(WOODSHED[0] + R(-1, 1), groundY(WOODSHED[0], WOODSHED[1]) + 1.2, WOODSHED[1] + R(-1, 1));
+    g.visible = false;
+    scene.add(g);
+    COINS.push({ g, gl, vx: 0, vz: 0, vy: 0, down: true, to: RAMA, far: true, t: 0, wait: i * 0.14, worth: Math.floor(n / m) + (i < n % m ? 1 : 0) });
+  }
+}
 function coinsUpdate(dt) {
   for (const d of grunts)
     if (d.br && d.dead && !d.coin) {
@@ -3618,9 +4414,36 @@ function coinsUpdate(dt) {
   for (let i = COINS.length - 1; i >= 0; i--) {
     const c = COINS[i],
       P = c.g.position;
+    // (one sent for at the day's end waits its turn, unseen)
+    if (c.wait > 0) {
+      c.wait -= dt;
+      continue;
+    }
+    c.g.visible = true;
     c.t += dt;
     c.g.rotation.y += dt * (c.down ? 2.6 : 11);
     c.gl.material.opacity = 0.1 + 0.04 * Math.sin(c.t * 4);
+    if (c.to && c.far) {
+      // One called in at the night's end: it lifts from where it lay and crosses to Rama in one even arc, slow to start and
+      // slow to land, in a time set by how far it has to come
+      const q = c.to.group.position;
+      if (!c.from) {
+        c.from = P.clone();
+        c.t = 0;
+        c.dur = 0.8 + 0.012 * Math.hypot(q.x - P.x, q.z - P.z);
+      }
+      const k = Math.min(1, c.t / c.dur),
+        e = k * k * (3 - 2 * k);
+      // (it ends over his head, not on him, and is gone there: smaller and smaller over the last of the way, to nothing)
+      P.set(c.from.x + (q.x - c.from.x) * e, c.from.y + (q.y + 2.7 - c.from.y) * e + 2 * Math.sin(Math.PI * e), c.from.z + (q.z - c.from.z) * e);
+      c.g.scale.setScalar(1 - Math.max(0, (k - 0.75) / 0.25));
+      if (k >= 1) {
+        woodGain(c.worth === undefined ? COIN_WORTH : c.worth);
+        scene.remove(c.g);
+        COINS.splice(i, 1);
+      }
+      continue;
+    }
     if (c.to) {
       // drawn in to the brother who came for it, quicker the nearer it gets
       const q = c.to.group.position,
@@ -3631,7 +4454,7 @@ function coinsUpdate(dt) {
       c.g.scale.setScalar(Math.max(0.3, 1 - c.t * 1.6));
       if (Math.hypot(q.x - P.x, q.z - P.z) < 0.35) {
         puff(P, 0xfff0c8, 8, 1.6, 0.3, 0, 0.25);
-        woodGain(COIN_WORTH);
+        woodGain(c.worth === undefined ? COIN_WORTH : c.worth);
         scene.remove(c.g);
         COINS.splice(i, 1);
       }
@@ -3657,7 +4480,7 @@ function coinsUpdate(dt) {
       }
     } else {
       P.y = c.y + 0.07 * Math.sin(c.t * 2.4);
-      const h = HEROES.find((h) => h.hp > 0 && Math.hypot(h.group.position.x - P.x, h.group.position.z - P.z) < 1.1);
+      const h = HEROES.find((h) => h.hp > 0 && Math.hypot(h.group.position.x - P.x, h.group.position.z - P.z) < 4.5);
       if (h) {
         c.to = h;
         c.t = 0;
@@ -3693,23 +4516,6 @@ function coinsUpdate(dt) {
   addEventListener('keydown', (e) => e.code === 'Escape' && show(m.style.display === 'none'));
 }
 function lampsUpdate(dt) {
-  // An Agneyastra in flight lights a lamp it passes through or close by, without having to land beside it. (Aiming at the bowl
-  // on the screen sends the arrow at the ground some way behind the pillar, because of the camera's slant, so its landing
-  // place alone is not a fair test)
-  // and it does not fly on through the pillar: it is brought down at the lamp's foot, where it bursts as it would on any ground
-  // (the shared code ends an arrow that is under the ground, with its proper burst)
-  for (const s of shots) {
-    if (!s.live || !s.K.agni) continue;
-    const q = s.g.position;
-    for (const l of LAMPS)
-      if (l.ready && q.y < l.y + 2.6 && Math.hypot(q.x - l.x, q.z - l.z) < 1.1) {
-        lampLight(l);
-        q.set(l.x, l.y - 0.2, l.z);
-        s.v.set(0, -0.01, 0);
-        s.lock = null;
-        break;
-      }
-  }
   buildUpdate(dt);
   for (const l of LAMPS) {
     if (l.built && !l.ready) assemble(l, dt);
@@ -3785,9 +4591,8 @@ let shown = 0,
       p.hold = 99;
       p.go = true;
       p.path = [];
-      p.sit = 1;
-      p.g.position.set(VSEATS[i][0], 0, VSEATS[i][1]);
-      p.g.rotation.y = Math.atan2(-VSEATS[i][0], -VSEATS[i][1]);
+      toWood(p, woodN++);
+      p.g.position.set(p.wood.home[0], 0, p.wood.home[1]);
     });
     const at = skip === 'talk' ? [SEATS.rama, SEATS.lak] : [V3(-42, 0, 1), V3(-44, 0, 2.2)];
     HEROES.forEach((h, i) => {
@@ -3807,8 +4612,10 @@ let shown = 0,
 // With the flag `dev` in the address (level1.html?dev), a small row of buttons shows at the top of the screen, one for each
 // place the level can be started from. Pressing one reloads the page there, keeping the flag, so the buttons stay
 if (new URLSearchParams(location.search).has('dev')) {
-  // (there is no night yet: N counts the day's gathering as the end of a night would)
-  addEventListener('keydown', (e) => e.code === 'KeyN' && !e.repeat && nightTally());
+  // (there is no dawn yet: T counts the day's gathering as the end of a night would)
+  addEventListener('keydown', (e) => e.code === 'KeyT' && !e.repeat && nightTally());
+  // (and B begins the night at once, lamps or no lamps)
+  addEventListener('keydown', (e) => e.code === 'KeyB' && !e.repeat && nightStart());
   const now = new URLSearchParams(location.search).get('skip') || '',
     row = document.createElement('div');
   // (three small words in the top right corner, faint until the pointer is on them; the one the level was started at is brighter)
@@ -3858,6 +4665,9 @@ function frame(now) {
   }
 }
 ui();
-pickKind(0);
+// (the arrow he starts with: plain, unless a dev start has already armed an astra. This used to put the plain arrow back
+// on the string after such a start, while the icon went on showing the astra)
+pickKind(ASTRA.armed || 0);
+if (RAMA.s) RAMA.s.kind = ASTRA.armed || 0;
 requestAnimationFrame(frame);
 window.L = { rama, grunts, summon, state: () => ({ move, firing, shots: shots.length, who, follow: FOLLOW }) };

@@ -899,7 +899,14 @@ function gruntUpdate(dt) {
     {
       const nx = (ox - g.position.x) / r,
         nz = (oz - g.position.z) / r,
-        sp = d.pi && d.cr ? 2.6 : d.def.speed * (d.br ? 1 + 1.9 * (d.rageW || 0) : 1),
+        // the way he walks: straight at it when the way is clear, and otherwise round what is in the way. (Not for those in
+        // the air, which nothing on the ground stops)
+        A = walking && !d.df ? navAim(g.position, ox, oz, d.rng + 0.6) : null,
+        al = A && A.via ? Math.hypot(A.x - g.position.x, A.z - g.position.z) || 1 : 0,
+        wx = al ? (A.x - g.position.x) / al : nx,
+        wz = al ? (A.z - g.position.z) / al : nz,
+        // (d.slowK: a level may slow him, as a lit lamp does those near it)
+        sp = (d.pi && d.cr ? 2.6 : d.def.speed * (d.br ? 1 + 1.9 * (d.rageW || 0) : 1)) * (d.slowK || 1),
         bm = d.pi && !d.cr ? 1 + 0.4 * Math.sin(d.ph - 0.3) : 1,
         lat = !walking
           ? 0
@@ -910,8 +917,9 @@ function gruntUpdate(dt) {
               : d.br
                 ? Math.sin(T * 2.4 + d.seed * 3) * 1.8 * (d.rageW || 0)
                 : Math.sin(T * 1.9 + d.seed * 3) * 1.4,
-        vx = nx * sp - nz * lat,
-        vz = nz * sp + nx * lat;
+        // (on a way round he weaves less, so the weave does not carry him into what he is going round)
+        vx = wx * sp - wz * lat * (al ? 0.35 : 1),
+        vz = wz * sp + wx * lat * (al ? 0.35 : 1);
       if (walking) {
         g.position.x += vx * bm * dt;
         g.position.z += vz * bm * dt;

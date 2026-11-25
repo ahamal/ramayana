@@ -125,6 +125,14 @@ const tgt = V3(0, 1, 0),
   ndc = new THREE.Vector2(0.3, 0.1);
 rama.position.set(Math.sin(0.6) * 4, 0, Math.cos(0.6) * 4);
 let aimLock = null;
+// a level may give this: asked where the pointer is when no enemy is under it, it answers with something else worth snapping the aim to, or nothing
+let aimSnap = null;
+// (a level's hook) while set, the hero `h` stands facing the camera with his bow raised straight up, the string drawn by
+// `draw` (0 to 1) and an arrow on it while `nock` is true: { h, draw, nock }
+let SKYSHOT = null;
+// what the player's aim is on this frame, for whoever draws a mark for it: on (the pointer is over the world), p (the point under
+// the pointer, before any snapping), lock (the enemy it has snapped to) and snap (anything else it has snapped to, as a point)
+const AIMED = { on: false, p: V3(), lock: null, snap: null };
 const bodyPt = (d, out) => out.set(d.g.position.x, d.g.position.y + d.def.aimY, d.g.position.z); // where on an enemy a shot is aimed: chest of a rakshasa, back of a crawling pishacha, the body of a flying defiler
 let keyDir = V3(),
   aimPt = V3(0, 1.15, 9);
@@ -203,7 +211,7 @@ addEventListener('keydown', (e) => {
   ui();
 });
 const cv = renderer.domElement;
-cv.style.cursor = 'grab';
+cv.style.cursor = 'default';
 addEventListener('keyup', (e) => {
   keys[e.code] = false;
   if (e.code === 'KeyF' || e.code === 'Space') {
@@ -645,9 +653,11 @@ function brain(h, dt) {
     ld = lead ? Math.hypot(lead.x - P.x, lead.z - P.z) : 0;
   if (lead) h.post.copy(P);
   if (lead && ld > 6.5 && !(best && room < 0)) {
+    // (round whatever stands between them, not into it)
+    const A = navAim(P, lead.x, lead.z);
     h.mode = null;
-    dx = lead.x - P.x;
-    dz = lead.z - P.z;
+    dx = A.x - P.x;
+    dz = A.z - P.z;
   } else if (best) {
     if (room < 0) h.mode = 'back';
     else if (bd > h.range * 0.92) h.mode = 'close';
@@ -655,8 +665,9 @@ function brain(h, dt) {
     const ex = (best.g.position.x - P.x) / (bd || 1),
       ez = (best.g.position.z - P.z) / (bd || 1);
     if (h.mode === 'close') {
-      dx = ex;
-      dz = ez;
+      const A = navAim(P, best.g.position.x, best.g.position.z, 1.5);
+      dx = A.via ? A.x - P.x : ex;
+      dz = A.via ? A.z - P.z : ez;
     } else if (h.mode === 'back') {
       // away from the whole crowd, not just the nearest of them. Hemmed in on all sides the pushes cancel, and he stands his ground and shoots
       const tl = Math.hypot(tx, tz);
@@ -679,9 +690,11 @@ function brain(h, dt) {
     // nothing to fight: walk at his brother's shoulder. He sets off once he has fallen three paces behind and stops two paces short
     h.mode = null;
     if (ld > (keyed ? 2.2 : 3.2)) {
-      dx = lead.x - P.x;
-      dz = lead.z - P.z;
-      IN.walk = ld < 4.5;
+      const A = navAim(P, lead.x, lead.z);
+      dx = A.x - P.x;
+      dz = A.z - P.z;
+      // (on a way round he keeps up his pace: the straight distance says he is near when he is not)
+      IN.walk = ld < 4.5 && !A.via;
     }
   } else {
     h.mode = null;
@@ -778,7 +791,8 @@ function heroStep(dt) {
     if (!AUTO) ui();
   }
   wNam += ((namaste && wSit > 0.8 ? 1 : 0) - wNam) * Math.min(1, dt * 4);
-  wAim += ((firing ? 1 : 0) - wAim) * Math.min(1, dt * 7);
+  const sky = SKYSHOT && SKYSHOT.h === CUR ? SKYSHOT : null;
+  wAim += ((firing || sky ? 1 : 0) - wAim) * Math.min(1, dt * (sky ? 10 : 7));
   wInv += ((invoking ? 1 : 0) - wInv) * Math.min(1, dt * (invoking ? 5 : 12));
   // going backwards he keeps his speed and the stride runs in reverse
   haltW = KINDS[kind].halt ? wInv : 0;
@@ -832,13 +846,29 @@ function heroStep(dt) {
         }
       }
       aimLock = best;
+      AIMED.on = true;
+      AIMED.p.copy(tmp);
+      AIMED.lock = best;
+      AIMED.snap = null;
       if (best) bodyPt(best, tmp);
+      else if (aimSnap) {
+        const q = aimSnap(tmp);
+        if (q) tmp.copy((AIMED.snap = q));
+      }
       aimPt.lerp(tmp, Math.min(1, dt * 14));
-    } else aimLock = null;
+    } else {
+      aimLock = null;
+      AIMED.on = false;
+    }
   }
   // (the aim is taken from his own chest height, wherever the ground has put him)
   tmp.copy(aimPt).sub(tmp2.copy(rama.position).setY(rama.position.y + 1.3));
   if (tmp.length() > 0.8) aimDir.copy(tmp.normalize());
+  if (sky) {
+    // (he shoots side-on, so to face the camera his aim lies across its line of sight)
+    const f = Math.atan2(cam.position.x - rama.position.x, cam.position.z - rama.position.z);
+    aimDir.set(Math.cos(f), 0, -Math.sin(f));
+  }
   const aimFace = Math.atan2(-aimDir.z, aimDir.x),
     wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a)),
     mvW = Math.max(wWalk, wRun) * (1 - haltW);
@@ -889,6 +919,7 @@ function heroStep(dt) {
     // so the string hand does not jump
     const want = INVT ? invP : Math.max(0, Math.min(1, fireT / (RATE * 0.82)));
     draw = want >= draw ? want : draw + (want - draw) * Math.min(1, dt * 26);
+    if (sky) draw = sky.draw;
   }
   {
     const shut = wInv > 0.5 || wNam > 0.6;
@@ -901,6 +932,7 @@ function heroStep(dt) {
   }
   poseDir.set(aimDir.x, 0, aimDir.z).normalize().multiplyScalar(Math.cos(0.92)).addScaledVector(UP, Math.sin(0.92));
   poseDir.lerpVectors(aimDir, poseDir, wInv).normalize(); // where the bow points: skyward while meditating, at the target otherwise
+  if (sky) poseDir.copy(aimDir).multiplyScalar(0.14).addScaledVector(UP, 1).normalize(); // or straight up, for a level's signal arrow
   setPose(moveFace - facing);
   rama.updateMatrixWorld(true);
   if (wAim > 0.01) {
@@ -976,7 +1008,7 @@ function heroStep(dt) {
     bow.quaternion.setFromRotationMatrix(mB.makeBasis(bx, by, bz));
     bow.position.set(rama.position.x + Math.cos(facing) * 0.6, rama.position.y + 0.05, rama.position.z - Math.sin(facing) * 0.6);
   }
-  const drawn = wAim > 0.8 && fireT >= 0,
+  const drawn = sky ? sky.nock && wAim > 0.8 : wAim > 0.8 && fireT >= 0,
     sp2 = strGeo.attributes.position;
   if (drawn) {
     const l = bow.worldToLocal(tmp.copy(hR));
