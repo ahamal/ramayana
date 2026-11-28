@@ -6,6 +6,9 @@
 
 // ---------- the stage ----------
 setDay();
+// (much less haze than the day's own: enough left to soften the far hills, and none to speak of over the hermitage, even
+// with the camera drawn right back. It was 0.006)
+scene.fog.density = 0.0025;
 // (tree trunks here are a warm mid brown, not the scene's own dark one)
 TREE_MATS.trunk.color.set(0x7b5a3d);
 shadowFollow = true;
@@ -92,20 +95,16 @@ const WX = -90,
     [0, 44],
     [0.4, 31],
   ],
-  // Below the altar the south road divides. Its two arms part round the sacred ground, one to each side, and each runs into an
-  // end of the half ring, where the road from its own river also comes in. So the three roads meet in one loop round the altar,
-  // rounded at the top and drawn to a point at the bottom, and the ground inside it stays open grass. This is the west arm, from
-  // inside the end of the south road to the ring; the east arm is the same, mirrored
-  FORK = [
-    [0.4, 34.5],
-    [-3, 29.2],
-    [-13, 24.5],
-    [-24, 17.5],
-    [-31, 7],
-    [-32.6, -1.6],
-    [-29.78, -9.62],
-    [-28.95, -13.88],
-  ],
+  // The roads meet in a ring round the altar: a true circle, ROUND across its half, with the fire at its middle, so that it
+  // frames the sacred ground (and the pattern that can be built on it) evenly on every side. The far half of it is drawn as
+  // part of the main road; the near half is these two arms, which part where the south road comes in at the bottom and run
+  // round to the two ends of the far half. This is the west arm, from the foot of the circle round to where the far half
+  // begins; the east arm is the same, mirrored
+  ROUND = 31,
+  FORK = Array.from({ length: 12 }, (_, i) => {
+    const f = (i / 11) * (Math.PI - 1.45);
+    return [0.4 * (1 - i / 11) - ROUND * Math.sin(f), ROUND * Math.cos(f)];
+  }),
   // (near either arm: a rough test against the straight pieces between its points, for keeping trees and tall plants off it)
   forkWay = (x, z, pad) => {
     const ax = Math.abs(x - 0.4);
@@ -132,12 +131,12 @@ const WX = -90,
   // on the road (which ends at the clearing), in the demons' camp, or in or beside either river or the ridge the first one falls from
   onRoad = (x, z, pad) => ((x < -43 || x > 34) && Math.abs(z - roadZ(x)) < pad) || southWay(x, z, pad) || forkWay(x, z, pad),
   // The hermitage is laid out evenly about the line that runs north through the altar. The road comes in from the river on the
-  // west, sweeps round the far side of the altar in a half ring (its middle is YARD, a little north of the fire), and comes back
+  // west, sweeps round the far side of the altar in a half ring (its middle is the fire), and comes back
   // down on the east, where it rounds the end of the cliff and goes on south into the low country.
   // Three round houses stand outside the half ring, facing its middle: the hall at the top, the largest, and a smaller one
   // either side of it, the sage's on the left and the pupils' on the right. Each place is [x, z, the way it faces]
   YARD = [0, -6],
-  RING = 30,
+  RING = ROUND,
   SAGE_HOUSE = [-35.5, -26.5, 1.047],
   HALL = [0, -47, 0],
   LONG = [35.5, -26.5, -1.047],
@@ -546,10 +545,9 @@ for (let i = 0; i < 30; i++) {
   for (let x = START_X - 10; x < -44; x += 1.5) line.push(V3(x, 0, roadZ(x)));
   // from there on it is one smooth curve: it turns north to the foot of the half ring, goes round it, comes down the far side
   // the same way, and then heads east
-  const through = [V3(-44, 0, roadZ(-44)), V3(-37, 0, 0.6), V3(-32.6, 0, -1.6)];
-  for (let t = -1.45; t <= 1.46; t += 0.145) through.push(V3(YARD[0] + RING * Math.sin(t), 0, YARD[1] - RING * Math.cos(t)));
+  const through = [V3(-44, 0, roadZ(-44)), V3(-37, 0, 0.6)];
+  for (let t = -1.45; t <= 1.46; t += 0.145) through.push(V3(RING * Math.sin(t), 0, -RING * Math.cos(t)));
   for (const [x, z] of [
-    [32.6, -1.6],
     [40, -0.4],
     [50, 0.4],
     [60, 0.3],
@@ -1393,6 +1391,17 @@ function pose(p) {
     W.armR[0] = -sw * p.swing;
     W.foreL[0] = -0.12 - Math.max(0, -sw) * 0.4;
     W.foreR[0] = -0.12 - Math.max(0, sw) * 0.4;
+    // hurrying, it becomes the brothers' run by as much as he is hurrying (p.rk): knees up, heels kicked back, elbows bent and
+    // pumping, leaning into it, off the ground between steps. Without this a man going fast only walked faster, and slid
+    if (p.rk > 0.001) {
+      const Rn = run(p.ph);
+      for (const n in Rn) {
+        if (n[0] === '_') continue;
+        const a = W[n] || (W[n] = [0, 0, 0]);
+        for (let i = 0; i < 3; i++) a[i] += (Rn[n][i] - a[i]) * p.rk;
+      }
+      W._y += (Rn._y - W._y) * p.rk;
+    }
     for (const n in W)
       if (p.rig.bone[n]) {
         PQ.setFromEuler(PE.set(W[n][0], W[n][1], W[n][2]));
@@ -1830,10 +1839,35 @@ workCamp(
   [0.2, 31],
 ];
 LOOK = null;
+// The two far camps are not there on the first day. They are made with everything else, then put away: nothing of them is
+// drawn, their guards sleep, and nothing of theirs stands in anyone's way. On the second morning (see nightUpdate) they are
+// brought out, and the woodcutter comes with word of them
+function campHide(c) {
+  c.late = true;
+  if (c.kit) c.kit.visible = false;
+  c.hid = [...(c.kitS || []), ...c.prisoners.map((q) => q.solid)].filter((q) => q && SOLIDS.includes(q));
+  for (const q of c.hid) SOLIDS.splice(SOLIDS.indexOf(q), 1);
+  for (const q of c.prisoners) {
+    q.g.visible = false;
+    if (q.stake) q.stake.visible = false;
+  }
+  for (const d of c.guards) {
+    d.asleep = true;
+    d.g.visible = false;
+  }
+}
+function campShow(c) {
+  if (!c.late) return;
+  c.late = false;
+  if (c.kit) c.kit.visible = true;
+  SOLIDS.push(...c.hid);
+  for (const q of c.prisoners) if (q.stake) q.stake.visible = true;
+}
+for (const c of CAMPS) if (!c.first) campHide(c);
 function campUpdate(dt) {
   const me = SEL.group.position;
   for (const c of CAMPS) {
-    if (c.gone) continue;
+    if (c.gone || c.late) continue;
     // the camp's fire: its three sheets of flame leap and lean as the altar's do, and the glow about it breathes with them
     if (c.flames) {
       c.flames.forEach((m, i) => {
@@ -1921,23 +1955,6 @@ function campUpdate(dt) {
     // at the other camps too, once all are on their feet, they speak before they go
     if (!c.first && allUp && !c.thanked && !talking()) {
       c.thanked = true;
-      // Only one of the two far camps can be saved. The moment the men of one are free, the other is empty: its demons
-      // have gone, and taken their prisoners with them
-      for (const o of CAMPS)
-        if (o !== c && !o.first && !o.thanked && !o.gone) {
-          o.gone = true;
-          o.guards.forEach((d) => grunts.includes(d) && banish(d));
-          // (and they have struck their camp: tent and fire are gone, and only the ring of fire stones is left)
-          if (o.kit) {
-            o.kit.visible = false;
-            for (const q of o.kitS) SOLIDS.includes(q) && SOLIDS.splice(SOLIDS.indexOf(q), 1);
-          }
-          for (const q of o.prisoners) {
-            q.g.visible = false;
-            const i = SOLIDS.indexOf(q.solid);
-            if (i >= 0) SOLIDS.splice(i, 1);
-          }
-        }
       const f = c.prisoners.map((p) => snap(p.rig.bone.head, p.g.rotation.y, null)),
         mason = c.prisoners[0].look === 'mason';
       LOCK = true;
@@ -1945,19 +1962,31 @@ function campUpdate(dt) {
         mason
           ? [
               { who: 'Mason', face: f[0], text: 'They had us cutting stone for a wall to their king. Not one block more.' },
-              { who: 'Old mason', face: f[1], text: 'These hands have raised temples, prince. Give us stone and they are yours.' },
+              { who: 'Old mason', face: f[1], text: 'These hands have raised temples, prince. And this is what they paid us in. Take it. It is better spent on your fire.' },
               { who: 'Rama', face: photo(RAMA), text: 'Go to the hermitage. There will be work worth your hands.' },
               { who: 'Masons', face: f[f.length - 1], text: 'Jai Shree Ram!' },
             ]
           : [
               { who: 'Brahmin', face: f[0], text: 'The pot was already on the fire. Another hour and you would have found bones.' },
-              { who: 'Old brahmin', face: f[1], text: 'Live long, sons of Dasharatha. The sage’s rite needs voices. We will sit at his fire and chant till dawn.' },
+              { who: 'Old brahmin', face: f[1], text: 'Live long, sons of Dasharatha. We will sit at the sage’s fire and chant till dawn. But first, a blessing on your bow. Choose.' },
               { who: 'Rama', face: photo(RAMA), text: 'Go to Vishwamitra. Keep the rite. We will keep the night.' },
               { who: 'Brahmins', face: f[f.length - 1], text: 'Jai Shree Ram!' },
             ],
         () => {
-          LOCK = false;
-          c.rescued = true;
+          if (mason) {
+            // the masons' pay, handed over at once: coins from each of them to the counter
+            LOCK = false;
+            c.rescued = true;
+            for (let i = 0; i < MASON_GIFT; i++) {
+              const q = c.prisoners[i % c.prisoners.length].g.position;
+              coinToCounter(tmpB.set(q.x, q.y + 1.2, q.z), 1, i * 0.07);
+            }
+          } else
+            // the brahmins' blessing: one of three, his to choose (the level stays held until he has)
+            boonPick(() => {
+              LOCK = false;
+              c.rescued = true;
+            });
         },
       );
     }
@@ -2010,9 +2039,13 @@ function campUpdate(dt) {
       let want;
       if (!p.go) {
         p.wk = Math.max(0, p.wk - dt * 4);
-        if (allUp) p.nam = Math.min(1, p.nam + dt / 0.7);
-        if (p.nam >= 1 && !talking() && (p.hold += dt) > (c.first ? 0.8 : 1.6) + p.wait) {
+        // (freed in the middle of a demon's camp, nobody lingers: a quick bow, a short moment held, and away. The bow took 0.7 and
+        // was held 0.8 at the first camp and 1.6 at the others, with up to 0.9 more between one man and the next)
+        if (allUp) p.nam = Math.min(1, p.nam + dt / 0.45);
+        if (p.nam >= 1 && !talking() && (p.hold += dt) > (c.first ? 0.5 : 0.7) + p.wait * 0.5) {
           p.go = true;
+          // (and he hurries all the way to where he is going: see `hur` below)
+          p.hurry = true;
           // the men from the camp by the road are the sage's woodcutters: they walk home along the road and go straight back to work
           if (c.first && !p.wood) {
             toWood(p, woodN++);
@@ -2057,11 +2090,21 @@ function campUpdate(dt) {
         if (w && l < (last ? 0.4 : 3)) p.path.shift();
         p.wk += ((moving ? 1 : 0) - p.wk) * Math.min(1, dt * 5);
         if (moving) {
-          const v = p.pace * p.wk * (last ? Math.min(1, 0.35 + l / 2.5) : 1) * dt,
+          // (hurrying away from the camp he was held in: the working men at close to twice their walk, the brahmins at half as
+          // fast again, and never faster than a man can run. It lasts until he reaches where he was going)
+          const hur = p.hurry ? (p.look === 'brahmin' ? 1.35 : 1.6) : 1,
+            v = (p.dash ? 5.2 : Math.min(p.pace * hur, 5.2)) * p.wk * (last ? Math.min(1, 0.35 + l / 2.5) : 1) * dt,
             a = p.g.rotation.y;
           P.x += Math.sin(a) * v;
           P.z += Math.cos(a) * v;
-          p.ph += v / 0.45;
+          // (a longer stride with it, so the legs are not a blur)
+          // (how much of a run it is: the messenger flat out, the working men most of the way, the old brahmins a jog; and the
+          // same for the dash to the houses at nightfall. The ground covered by one stride grows with it, so the feet keep
+          // their grip on the ground)
+          const home = ((p.wood || p.mason) || {}).s === 'home',
+            rkTo = p.dash ? 1 : p.hurry || home ? (p.look === 'brahmin' ? 0.55 : 0.8) : 0;
+          p.rk = (p.rk || 0) + (rkTo - (p.rk || 0)) * Math.min(1, dt * 5);
+          p.ph += v / (0.45 + 0.07 * p.rk);
         }
         want = Math.atan2(dx, dz);
         // (with something between him and the next point of his way, he goes round it. The end of the way may itself be
@@ -2074,6 +2117,8 @@ function campUpdate(dt) {
         if (!w && p.mason && p.mason.s === 'work') want = Math.atan2(p.mason.spot[2].x - P.x, p.mason.spot[2].z - P.z);
         // (at his tree he faces it)
         if (!w && p.wood && p.wood.s !== 'drop' && p.wood.s !== 'fetch') want = Math.atan2(p.wood.spot[2].x - P.x, p.wood.spot[2].z - P.z);
+        if (!w) p.hurry = false;
+        if (!moving) p.rk = Math.max(0, (p.rk || 0) - dt * 4);
         if (!w && p.wk < 0.05) {
           if (p.wood) woodStep(p, dt);
           else if (p.mason) stoneStep(p, dt);
@@ -2084,7 +2129,7 @@ function campUpdate(dt) {
       pose(p);
       p.g.rotation.y +=
         Math.atan2(Math.sin(want - p.g.rotation.y), Math.cos(want - p.g.rotation.y)) *
-        Math.min(1, dt * (p.go ? (p.path.length === 1 || p.via ? 5 : 2.2) : 3)) *
+        Math.min(1, dt * (p.go ? (p.path.length === 1 || p.via ? 5 : p.hurry ? 3.4 : 2.2) : 3)) *
         p.up;
     }
   }
@@ -2294,11 +2339,230 @@ function woodStep(p, dt) {
   }
 }
 
+// ---------- the brahmins' blessing ----------
+// Freed, the brahmins bless Rama's bow, and he chooses how: three cards are laid out, drawn by chance from the blessings
+// below, each with its name and what it does. One is taken with a click or with 1, 2 or 3, and the others are gone. They are
+// all for Rama and they last the rest of the level; one already taken is not offered again.
+const MASON_GIFT = 12,
+  BOONS = [
+    { name: 'Vajra Points', text: 'Arrows strike a third harder.', sign: '◆', take: () => (RAMA.dmg = RAMA.dmg.map((v) => Math.round(v * 1.33))) },
+    { name: 'Swift Hands', text: 'Draw and loose a quarter faster.', sign: '≫', take: () => (RAMA.pace *= 0.75) },
+    { name: 'Twin Arrows', text: 'Every plain shot looses two arrows.', sign: '⇉', take: () => (RAMA.twin = (RAMA.twin || 0) + 1) },
+    { name: 'Far Sight', text: 'Shoots on his own from a third further off.', sign: '◎', take: () => (RAMA.range = Math.round(RAMA.range * 1.33)) },
+    { name: 'Inner Fire', text: 'Astra power returns twice as fast.', sign: '✹', take: () => (RAMA.mpRegen *= 2) },
+  ];
+function boonPick(done) {
+  const pool = BOONS.filter((b) => !b.got),
+    offer = [];
+  while (offer.length < 3 && pool.length) offer.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  if (!offer.length) return done();
+  if (!boonPick.css) {
+    boonPick.css = document.createElement('style');
+    boonPick.css.textContent = `
+    #boon { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px;
+      background: rgba(12, 12, 14, .62); opacity: 0; transition: opacity .25s; font-family: var(--f, Marcellus, Georgia, serif); color: #fff3df; user-select: none; }
+    #boon.on { opacity: 1; }
+    #boon h2 { margin: 0; font: 600 15px var(--f, Marcellus, Georgia, serif); letter-spacing: .22em; text-transform: uppercase; color: #ffd08a; }
+    #boon .row { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; padding: 0 16px; }
+    #boon button { width: 200px; min-height: 250px; padding: 22px 18px 18px; display: flex; flex-direction: column; align-items: center; gap: 12px; cursor: pointer;
+      color: #fff3df; background: rgba(24, 24, 26, .94); border: 2px solid rgba(255, 208, 138, .35); border-radius: 10px; font: inherit;
+      transform: translateY(14px); opacity: 0; transition: transform .28s ease-out, opacity .28s, border-color .15s, background .15s; }
+    #boon.on button { transform: none; opacity: 1; }
+    #boon button:nth-child(2) { transition-delay: .07s, .07s, 0s, 0s; }
+    #boon button:nth-child(3) { transition-delay: .14s, .14s, 0s, 0s; }
+    #boon button:hover { border-color: #ffd08a; background: rgba(40, 36, 30, .96); transform: translateY(-4px); }
+    #boon i { font: 400 46px/1 Georgia, serif; font-style: normal; color: #ffd08a; height: 56px; display: grid; place-items: center; }
+    #boon b { font: 600 21px var(--f, Marcellus, Georgia, serif); }
+    #boon span { font: 500 16px/1.35 var(--f, Marcellus, Georgia, serif); opacity: .82; flex: 1; }
+    #boon kbd { font: 700 12px var(--f, Marcellus, Georgia, serif); letter-spacing: .1em; color: #ffd08a; opacity: .7; }`;
+    document.head.append(boonPick.css);
+  }
+  const el = document.createElement('div');
+  el.id = 'boon';
+  el.innerHTML = '<h2>The brahmins’ blessing · choose one</h2><div class="row"></div>';
+  const take = (b) => {
+      if (!el.isConnected || el.dataset.gone) return;
+      el.dataset.gone = 1;
+      b.got = true;
+      b.take();
+      removeEventListener('keydown', key, true);
+      el.classList.remove('on');
+      setTimeout(() => el.remove(), 260);
+      flash(tmpA.copy(RAMA.group.position).setY(RAMA.group.position.y + 1.3), 0xffd08a, 14);
+      puff(tmpA, 0xffd08a, 26, 2.6, 0.5, -1.2, 0.7);
+      done();
+    },
+    // (its own keys, taken before anything else hears them: 1, 2 and 3 would otherwise change how he stands)
+    key = (e) => {
+      const b = offer[{ Digit1: 0, Digit2: 1, Digit3: 2 }[e.code]];
+      e.stopPropagation();
+      e.preventDefault();
+      if (b && !e.repeat) take(b);
+    };
+  offer.forEach((b, i) => {
+    const c = document.createElement('button');
+    c.innerHTML = `<i>${b.sign}</i><b>${b.name}</b><span>${b.text}</span><kbd>${i + 1}</kbd>`;
+    c.onclick = () => take(b);
+    el.lastChild.append(c);
+  });
+  document.body.append(el);
+  addEventListener('keydown', key, true);
+  requestAnimationFrame(() => el.classList.add('on'));
+}
+
 // ---------- the men's orders ----------
 // The two far camps (stone masons in the east, brahmins in the south) are not part of this first day: freeing them is for the
 // next. Nothing here sends the player to them, and no choice between them is asked for. (ORDER is kept for the code that reads it)
 const ORDER = { done: false, pick: null };
-function orderUpdate() {}
+// The morning after the first night, word comes of them. One of the woodcutters, out of his house with the day, runs to the
+// brother you lead and tells him: two more camps, the masons one way and the brahmins the other. What each brings is said in
+// the same breath: the masons, coins at once; the brahmins, a blessing on Rama's bow, his to choose. Both are to be freed
+// that day, and the night cannot be called until they are.
+// After it, each camp has a small label at the edge of the screen, pointing its way and named, with what it would bring. A
+// label is only there while its camp is off the screen, and each goes for good the moment a brother reaches its camp (near
+// enough for its guards to turn on him). There is no objective line with them.
+//   off    nothing yet        run    he is on his way to the brother        talk    he is speaking        done    said
+const MESS = { st: 'off', p: null, els: null };
+function orderUpdate() {
+  const far = CAMPS.filter((c) => !c.first),
+    open = far.length === 2 && far.some((c) => !c.thanked && !c.roused),
+    isMason = (c) => c.prisoners[0].look === 'mason';
+  if (MESS.st === 'off') {
+    // (once the day is most of the way back, and with one of them out of doors to carry it)
+    if (dayN() < 2 || !open || talking() || LOCK || SEL.hp <= 0) return;
+    const p = CAMPS[0].prisoners.find((q) => q.wood && q.go && q.g.visible && !q.wood.in);
+    if (!p) return;
+    MESS.p = p;
+    MESS.st = 'run';
+  }
+  // (if both camps have been found before he gets there, he has nothing to tell: he turns back to his work)
+  if (MESS.st === 'run' && !open) {
+    const p = MESS.p;
+    MESS.st = 'over';
+    p.dash = p.hurry = false;
+    p.wood.s = 'fetch';
+    p.wood.t = 0;
+    p.path = [p.wood.home];
+    return;
+  }
+  if (MESS.st === 'run' || MESS.st === 'talk') {
+    const p = MESS.p,
+      P = p.g.position,
+      H = SEL.group.position,
+      W = p.wood;
+    // his own work waits: no axe, no bundle, and the woodcutter's round held at its first step until he is let go
+    W.s = 'fetch';
+    W.t = 0;
+    W.bent = false;
+    W.axe.visible = false;
+    if (W.bundle) W.bundle.visible = false;
+    p.job = null;
+    // (the way is always the brother himself, wherever he has got to; and while they speak it keeps the man facing him)
+    p.path = [[H.x, H.z]];
+    p.hurry = p.dash = true;
+    if (MESS.st === 'run' && Math.hypot(H.x - P.x, H.z - P.z) < 2.6 && !talking() && !LOCK) {
+      MESS.st = 'talk';
+      // which way each lies from where they stand, in a word
+      const way = (c) => {
+          const dx = c.x - H.x,
+            dz = c.z - H.z;
+          return Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? 'east' : 'west') : dz > 0 ? 'south' : 'north';
+        },
+        m = far.find(isMason),
+        b = far.find((c) => !isMason(c)),
+        f = snap(p.rig.bone.head, p.g.rotation.y, null),
+        me = { who: NAMES[SEL.name] || 'Rama', face: photo(SEL) };
+      LOCK = true;
+      say(
+        [
+          { who: 'Woodcutter', face: f, text: 'Prince! Prince! They came back in the night. There are two camps in the forest now, and more of us in them.' },
+          { who: 'Woodcutter', face: f, text: `To the ${way(m)} they hold the stone masons. To the ${way(b)}, the brahmins who chant for the sage.` },
+          { who: 'Woodcutter', face: f, text: 'The masons were made to carry their plunder, and will give it to you. The brahmins can put a blessing on your bow.' },
+          { ...me, text: 'Then both must be free before dark. Go back to your work, friend. You have done well.' },
+        ],
+        () => {
+          LOCK = false;
+          MESS.st = 'done';
+          // back to the store for his axe, and out to his tree, at his own pace
+          p.dash = p.hurry = false;
+          W.s = 'fetch';
+          W.t = 0;
+          p.path = [W.home];
+        },
+      );
+    }
+  }
+  // the two labels
+  if (MESS.st !== 'done') return;
+  // (each goes for good when a brother reaches its camp; with both gone there is nothing more to do here)
+  if (MESS.els) {
+    for (const e of MESS.els.filter((e) => e.c.roused || e.c.thanked)) {
+      e.el.remove();
+      MESS.els.splice(MESS.els.indexOf(e), 1);
+    }
+    if (!MESS.els.length) {
+      MESS.els = null;
+      MESS.st = 'over';
+      return;
+    }
+  }
+  if (!MESS.els) {
+    // Each is a round picture of one of the men held there, ringed, with a notch on the ring that points the way to their camp.
+    // The words sit under it, outside the ring: who they are, and what freeing them would bring
+    const st = document.createElement('style');
+    st.textContent = `
+    .way { position: fixed; left: 0; top: 0; z-index: 12; display: none; flex-direction: column; align-items: center; gap: 8px; pointer-events: none;
+      color: #fff3df; white-space: nowrap; text-align: center; font: 600 15px var(--f, Marcellus, Georgia, serif); text-shadow: 0 1px 3px rgba(0, 0, 0, .95), 0 0 8px rgba(0, 0, 0, .7); }
+    .way.side { flex-direction: row; text-align: left; gap: 16px; }
+    .way .rd { position: relative; width: 46px; height: 46px; flex: none; }
+    .way img { position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box; border-radius: 50%; object-fit: cover;
+      background: #1a1a1c; border: 5px solid #1a1a1c; }
+    .way .nt { position: absolute; inset: 0; }
+    .way .nt::after { content: ''; position: absolute; left: 100%; top: 50%; margin: -8px 0 0 -2px; border: 8px solid transparent; border-left: 10px solid #1a1a1c; border-right: 0; }
+    .way small { display: block; font: 500 12px var(--f, Marcellus, Georgia, serif); color: #ffd08a; letter-spacing: .04em; }`;
+    document.head.append(st);
+    MESS.els = far.map((c) => {
+      const el = document.createElement('div'),
+        q = c.prisoners[0],
+        was = q.g.visible;
+      // (his picture is taken as he stands in the camp, whether or not he is being drawn just now)
+      q.g.visible = true;
+      q.g.updateMatrixWorld(true);
+      const face = snap(q.rig.bone.head, q.g.rotation.y, null);
+      q.g.visible = was;
+      el.className = 'way';
+      el.innerHTML =
+        `<div class="rd"><img alt="" src="${face}"><div class="nt"></div></div>` +
+        (isMason(c) ? '<span>Masons<small>Coins</small></span>' : '<span>Brahmins<small>A blessing for the bow</small></span>');
+      document.body.append(el);
+      return { el, c, tip: el.querySelector('.nt') };
+    });
+  }
+  for (const e of MESS.els) {
+    const v = tmpA.set(e.c.x, groundY(e.c.x, e.c.z) + 1, e.c.z).project(cam),
+      back = v.z > 1,
+      x = back ? -v.x : v.x,
+      y = back ? -v.y : v.y,
+      // (how far out toward the edge its camp lies: under one, it is on the screen, and the label is not needed)
+      // (the ring's middle is kept this many pixels in from each edge: 64 at the sides, where the words under it need half
+      // their width; 40 at the top; 104 at the foot, clear of the instruction line and the counters. It was a tenth of the
+      // screen's width and a seventh of its height, which left it floating well inside)
+      k = Math.max(Math.abs(x) / (1 - 128 / innerWidth), y > 0 ? y / (1 - 80 / innerHeight) : -y / (1 - 208 / innerHeight));
+    if ((k < 1 && !back) || talking() || LOCK) {
+      e.el.style.display = 'none';
+      continue;
+    }
+    const ex = x / (k || 1),
+      ey = y / (k || 1);
+    e.el.style.display = 'flex';
+    // (placed by the middle of the ring, not of the whole label, so the notch turns about the right point. The words go under
+    // the ring, except at the foot of the screen, where there is no room under it and they go beside it)
+    const side = ey < -0.6;
+    e.el.classList.toggle('side', side);
+    e.el.style.transform = `translate(${side ? '-23px,-50%' : '-50%,-23px'}) translate(${((ex + 1) / 2) * innerWidth}px,${((1 - ey) / 2) * innerHeight}px)`;
+    e.tip.style.transform = `rotate(${Math.atan2(-ey, ex)}rad)`;
+  }
+}
 
 // ---------- arriving at the hermitage ----------
 // When the brother you are playing comes near the altar with no enemy about, the scene takes over:
@@ -2728,8 +2992,8 @@ const VIEW = new THREE.Vector3();
     d.drawImage(bg, 0, 0, W, H);
     MINI.letter(d);
     for (const c of CAMPS) {
-      // (a camp that has been emptied shows nothing)
-      if (c.gone) continue;
+      // (a camp that has been emptied, or is not there yet, shows nothing)
+      if (c.gone || c.late) continue;
       const live = c.guards.filter((e) => grunts.includes(e) && !e.dead);
       for (const p of c.prisoners) dot(p.g.position.x, p.g.position.z, 2, p.free ? INK : 'rgba(0,0,0,0)', INK);
       if (live.length) {
@@ -2848,6 +3112,7 @@ function sceneryUpdate(dt) {
   orderUpdate();
   astraFx(dt);
   lampsUpdate(dt);
+  statuesUpdate(dt);
   if (++MINI.n % 5 === 0) MINI.draw();
   talkUpdate(dt);
   tipsUpdate();
@@ -2874,7 +3139,7 @@ pitch = 0.62;
 // low and a high view, and zooms only so far in and out
 CAMLIM.yaw = [-0.6, 0.6];
 CAMLIM.pitch = [0.5, 1.2];
-CAMLIM.dist = [12, 35];
+CAMLIM.dist = [12, 60];
 // the map for finding a way round things covers the level's own ground
 NAV.box = [X0, ZN, EX, ZS];
 
@@ -2906,7 +3171,8 @@ function goal() {
   if (built < n) return `Build the lamps. ${gold(built + ' of ' + n)}`;
   // every lamp stands, dark: the night is his to begin when he is ready
   if (NIGHT.on) return WAVE.msg;
-  return !LAMPS.every((l) => l.ready) ? '' : 'Call the night from any of the four symbols.';
+  // (said before the first night only: after that he knows)
+  return !LAMPS.every((l) => l.ready) || dayN() > 1 ? '' : 'Call the night from any of the four symbols.';
 }
 
 // ---------- the party: a card for each brother, to switch between them and to show how they are ----------
@@ -3411,7 +3677,7 @@ const LAMPS = [
   }
   flame.visible = false;
   G.add(flame);
-  const light = new THREE.PointLight(0xffa040, 0, 18, 1.5);
+  const light = new THREE.PointLight(0xffa040, 0, 28, 1.5); // (its reach was 18)
   light.position.set(0, 3.2, 0);
   G.add(light);
   SOLIDS.push({ x, z, r: 0.7 });
@@ -3487,7 +3753,7 @@ const STOCK = { n: 10, pend: 0, pendS: 0, el: null, sign: null, ring: null, at: 
   STOCK.sign = sg;
   STOCK.ring = sg.querySelectorAll('circle')[2];
   const hold = (on) => {
-    if (on && STOCK.at && !STOCK.at.rite && STOCK.n < LAMP_COST) {
+    if (on && STOCK.at && !STOCK.at.rite && STOCK.n < costOf(STOCK.at)) {
       for (const o of [sg, el]) o.animate([{ translate: '0' }, { translate: '-4px' }, { translate: '4px' }, { translate: '0' }], { duration: 220 });
       return;
     }
@@ -3539,8 +3805,12 @@ const NIGHT = { on: false, go: false, k: 0, from: null, key: false, t: -1, arrow
   RITE_T = 1.7,
   RISE_T = 0.65,
   RISE_H = 24;
+// (which day it is: 1 until the first night is over. From the second day on, the night cannot be called until the men of
+// both far camps are free)
+const dayN = () => NIGHT.day || 1,
+  farFree = () => dayN() < 2 || CAMPS.every((c) => c.first || c.rescued);
 function nightReady() {
-  return !NIGHT.on && (!LOCK || NIGHT.lock) && !talking() && ARR.talked && LAMPS.every((l) => l.ready);
+  return !NIGHT.on && (!LOCK || NIGHT.lock) && !talking() && ARR.talked && LAMPS.every((l) => l.ready) && farFree();
 }
 // the four signs: four plastered rounds at the four quarters of the altar, made as its floor is: the same plastered earth,
 // the same ochre edge and rice-flour line. Each has a sign drawn on it in rice flour: the conch to the south, the trident to
@@ -3783,6 +4053,17 @@ function nightUpdate(dt) {
   nightArrow(dt);
   waveUpdate(dt);
   // (the day goes at the arrow's burst, and comes back the same way at dawn)
+  // The night is over and the day is all the way back: it is the next day. Everything about the night is put back as it was
+  // before the first, so that another can be called; and on the second morning the two far camps are there
+  if (NIGHT.dawn && NIGHT.done && NIGHT.k <= 0 && !NIGHT.lost) {
+    NIGHT.on = NIGHT.go = NIGHT.dawn = NIGHT.done = false;
+    NIGHT.t = -1;
+    NIGHT.day = dayN() + 1;
+    WAVE.i = -1;
+    WAVE.st = 'off';
+    WAVE.msg = '';
+    for (const c of CAMPS) campShow(c);
+  }
   const dir = NIGHT.dawn ? -1 : NIGHT.go ? 1 : 0;
   if (!dir || (dir > 0 ? NIGHT.k >= 1 : NIGHT.k <= 0)) return;
   // (the look of it, day to night, is skyNight's, in altar.js: the sandbox turns to the same night)
@@ -3930,6 +4211,39 @@ function waveUpdate(dt) {
     d.lamp = foe ? null : lamp;
     d.to = foe ? foe.group.position : lamp;
     d.rng = d.st ? d.def.reach : foe ? (d.br ? 2.3 : 1.5) : lamp ? 1.3 : d.df ? d.def.reach : d.br ? 3.2 : d.pi || d.rn ? 2.2 : 2.6;
+    // A guard statue near him: a foot soldier or a brute with no brother to fight stops to break it before he goes on
+    d.stat = null;
+    if (!foe && !d.pi && !d.df && !d.rn && !d.st) {
+      let best = null,
+        bd = 5.5;
+      for (const S of STATUES) {
+        const l = S.dead ? 99 : Math.hypot(S.x - P.x, S.z - P.z);
+        if (l < bd) {
+          bd = l;
+          best = S;
+        }
+      }
+      if (best) {
+        d.stat = best;
+        d.lamp = null;
+        d.to = best;
+        d.rng = best.r + (d.br ? 1.7 : 1.0);
+      }
+    }
+    // A wall between him and where he is going: he goes round it if he can (the pathfinder's doing). With no way round, or
+    // only a long one, he breaks it. He looks into it twice a second, and once set on a wall he stays on it until it is down
+    // or a brother comes for him. (Not those that fly, nor the stone-hurler, who throws over it)
+    if (d.wallT && (d.wallT.dead || foe)) d.wallT = null;
+    if (!foe && !d.df && !d.st && !d.wallT && (d.wallCk = (d.wallCk === undefined ? Math.random() * 0.5 : d.wallCk) - dt) <= 0) {
+      d.wallCk = 0.5;
+      d.wallT = wallInWay(P, d.to ? d.to.x : 0, d.to ? d.to.z : 0);
+    }
+    if (d.wallT && !d.stat) {
+      d.stat = d.wallT;
+      d.lamp = null;
+      d.to = d.wallT;
+      d.rng = d.br ? 2.4 : 1.6;
+    }
     // (a defiler has no blow: while its pot is tipped over the fire, the fire is fouled)
     if (d.df && d.pour > 0.5 && Math.hypot(P.x, P.z) < 4.5) fireHurt(2.5 * dt);
   }
@@ -3937,7 +4251,8 @@ function waveUpdate(dt) {
     FIRE.hp = Math.min(FIRE.max, FIRE.hp + dt * 1.2);
     if (W.t <= 0) {
       W.i++;
-      W.q = WAVES[W.i].map((g) => [...g]);
+      // (each later night is heavier: half as many again of everything, for each night after the first)
+      W.q = WAVES[W.i].map((g) => [g[0], Math.ceil(g[1] * (1 + 0.5 * (dayN() - 1))), g[2], g[3]]);
       W.st = 'fight';
       W.t = 0;
     }
@@ -3987,19 +4302,155 @@ function woodGain(n) {
 // which empty platform Rama is standing by, if any; the sign held over it on the screen; and the ring, filling while he holds
 // ---------- places where something can be built ----------
 // A place to build is shown the same way whatever is to be built there (a lamp today; a statue or a wall later), and
-// building is always the player's choice, never an order. Once building is open, each empty place shows two things from
-// afar: the thing itself standing there as a faint ghost, and over it a small dark token with a coin and its price, which
-// bobs a little. Come close, and the token gives way to the full sign with its ring, and the ghost firms. A place the
-// player cannot yet afford shows its token dimmer, with the price in red. The moment building opens, every place flares
-// once, so that it is noticed.
+// building is always the player's choice, never an order. Nothing marks a place from afar: no token, no ghost, nothing on
+// the screen. Only when the brother being played comes up to an empty place does it show itself, with the thing that could
+// stand there as a faint ghost and the sign with its price and ring over it. The one moment the places draw the eye is
+// when building first opens: each flares once.
 // SITES is the list; a place is { x, y, z, cost, open(), ghost } and adds itself
 const SITES = [],
-  GHOST_FAR = new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.1, depthWrite: false, fog: false }),
   buildOpen = () => !!ARR.talked;
 for (const l of LAMPS) SITES.push({ x: l.x, y: l.y, z: l.z, cost: LAMP_COST, open: () => !l.built, ghost: l.ghost, of: l });
+// Once the masons are free the ground round the hermitage can be built on. What may be built is drawn on it as one pattern,
+// in thin pale lines, like a kolam: dots, and lines joining them.
+//   The lines are the sides of three rings (RINGS), the inner two eight-sided and the outer one sixteen-sided so that no
+//     side is long, and lines between each ring and the next, corner to corner: so the ground between the rings is all triangles. The
+//     innermost ring runs inside the lamps, just clear of the four signs, and each lamp stands in a triangle of its own.
+//     Any length can be raised into a wall, so the ground can be shut, opened or wound as he likes. A longer length costs
+//     more. Walkers go round a wall; a demon with no way round, or only a long one, breaks it (see wallInWay, in statue.js)
+//   The dots are small circles, one in the middle of every triangle that has no lamp in it, and a guard can be stood on
+//     each: a mace-bearer, who holds what comes to him, or an archer on a pedestal, who shoots what comes in reach. Which of
+//     the two is his to choose there (R changes it; GUARD.kind is the one last chosen, and the next circle offers the same).
+// All of it is shown and paid for exactly as the lamps are (stand at one, hold fire).
+// (the guards and walls themselves are in statue.js). PLACES.on says the masons have opened them
+const PLACES = [],
+  RINGS = [12.2, 19.5, 26.5],
+  WALL_N = 8,
+  GUARD = { kind: 'statue', cost: { statue: 5, tower: 6 }, name: { statue: 'Mace-bearer', tower: 'Archer' } },
+  costOf = (l) => (l && l.cost) || LAMP_COST;
+PLACES.rings = new URLSearchParams(location.search).get('pattern') === 'rings';
+{
+  const LINE = new THREE.MeshBasicMaterial({ color: 0xf3ead6, transparent: true, opacity: 0.08, depthWrite: false }),
+    DOT = new THREE.RingGeometry(0.62, 0.72, 28).rotateX(-Math.PI / 2),
+    // (the ghost of a guard: a plinth, a figure and a head, no more than a shape)
+    shape = (tall) => {
+      const g = new THREE.Group();
+      cyl(g, tall ? 0.6 : 0.8, tall ? 0.7 : 0.9, tall ? 1.7 : 0.45, GHOST, [0, tall ? 0.85 : 0.22, 0]);
+      cyl(g, 0.28, 0.36, 1.25, GHOST, [0, (tall ? 1.7 : 0.45) + 0.62, 0]);
+      sph(g, 0.24, GHOST, [0, (tall ? 1.7 : 0.45) + 1.48, 0]);
+      return g;
+    },
+    put = (x, z, kind, cost, yaw, len = 0) => {
+      const y = groundY(x, z),
+        wall = kind === 'wall',
+        base = wall ? add(scene, new THREE.BoxGeometry(len - 0.4, 0.02, 0.12), LINE, [x, y + 0.025, z], [0, yaw, 0]) : add(scene, DOT, LINE, [x, y + 0.03, z]),
+        ghost = new THREE.Group(),
+        q = { x, y, z, kind, cost, face: yaw, len, built: false, base, ghost };
+      // (the ghost of what would stand there: the length of the wall, or the guard of either kind)
+      if (wall) add(ghost, new THREE.BoxGeometry(len, 1.4, 0.75), GHOST, [0, 0.7, 0], [0, yaw, 0]);
+      else {
+        q.pick = { statue: shape(false), tower: shape(true) };
+        ghost.add(q.pick.statue, q.pick.tower);
+      }
+      ghost.position.set(x, y, z);
+      ghost.visible = base.visible = false;
+      scene.add(ghost);
+      PLACES.push(q);
+      SITES.push({ x, y, z, cost, open: () => PLACES.on && !q.built, ghost, of: q });
+    };
+  // (the inner and outer rings have their corners half a step round, so a side of the inner ring faces each lamp)
+  const step = (Math.PI * 2) / WALL_N,
+    half = (k) => (k + 1) % 2,
+    at = (k, i) => [Math.sin((i + half(k) * 0.5) * step) * RINGS[k], Math.cos((i + half(k) * 0.5) * step) * RINGS[k]],
+    // (a length of up to about eleven paces is two coins; the sides of the middle ring, the longest, are three)
+    seg = (a, b) => {
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      put((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 'wall', Math.max(2, Math.round(len / 4.5)), Math.atan2(a[1] - b[1], b[0] - a[0]), len);
+    },
+    // (a circle in the middle of a triangle, unless a lamp stands in it; a guard there faces away from the fire)
+    dot = (a, b, c) => dotAt((a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3),
+    dotAt = (x, z) => {
+      if (!LAMPS.some((l) => Math.hypot(l.x - x, l.z - z) < 3.5)) put(x, z, GUARD.kind, GUARD.cost[GUARD.kind], Math.atan2(x, z));
+    };
+  // The other pattern, for trying beside this one (level1.html?pattern=rings): four rings and the short spokes between
+  // them, as a chakravyuha is laid out. The two inner rings have eight sides and the two outer ones sixteen; a lane runs
+  // between each ring and the next, cut into cells by the spokes, with a circle for a guard in each cell that has no lamp.
+  // A ring's side is a wall or a gate; a spoke shuts the lane
+  if (PLACES.rings) {
+    const RR = [12.2, 17.3, 22.4, 27.5],
+      e = Math.PI / 8,
+      P = (r, a) => [Math.sin(a) * r, Math.cos(a) * r];
+    for (let k = 0; k < 4; k++)
+      for (let i = 0, n = k < 2 ? 8 : 16; i < n; i++) {
+        const a = k < 2 ? e + i * 2 * e : i * e;
+        seg(P(RR[k], a), P(RR[k], a + (k < 2 ? 2 * e : e)));
+      }
+    for (let l = 0; l < 3; l++)
+      for (let i = 0, n = l < 2 ? 8 : 16; i < n; i++) {
+        const a = l < 2 ? e + i * 2 * e : i * e;
+        seg(P(RR[l], a), P(RR[l + 1], a));
+        // (in the innermost lane both rings' sides run straight across the cell, nearer the fire than their corners)
+        dotAt(...P(((RR[l] + RR[l + 1]) / 2) * (l ? 1 : Math.cos(e)), a + (l < 2 ? e : e / 2)));
+      }
+  }
+  for (let k = 0; k < 2 && !PLACES.rings; k++)
+    for (let i = 0; i < WALL_N; i++) {
+      const c = at(k, i);
+      seg(c, at(k, i + 1));
+      if (!k) continue;
+      // (the zigzag in from this ring: each corner to the two corners of the ring inside that it stands between; and the
+      // two triangles that makes, one with its point out here and one with its point in there)
+      const j = half(k) ? i : i - 1;
+      seg(c, at(k - 1, j));
+      seg(c, at(k - 1, j + 1));
+      dot(c, at(k - 1, j), at(k - 1, j + 1));
+      dot(c, at(k, i + 1), at(k - 1, j + 1));
+    }
+  // The outer ring has twice the corners, so that its sides are no longer than the rest. Every other corner of it stands
+  // straight out from a corner of the middle ring, and a short line joins the two; each corner between is joined to the two
+  // middle corners it stands between. So each side of the middle ring has three triangles beyond it
+  const out = (j) => [Math.sin((j * step) / 2) * RINGS[2], Math.cos((j * step) / 2) * RINGS[2]];
+  for (let i = 0; i < WALL_N && !PLACES.rings; i++) {
+    const m = at(1, i),
+      n = at(1, i + 1),
+      a = out(2 * i),
+      b = out(2 * i + 1),
+      c = out(2 * i + 2);
+    seg(a, b);
+    seg(b, c);
+    seg(m, a);
+    seg(m, b);
+    seg(n, b);
+    dot(m, a, b);
+    dot(m, n, b);
+    dot(n, b, c);
+  }
+  PLACES.line = LINE;
+  // (R, at a circle: the other kind of guard)
+  addEventListener('keydown', (e) => {
+    if (e.code !== 'KeyR' || e.repeat || !STOCK.at || !STOCK.at.pick) return;
+    GUARD.kind = GUARD.kind === 'statue' ? 'tower' : 'statue';
+  });
+}
+// (the moment the masons are free the pattern is there on the ground)
+function placesOpen() {
+  if (PLACES.on || !CAMPS.some((c) => !c.first && c.rescued && c.prisoners[0].look === 'mason')) return;
+  PLACES.on = true;
+  for (const q of PLACES) q.base.visible = true;
+}
+// (built: the wall or the guard stands where its mark was, in a burst of stone dust)
+function placeBuilt(q) {
+  q.base.visible = false;
+  if (q.kind === 'wall') {
+    // (it goes up in dust along its whole length)
+    q.S = makeWall(q.x, q.z, q.face, q.len);
+    for (let t = -q.len / 2; t <= q.len / 2; t += 1.6) puff(tmpA.set(q.x + q.S.ux * t, q.y + 0.7, q.z + q.S.uz * t), 0xe6dccb, 12, 2.6, 0.7, 3, 0.45);
+    return;
+  }
+  q.S = (q.kind === 'tower' ? makeTower : makeStatue)(q.x, q.z, q.face);
+  puff(tmpA.set(q.x, q.y + 1.2, q.z), 0xe6dccb, 40, 3.4, 0.8, 3, 0.5);
+}
 function siteMarks(dt) {
-  const on = buildOpen();
-  if (on && !STOCK.opened) {
+  if (buildOpen() && !STOCK.opened) {
     // building has just opened: each place flares
     STOCK.opened = true;
     for (const q of SITES)
@@ -4009,37 +4460,39 @@ function siteMarks(dt) {
         ring(tmpA.setY(q.y + 0.08), 1.6, 0xffd08a, 0.8);
       }
   }
-  GHOST_FAR.opacity = 0.09 + 0.03 * Math.sin(T * 2.2);
-  for (const q of SITES) {
-    const show = on && q.open(),
-      here = q.of === STOCK.at;
-    q.ghost.visible = show;
-    if (show && q.near !== here) {
-      q.near = here;
-      q.ghost.traverse((o) => o.isMesh && (o.material = here ? GHOST : GHOST_FAR));
-    }
-    if (!q.el) {
-      q.el = document.createElement('div');
-      q.el.style.cssText =
-        'position:fixed;left:0;top:0;z-index:12;display:none;align-items:center;gap:3px;padding:4px 7px 4px 5px;border-radius:999px;background:rgba(22,19,16,.6);font:600 12px var(--f);color:#fff3df;pointer-events:none;white-space:nowrap';
-      q.el.innerHTML = `<span style="width:11px;height:11px;display:block">${TEJAS_ICON}</span><i style="font-style:normal;line-height:1;font-variant-numeric:lining-nums">${q.cost}</i>`;
-      document.body.append(q.el);
-    }
-    tmpA.set(q.x, q.y + 2.3 + 0.07 * Math.sin(T * 2.4 + q.x), q.z).project(cam);
-    const seen = show && !here && !LOCK && !talking() && tmpA.z < 1 && Math.abs(tmpA.x) < 1.02 && Math.abs(tmpA.y) < 1.02,
-      poor = STOCK.n < q.cost;
-    q.el.style.display = seen ? 'flex' : 'none';
-    if (!seen) continue;
-    q.el.style.transform = `translate(-50%,-50%) translate(${((tmpA.x + 1) / 2) * innerWidth}px,${((1 - tmpA.y) / 2) * innerHeight}px)`;
-    q.el.style.opacity = poor ? 0.5 : 0.9;
-    q.el.lastChild.style.color = poor ? '#ff8a7a' : '#fff3df';
-  }
+  // (the ghost stands only on the place he is at)
+  for (const q of SITES) q.ghost.visible = q.of === STOCK.at;
 }
 function buildUpdate(dt) {
   // (all of this is for whichever brother is being played, Rama or Lakshmana)
   const P = SEL.group.position;
   // (nothing can be built until Vishwamitra has spoken with the brothers: see buildOpen)
-  STOCK.at = (buildOpen() && !LOCK && !talking() && LAMPS.find((l) => !l.built && Math.hypot(P.x - l.x, P.z - l.z) < 2.4)) || null;
+  placesOpen();
+  // (the pattern is for the day's building: it goes out as the night comes down, and is back with the morning)
+  // (and while it cannot be seen, nothing can be built on it)
+  PLACES.line.opacity = 0.08 * Math.max(0, 1 - NIGHT.k * 2.5);
+  PLACES.line.visible = PLACES.line.opacity > 0.004;
+  const by = (l) => !l.built && Math.hypot(P.x - l.x, P.z - l.z) < 2.4,
+    // (a length of the pattern is his when he stands anywhere along it: the nearest one within reach)
+    off = (l) => {
+      if (!l.len) return Math.hypot(P.x - l.x, P.z - l.z);
+      const ux = Math.cos(l.face),
+        uz = -Math.sin(l.face),
+        t = Math.max(-l.len / 2, Math.min(l.len / 2, (P.x - l.x) * ux + (P.z - l.z) * uz));
+      return Math.hypot(P.x - l.x - ux * t, P.z - l.z - uz * t);
+    },
+    place = () => {
+      let b = null,
+        bd = 2.4;
+      for (const l of PLACES) {
+        if (l.built) continue;
+        // (a circle he is standing on comes before any line that ends there)
+        const d = l.len ? off(l) : off(l) < 1.3 ? off(l) - 2 : 9;
+        if (d < (l.len ? 1.5 : bd) && d < bd) (b = l), (bd = d);
+      }
+      return b;
+    };
+  STOCK.at = (buildOpen() && !LOCK && !talking() && (LAMPS.find(by) || (PLACES.on && PLACES.line.visible && place()))) || null;
   // When every lamp stands, Rama standing on any of the four signs gets the same sign over his head, and Space held there
   // is his draw. Which sign he began the night from is kept in RITE.sign
   const on = !STOCK.at && nightReady() && SIGNS_AT.find((q) => Math.hypot(P.x - q.x, P.z - q.z) < 1.5);
@@ -4053,6 +4506,22 @@ function buildUpdate(dt) {
   nightUpdate(dt);
   const l = STOCK.at,
     sg = STOCK.sign;
+  // at a circle: the guard is of the kind last chosen, and a line under the sign names it and the key that changes it
+  if (!STOCK.cap) {
+    STOCK.cap = document.createElement('div');
+    STOCK.cap.style.cssText = 'position:absolute;top:58px;left:50%;transform:translateX(-50%);font:600 12px var(--f);letter-spacing:.03em;color:#fff3df;text-shadow:0 1px 3px rgba(0,0,0,.85);pointer-events:none';
+    // (first inside the sign: its last child stays the cost)
+    sg.prepend(STOCK.cap);
+  }
+  if (l && l.pick) {
+    l.kind = GUARD.kind;
+    l.cost = GUARD.cost[l.kind];
+    l.pick.statue.visible = l.kind === 'statue';
+    l.pick.tower.visible = l.kind === 'tower';
+    const txt = GUARD.name[l.kind] + ' · R: ' + GUARD.name[l.kind === 'statue' ? 'tower' : 'statue'];
+    if (STOCK.cap.textContent !== txt) STOCK.cap.textContent = txt;
+  }
+  STOCK.cap.style.display = l && l.pick ? 'block' : 'none';
   // (what the sign shows: a lamp's cost, or the moon)
   if (l && sg.rite !== !!l.rite) {
     sg.rite = !!l.rite;
@@ -4067,8 +4536,9 @@ function buildUpdate(dt) {
     nightStart();
   } else if (l && STOCK.k >= 1) {
     // the ring has closed: the wood is spent and the lamp begins to put itself together
-    woodGain(-LAMP_COST);
+    woodGain(-costOf(l));
     l.built = true;
+    if (l.kind) placeBuilt(l);
     STOCK.hold = false;
     STOCK.k = 0;
     STOCK.at = null;
@@ -4078,13 +4548,15 @@ function buildUpdate(dt) {
   // the ghost stands on the platform he is at: breathing a little, firmer as the ring fills, red if he cannot pay
   siteMarks(dt);
   GHOST.opacity = 0.26 + 0.06 * Math.sin(T * 3) + 0.4 * STOCK.k;
-  GHOST.color.set(STOCK.n < LAMP_COST ? 0xff7a6a : 0xffd9a0);
+  GHOST.color.set(STOCK.n < costOf(STOCK.at) ? 0xff7a6a : 0xffd9a0);
   STOCK.ring.setAttribute('stroke-dashoffset', RING_LEN * (1 - STOCK.k));
   if (!STOCK.at) return;
   tmpA.set(l.x, l.y + 2.0, l.z).project(cam);
   sg.style.transform = `translate(-50%,-100%) translate(${((tmpA.x + 1) / 2) * innerWidth}px,${((1 - tmpA.y) / 2) * innerHeight}px) scale(${1 + 0.06 * STOCK.k})`;
-  const poor = !l.rite && STOCK.n < LAMP_COST,
+  const poor = !l.rite && STOCK.n < costOf(l),
     num = sg.querySelector('i');
+  // (the price on the sign is this place's own)
+  if (num && !l.rite && num.textContent !== String(costOf(l))) num.textContent = costOf(l);
   if (num) num.style.color = poor ? '#ff8a7a' : '#fff3df';
   sg.style.opacity = poor ? 0.8 : 1;
 }
@@ -4170,7 +4642,7 @@ function tipsUpdate() {
         ? ''
         : goal()
       : k === 'build'
-        ? STOCK.n < LAMP_COST
+        ? STOCK.n < costOf(STOCK.at)
           ? 'A lamp needs more Tejas than you have.'
           : 'Hold <kbd>Space</kbd> or the mouse to construct the lamp.'
         : k === 'agni'
@@ -4348,12 +4820,9 @@ const COINS = [],
 // if it lay out of sight), swings up, and drops into the count
 const COIN_NEAR = 14;
 function coinToCounter(pos, worth, delay) {
-  const v = tmpA.copy(pos).project(cam),
-    // (behind the camera, the picture of it is turned about)
-    k = v.z > 1 ? -1 : 1,
-    x0 = Math.max(24, Math.min(innerWidth - 24, ((v.x * k + 1) / 2) * innerWidth)),
-    y0 = v.z > 1 ? innerHeight - 24 : Math.max(24, Math.min(innerHeight - 24, ((1 - v.y) / 2) * innerHeight)),
-    r = STOCK.el.getBoundingClientRect(),
+  // (a plain drop: it appears a little above the counter and falls into it. It used to come in from where the coin lay in
+  // the world, across the screen. `pos` is kept for the callers, and no longer used)
+  const r = STOCK.el.getBoundingClientRect(),
     x1 = r.left + 10,
     y1 = r.top + r.height / 2,
     el = document.createElement('div');
@@ -4363,12 +4832,11 @@ function coinToCounter(pos, worth, delay) {
   const at = (x, y, sc) => `translate(${x}px,${y}px) scale(${sc})`;
   el.animate(
     [
-      { transform: at(x0, y0, 0.4), opacity: 0, offset: 0 },
-      { transform: at(x0, y0 - 18, 1.25), opacity: 1, offset: 0.18 },
-      { transform: at((x0 + x1) / 2, Math.min(y0, y1) - 70, 1.1), opacity: 1, offset: 0.6 },
-      { transform: at(x1, y1, 0.7), opacity: 1, offset: 1 },
+      { transform: at(x1, y1 - 46, 0.8), opacity: 0, offset: 0 },
+      { transform: at(x1, y1 - 40, 1), opacity: 1, offset: 0.25 },
+      { transform: at(x1, y1, 0.75), opacity: 1, offset: 1 },
     ],
-    { duration: 760, delay: delay * 1000, easing: 'cubic-bezier(.45,0,.55,1)', fill: 'forwards' },
+    { duration: 380, delay: delay * 1000, easing: 'cubic-bezier(.5,0,.9,.6)', fill: 'forwards' },
   ).onfinish = () => {
     el.remove();
     woodGain(worth);
@@ -4552,7 +5020,7 @@ function lampsUpdate(dt) {
       c.scale.set(l.glow * l.str * (0.9 + 0.1 * k), l.glow * l.str * k, l.glow * l.str * (0.9 + 0.1 * k));
       c.rotation.z = Math.sin(T * 5 + l.seed + i) * 0.1;
     });
-    l.light.intensity = 14 * l.glow * f;
+    l.light.intensity = 20 * l.glow * f; // (was 14)
     if (Math.random() < dt * 2) puff(tmpA.set(l.x + R(-0.5, 0.5), l.y + 1.7, l.z + R(-0.5, 0.5)), 0xffb347, 1, 0.3, 0.8, -1.5, 0.1);
   }
 }
@@ -4602,10 +5070,14 @@ let shown = 0,
 //   level1.html?skip=night    that, and the four lamps stand built as well, and the night begins by itself a moment after
 //                             the level opens: for trying out what comes in the dark. (NIGHT.lab is set, for anything that
 //                             should be different on such a night)
+//   level1.html?skip=morning  that night is already over: the lamps stand, it is day again, and what the second morning
+//                             brings (the woodcutter with word of the two far camps) begins at once
+//   level1.html?skip=saved    the second morning with both far camps already freed: the masons' coins are in hand, a
+//                             blessing (the first of them) is on the bow, and the ground can be built on
 // With nothing after the name, the level starts at the beginning as usual
 {
   const skip = new URLSearchParams(location.search).get('skip');
-  if (skip === 'rescue' || skip === 'talk' || skip === 'night') {
+  if (skip === 'rescue' || skip === 'talk' || skip === 'night' || skip === 'morning' || skip === 'saved') {
     const c = CAMPS[0];
     c.guards.forEach((d) => grunts.includes(d) && banish(d));
     c.roused = c.cried = c.seen = c.thanked = c.rescued = true;
@@ -4638,6 +5110,31 @@ let shown = 0,
         nightStart();
       }, 100);
     }
+    if (skip === 'morning' || skip === 'saved') {
+      // the first night is over without having been fought: the lamps stand, dark again, and it is day
+      for (const l of LAMPS) {
+        l.built = true;
+        l.t = LAMP_T + 1;
+      }
+      NIGHT.day = 2;
+      for (const c of CAMPS) campShow(c);
+    }
+    if (skip === 'saved') {
+      // both far camps are freed, with nothing fought or said: their guards are gone, their captives stand loose and set
+      // off for the hermitage on their own, and what each camp gives has been given
+      for (const c of CAMPS) {
+        if (c.first) continue;
+        c.guards.forEach((d) => grunts.includes(d) && banish(d));
+        c.roused = c.cried = c.seen = c.thanked = c.rescued = true;
+        for (const p of c.prisoners) {
+          p.free = true;
+          p.by = RAMA;
+          p.ropes.forEach((o) => o.parent && o.parent.remove(o));
+        }
+      }
+      woodGain(MASON_GIFT);
+      BOONS[0].take();
+    }
     if (skip !== 'rescue') {
       ARR.step = 'done';
       ARR.talked = true;
@@ -4656,24 +5153,49 @@ if (new URLSearchParams(location.search).has('dev')) {
   // (and B begins the night at once, lamps or no lamps)
   addEventListener('keydown', (e) => e.code === 'KeyB' && !e.repeat && nightStart());
   const now = new URLSearchParams(location.search).get('skip') || '',
-    row = document.createElement('div');
-  // (four small words in the top right corner, faint until the pointer is on them; the one the level was started at is brighter)
+    row = document.createElement('div'),
+    sel = document.createElement('select');
+  // (a small box in the top right corner, faint until the pointer is on it, showing the place the level was started at)
   row.style.cssText = 'position:fixed;right:14px;top:10px;z-index:40;display:flex;gap:2px;align-items:center';
   for (const [label, skip] of [
     ['Start', ''],
     ['Rescue', 'rescue'],
     ['Talk', 'talk'],
     ['Night', 'night'],
+    ['Morning', 'morning'],
+    ['Saved', 'saved'],
   ]) {
-    const b = document.createElement('button'),
-      dim = skip === now ? 0.75 : 0.35;
-    b.textContent = label;
-    b.style.cssText = `font:600 13px var(--f);letter-spacing:.06em;padding:4px 7px;background:none;border:none;color:#fff;opacity:${dim};transition:opacity .15s`;
-    b.onmouseenter = () => (b.style.opacity = 1);
-    b.onmouseleave = () => (b.style.opacity = dim);
-    b.onclick = () => (location.search = skip ? '?dev&skip=' + skip : '?dev');
-    row.append(b);
+    const o = document.createElement('option');
+    o.textContent = label;
+    o.value = skip;
+    o.selected = skip === now;
+    sel.append(o);
   }
+  // (one small faint box: choosing a place reloads the page there. Keys never change it, so they stay with the game)
+  sel.style.cssText = 'font:600 13px var(--f);letter-spacing:.06em;padding:3px 6px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.25);border-radius:5px;color:#fff;opacity:.45;transition:opacity .15s';
+  sel.onmouseenter = () => (sel.style.opacity = 1);
+  sel.onmouseleave = () => (sel.style.opacity = 0.45);
+  // (and a second box beside it for which pattern is on the ground; either choice keeps the other)
+  const pat = sel.cloneNode(false),
+    go = () => (location.search = '?dev' + (sel.value ? '&skip=' + sel.value : '') + (pat.value ? '&pattern=' + pat.value : ''));
+  for (const [label, v] of [
+    ['Triangles', ''],
+    ['Rings', 'rings'],
+  ]) {
+    const o = document.createElement('option');
+    o.textContent = label;
+    o.value = v;
+    o.selected = PLACES.rings === !!v;
+    pat.append(o);
+  }
+  for (const b of [sel, pat]) {
+    b.onmouseenter = () => (b.style.opacity = 1);
+    b.onmouseleave = () => (b.style.opacity = 0.45);
+    b.onkeydown = (e) => e.preventDefault();
+    b.onchange = go;
+  }
+  row.style.gap = '6px';
+  row.append(pat, sel);
   document.body.append(row);
 }
 function frame(now) {

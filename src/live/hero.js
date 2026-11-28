@@ -115,7 +115,7 @@ let move = 'idle',
   hits = 0,
   T = 0;
 // how far the camera may be turned, tilted and pulled back; a level may narrow these (yaw null: it turns all the way round)
-const CAMLIM = { yaw: null, pitch: [0.05, 1.35], dist: [2.5, 32] };
+const CAMLIM = { yaw: null, pitch: [0.05, 1.35], dist: [2.5, 70] };
 let yaw = 0.5,
   pitch = 0.74,
   dist = 15,
@@ -169,9 +169,14 @@ let shotQ = 0,
   holdT = 0,
   latch = false,
   mDown = false,
-  kDown = false;
+  kDown = false,
+  // (SELF: the hero you lead shoots on his own at whatever comes within his range, as his brother does. selfT is who he has
+  // picked. Holding fire yourself takes the bow back: then he shoots where you point)
+  SELF = true,
+  selfT = null;
 const keys = {},
-  held = () => (AUTO ? IN.fire : latch || mDown || kDown);
+  byHand = () => latch || mDown || kDown,
+  held = () => (AUTO ? IN.fire : byHand() || !!selfT);
 // fire is held: the mouse button, Space or F, or the Rapid fire button latched on. A short press still gets one full shot; holding keeps them coming
 function press() {
   if (LOCK) return;
@@ -206,11 +211,39 @@ addEventListener('keydown', (e) => {
     }
     e.preventDefault();
   } else if (e.code === 'KeyN') toggleNam();
-  else if (e.code === 'KeyG') FOLLOW = !FOLLOW;
+  else if (e.code === 'KeyG') sendBrother();
   else if (e.code === 'KeyH') CALM = !CALM;
   else return;
   ui();
 });
+// G: send the other brother to stand guard where the pointer is. With the pointer on the brother you lead (or off the ground
+// altogether) it calls him back to your side instead. A ring flashes once at the spot and is gone: nothing is left marking it
+function sendBrother() {
+  if (LOCK || who === 'sage') return;
+  const P = SEL.group.position,
+    q = V3();
+  ray.setFromCamera(ndc, cam);
+  plane.constant = -P.y;
+  let ok = !!ray.ray.intersectPlane(plane, q);
+  for (let i = 0; ok && i < 3; i++) {
+    plane.constant = -groundY(q.x, q.z);
+    ok = !!ray.ray.intersectPlane(plane, q);
+  }
+  if (!ok || Math.hypot(q.x - P.x, q.z - P.z) < 2.5) {
+    FOLLOW = !ok ? !FOLLOW : true;
+    if (FOLLOW) {
+      ring(P, 1.3, 0xffe2a0, 0.45);
+      rings[rings.length - 1].m.position.y = P.y + 0.12; // (ring() lays it near the floor: lift it onto this ground)
+    }
+    return;
+  }
+  hem(q);
+  q.y = groundY(q.x, q.z);
+  FOLLOW = false;
+  for (const h of HEROES) if (h !== SEL && h.post) h.post.copy(q);
+  ring(q, 1.3, 0xffe2a0, 0.6);
+  rings[rings.length - 1].m.position.y = q.y + 0.12;
+}
 const cv = renderer.domElement;
 cv.style.cursor = 'default';
 addEventListener('keyup', (e) => {
@@ -296,7 +329,8 @@ function loose() {
   }
   // a level may want to know each time a shot leaves the bow, and with what (AFTER_SHOT)
   if (AFTER_SHOT) AFTER_SHOT(CUR, K);
-  const n = K.fan || 1;
+  // (a brother blessed with twin arrows looses that many more with every plain shot)
+  const n = (K.fan || 1) + (K === KINDS[0] ? CUR.twin || 0 : 0);
   if (K.wind) return windGust(hL, aimDir);
   if (K.manava) return manavaFire(hL, aimDir);
   for (let i = 0; i < n; i++) {
@@ -657,7 +691,15 @@ function brain(h, dt) {
   const lead = FOLLOW && who !== 'sage' && h !== SEL ? SEL.group.position : null,
     ld = lead ? Math.hypot(lead.x - P.x, lead.z - P.z) : 0;
   if (lead) h.post.copy(P);
-  if (lead && ld > 6.5 && !(best && room < 0)) {
+  // on guard at a post: he fights what comes near it, and will not be drawn off. Past nine paces from it he comes back unless
+  // something is right on top of him, and he does not step toward an enemy once he is five paces out
+  const pd = Math.hypot(h.post.x - P.x, h.post.z - P.z);
+  if (!lead && pd > 9 && !(best && room < 0)) {
+    const A = navAim(P, h.post.x, h.post.z);
+    h.mode = null;
+    dx = A.x - P.x;
+    dz = A.z - P.z;
+  } else if (lead && ld > 6.5 && !(best && room < 0)) {
     // (round whatever stands between them, not into it)
     const A = navAim(P, lead.x, lead.z);
     h.mode = null;
@@ -669,7 +711,9 @@ function brain(h, dt) {
     else if (h.mode === 'back' ? room > 1.2 : h.mode === 'close' ? bd < h.range * 0.72 : !h.mode) h.mode = 'hold';
     const ex = (best.g.position.x - P.x) / (bd || 1),
       ez = (best.g.position.z - P.z) / (bd || 1);
-    if (h.mode === 'close') {
+    if (h.mode === 'close' && !lead && pd > 5) {
+      // (as far from his post as he will go after anyone)
+    } else if (h.mode === 'close') {
       const A = navAim(P, best.g.position.x, best.g.position.z, 1.5);
       dx = A.via ? A.x - P.x : ex;
       dz = A.via ? A.z - P.z : ez;
@@ -703,9 +747,11 @@ function brain(h, dt) {
     }
   } else {
     h.mode = null;
-    dx = h.post.x - P.x;
-    dz = h.post.z - P.z;
-    const l = Math.hypot(dx, dz);
+    // (back to his post, round whatever stands in the way)
+    const A = navAim(P, h.post.x, h.post.z),
+      l = pd;
+    dx = A.x - P.x;
+    dz = A.z - P.z;
     if (l < (keyed ? 0.25 : 0.9)) dx = dz = 0;
     IN.walk = l < 3;
   }
@@ -823,8 +869,8 @@ function heroStep(dt) {
       if (!AUTO) ui();
     }
   }
-  wWalk += ((move === 'walk' ? 1 : 0) - wWalk) * Math.min(1, dt * (move === 'idle' && !orbit ? 12 : 5));
-  wRun += ((move === 'run' ? 1 : 0) - wRun) * Math.min(1, dt * (move === 'idle' && !orbit ? 12 : 5));
+  wWalk += ((move === 'walk' ? 1 : 0) - wWalk) * Math.min(1, dt * (move === 'idle' && !orbit ? 12 : 9));
+  wRun += ((move === 'run' ? 1 : 0) - wRun) * Math.min(1, dt * (move === 'idle' && !orbit ? 12 : 9));
   wSit += ((move === 'sit' ? 1 : 0) - wSit) * Math.min(1, dt * 3);
   if (move !== 'sit' && namaste) {
     namaste = false;
@@ -832,14 +878,14 @@ function heroStep(dt) {
   }
   wNam += ((namaste && wSit > 0.8 ? 1 : 0) - wNam) * Math.min(1, dt * 4);
   const sky = SKYSHOT && SKYSHOT.h === CUR ? SKYSHOT : null;
-  wAim += ((firing || sky ? 1 : 0) - wAim) * Math.min(1, dt * (sky ? 10 : 7));
+  wAim += ((firing || sky ? 1 : 0) - wAim) * Math.min(1, dt * (sky ? 10 : 14)); // (the bow came up at 7: now twice as quick)
   wInv += ((invoking ? 1 : 0) - wInv) * Math.min(1, dt * (invoking ? 5 : 12));
   // going backwards he keeps his speed and the stride runs in reverse
   haltW = KINDS[kind].halt ? wInv : 0;
   const still = (1 - haltW) * (1 - wSit),
     // IN.quick is a scene's brisker walk: the same stride, taken faster
-    sp = (1.3 * IN.quick * wWalk + 5.0 * wRun) * still;
-  phase += dt * ((wWalk * 1.3 * IN.quick) / 0.36 + wRun * 10) * still * (1 - 2 * wBk);
+    sp = (1.3 * IN.quick * wWalk + 6.0 * wRun) * still; // the run was 5.0
+  phase += dt * ((wWalk * 1.3 * IN.quick) / 0.36 + wRun * 11.5) * still * (1 - 2 * wBk);
   {
     const P = rama.position;
     if (!orbit) {
@@ -869,6 +915,35 @@ function heroStep(dt) {
       holdT = 0.2;
     }
   } else {
+    // on his own, while fire is not held: the nearest enemy within his range, keeping the one he is on unless another has come
+    // much closer
+    let st = null;
+    if (SELF && !LOCK && !byHand() && move !== 'sit') {
+      let bd = CUR.range;
+      for (const d of grunts) {
+        if (d.dead || d.flung || d.asleep) continue;
+        const l = Math.hypot(d.g.position.x - rama.position.x, d.g.position.z - rama.position.z);
+        if (l < (d === selfT ? bd / 0.6 : bd) && l <= CUR.range) {
+          bd = d === selfT ? l * 0.6 : l;
+          st = d;
+        }
+      }
+    }
+    if (st && !firing) {
+      firing = true;
+      shotQ = 1;
+      holdT = 0;
+    } else if (!st && selfT && firing && !byHand()) {
+      shotQ = 0;
+      holdT = 0.2;
+    }
+    selfT = st;
+  }
+  if (!AUTO && selfT) {
+    aimLock = selfT;
+    AIMED.on = false;
+    aimPt.lerp(bodyPt(selfT, tmp), Math.min(1, dt * 10));
+  } else if (!AUTO) {
     ray.setFromCamera(ndc, cam);
     // where the pointer's line meets chest height above the ground. On uneven ground that height is found in a few steps:
     // try the hero's own level, see how high the land is where that lands, and try again at that level
@@ -936,7 +1011,8 @@ function heroStep(dt) {
   const INVT = KINDS[kind].invoke || 0,
     RATE = (INVT ? 0.32 : KINDS[kind].rate) * pace(CUR);
   if (!firing) fireT = shotQ = 0;
-  else if (wAim > 0.85 && (held() || shotQ)) {
+  // (the pull starts while the bow is still coming up, not after it has arrived: it waited for 0.85)
+  else if (wAim > 0.4 && (held() || shotQ)) {
     // a new draw only starts while fire is held, or to finish the one shot a short press is owed.
     // Without this a fast archer began another shot inside the lowering pause after release, and so never stopped
     fireT += dt;

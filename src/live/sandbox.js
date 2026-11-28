@@ -14,6 +14,16 @@ TREE_MATS.trunk.color.set(0x7b5a3d);
 yaw = 0;
 dist = 28;
 pitch = 0.62;
+// (here the camera may be drawn back as far as you like)
+CAMLIM.dist[1] = Infinity;
+// (and so that the ground is not cut away when it is, the camera sees further here than it need elsewhere)
+// (it also stops seeing things nearer than half a pace: with so long a reach, measuring depth from a hand's breadth away
+// left too little fineness for things lying close together far off)
+cam.far = 2000;
+cam.near = 0.5;
+cam.updateProjectionMatrix();
+// (no haze here either: from far back it greyed everything out)
+scene.fog.density = 0;
 // (the brother not being played holds his fire here unless told otherwise, so that what is summoned can be watched)
 CALM = true;
 // ---------- practice dummies and target boards ----------
@@ -78,7 +88,17 @@ $('tabs').onclick = (e) => {
 $('who').onclick = $('tabs').onclick;
 $('summon').onclick = (e) => {
   e.stopPropagation();
-  if (e.target.dataset.k) summon(e.target.dataset.k);
+  const k = e.target.dataset.k;
+  if (k === 'statue') {
+    // (a guard statue: set down a little way out from the fire, on the side the camera is on, facing outward; each new
+    // one a step further round)
+    const a = 0.5 + STATUES.length * 0.9;
+    makeStatue(Math.sin(a) * 9.5, Math.cos(a) * 9.5, a);
+  } else if (k === 'tower') {
+    // (an archer statue: further out, and round the other way)
+    const a = -0.6 - STATUES.length * 0.9;
+    makeTower(Math.sin(a) * 12, Math.cos(a) * 12, a);
+  } else if (k) summon(k);
 };
 let fpsN = 0,
   fpsT = 0,
@@ -95,6 +115,7 @@ function frame(now) {
   heroUpdate(dt);
   shotsUpdate(dt);
   worldUpdate(dt);
+  statuesUpdate(dt);
   hearthUpdate(dt);
   if (DARK_ON.k !== (DARK_ON.on ? 1 : 0)) {
     DARK_ON.k = Math.max(0, Math.min(1, DARK_ON.k + ((DARK_ON.on ? 1 : -1) * dt) / 2));

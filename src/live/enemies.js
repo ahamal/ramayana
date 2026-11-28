@@ -592,7 +592,7 @@ function spawn(a, kind, at) {
     br = kind === 'brute';
   if (grunts.length >= SPAWN_MAX) return;
   // (an archer arrives well out, beyond his own bowshot, and walks in to it)
-  const r = kind === 'archer' ? 23 + Math.random() * 3 : 18 + Math.random() * 3,
+  const r = kind === 'archer' ? 40 + Math.random() * 5 : 34 + Math.random() * 6,
     g = new THREE.Group();
   if (at) g.position.copy(at);
   else g.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
@@ -1381,6 +1381,30 @@ function gruntUpdate(dt) {
     }
     // what he is making for: the altar fire, unless a level has given him something else (d.to, a point that may move).
     // d.wait keeps him standing where he is, doing nothing, until the level lets him go
+    // A guard statue in his way: a foot soldier or a brute who comes near one stops to break it before he goes on. (Where
+    // there are statues at all; and not those a level is directing, which it sets on things itself.) d.stat is the one
+    // he is at
+    if (typeof STATUES !== 'undefined' && !d.dead && !d.df && !d.pi && !d.ar && !d.st && !d.rn && !d.wave && !d.wait) {
+      let best = null,
+        bd = 5.5;
+      for (const S of STATUES) {
+        if (S.dead) continue;
+        const l = Math.hypot(S.x - g.position.x, S.z - g.position.z);
+        if (l < bd) {
+          bd = l;
+          best = S;
+        }
+      }
+      if (best) {
+        d.stat = best;
+        d.to = best;
+        d.rng = best.r + (d.br ? 1.7 : 1.0);
+      } else if (d.stat) {
+        d.stat = null;
+        d.to = null;
+        d.rng = d.def.reach;
+      }
+    }
     // (an archer is after the nearest brother still standing, wherever he is)
     if (d.ar && !d.dead) {
       let best = null;
@@ -1524,6 +1548,7 @@ function gruntUpdate(dt) {
       // (the ground shakes under a planted blow; a swing thrown on the run, which may be far from anyone, barely stirs it)
       shake = Math.max(shake, !attacking ? 0.03 : d.br ? 0.14 : 0.05);
       // the moment the blow lands: a level that wants it to hurt someone says how
+      if (d.stat && !d.stat.dead) statueHurt(d.stat, Math.round(d.def.dmg[0] + Math.random() * (d.def.dmg[1] - d.def.dmg[0])));
       if (d.onHit) d.onHit();
       if (d.sk === 2) {
         tmpA.y = 0.08;

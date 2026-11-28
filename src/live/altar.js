@@ -92,7 +92,7 @@ function worn(x, z, r, long = 1, turn = 0) {
 // a round mat of woven grass to sit on, with a darker bound edge
 function seatMat(x, z, r = 0.56) {
   add(scene, new THREE.CylinderGeometry(r, r, 0.03, 20), PAVE.strawEdge, [x, 0.055, z]).castShadow = false;
-  add(scene, new THREE.CylinderGeometry(r - 0.07, r - 0.07, 0.034, 20), PAVE.straw, [x, 0.055, z]).castShadow = false;
+  add(scene, new THREE.CylinderGeometry(r - 0.07, r - 0.07, 0.03, 20), PAVE.straw, [x, 0.071, z]).castShadow = false;
 }
 {
   // the round stone floor the fire used to stand on is taken up, and the hearth sits on the ground, a little larger than it was
@@ -242,7 +242,9 @@ function seatMat(x, z, r = 0.56) {
       Z = -2,
       brass = toon(0xc0903c, { rim: 0.35 });
     flat(add(scene, new THREE.BoxGeometry(1.5, 0.03, 1.3), PAVE.strawEdge, [X, 0.05, Z]));
-    flat(add(scene, new THREE.BoxGeometry(1.38, 0.034, 1.18), PAVE.straw, [X, 0.05, Z]));
+    // (the mat's middle stands a clear finger's breadth above its bound edge: when the two tops were a hair apart, they
+    // could not be told apart from far off, and flickered one through the other)
+    flat(add(scene, new THREE.BoxGeometry(1.38, 0.03, 1.18), PAVE.straw, [X, 0.066, Z]));
     sph(scene, 0.15, brass, [X + 1.05, 0.14, Z + 0.1], [1, 0.85, 1]);
     cyl(scene, 0.05, 0.07, 0.1, brass, [X + 1.05, 0.3, Z + 0.1]);
     // and three smaller mats of the same make, east, west and south of the fire, for the brahmins (their seats are BSEATS)
@@ -252,7 +254,7 @@ function seatMat(x, z, r = 0.56) {
       [0, 2.7, 1.2, 1.05],
     ]) {
       flat(add(scene, new THREE.BoxGeometry(w, 0.03, d), PAVE.strawEdge, [x, 0.05, z]));
-      flat(add(scene, new THREE.BoxGeometry(w - 0.12, 0.034, d - 0.12), PAVE.straw, [x, 0.05, z]));
+      flat(add(scene, new THREE.BoxGeometry(w - 0.12, 0.03, d - 0.12), PAVE.straw, [x, 0.066, z]));
     }
   }
   // (and its light reaches further across the worn ground)
