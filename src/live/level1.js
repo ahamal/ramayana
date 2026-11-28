@@ -2638,6 +2638,26 @@ DIRECT = (h) => {
   }
   return true;
 };
+// And while something is being built where a brother stands, he walks off the spot: a few brisk steps straight away from
+// it, his own walk, whoever is playing him. (Once he is clear he is his own again)
+{
+  const scene0 = DIRECT;
+  DIRECT = (h, dt) => {
+    if (scene0(h, dt)) return true;
+    const l = STOCK.at;
+    if (!STOCK.hold || !l || !l.kind || h.clearOf === l) return false;
+    const o = offPlace(l, h.group.position);
+    if (o.d >= o.R) return false;
+    IN.x = o.dx;
+    IN.z = o.dz;
+    IN.walk = true;
+    IN.quick = 2;
+    IN.fire = false;
+    IN.at = null;
+    firing = false;
+    return true;
+  };
+}
 // Vishwamitra walks in a straight line to a spot, at his own walking pace; true once he is there
 function sageWalk(to, dt, pass) {
   const P = SG.at,
@@ -3630,10 +3650,10 @@ const LAMP_PROF = [
   ],
 ].map((pr) => new THREE.LatheGeometry(pr.map(([r, h]) => new THREE.Vector2(r, h)), 20));
 const LAMPS = [
-  [-9.8, -9.2],
-  [9.4, -9.9],
-  [-9.2, 9.6],
-  [10, 9.3],
+  [-10.9, -10.2],
+  [10.4, -11],
+  [-10.2, 10.7],
+  [11.1, 10.3],
 ].map(([x, z]) => {
   // Each place is one low round platform of stone, there from the start. The lamp that Rama builds on it is a standing lamp
   // of the shape kept in temples, but a hermitage's own: turned from plain fired clay and no taller than a man's shoulder,
@@ -3753,7 +3773,9 @@ const STOCK = { n: 10, pend: 0, pendS: 0, el: null, sign: null, ring: null, at: 
   STOCK.sign = sg;
   STOCK.ring = sg.querySelectorAll('circle')[2];
   const hold = (on) => {
-    if (on && STOCK.at && !STOCK.at.rite && STOCK.n < costOf(STOCK.at)) {
+    // (at a plinth that is waiting for its guard nothing is held: the guard is chosen by a click on its card)
+    if (STOCK.at && STOCK.at.wait) return;
+    if (on && STOCK.at && !STOCK.at.rite && (STOCK.shut || STOCK.n < costOf(STOCK.at))) {
       for (const o of [sg, el]) o.animate([{ translate: '0' }, { translate: '-4px' }, { translate: '4px' }, { translate: '0' }], { duration: 220 });
       return;
     }
@@ -3763,6 +3785,7 @@ const STOCK = { n: 10, pend: 0, pendS: 0, el: null, sign: null, ring: null, at: 
     e.stopPropagation();
     hold(true);
   });
+  STOCK.holdFn = hold;
   addEventListener('pointerup', () => hold(false));
   addEventListener('blur', () => hold(false));
   // Space is held to build while the sign is up, instead of loosing an arrow
@@ -3782,7 +3805,7 @@ const STOCK = { n: 10, pend: 0, pendS: 0, el: null, sign: null, ring: null, at: 
   addEventListener(
     'pointerdown',
     (e) => {
-      if (e.button !== 0 || e.target !== cv || !STOCK.at || talking()) return;
+      if (e.button !== 0 || e.target !== cv || !STOCK.at || STOCK.at.wait || talking()) return;
       e.stopImmediatePropagation();
       hold(true);
     },
@@ -4319,26 +4342,18 @@ for (const l of LAMPS) SITES.push({ x: l.x, y: l.y, z: l.z, cost: LAMP_COST, ope
 //     more. Walkers go round a wall; a demon with no way round, or only a long one, breaks it (see wallInWay, in statue.js)
 //   The dots are small circles, one in the middle of every triangle that has no lamp in it, and a guard can be stood on
 //     each: a mace-bearer, who holds what comes to him, or an archer on a pedestal, who shoots what comes in reach. Which of
-//     the two is his to choose there (R changes it; GUARD.kind is the one last chosen, and the next circle offers the same).
+//     the two is chosen once a plinth has been built on the circle (see buildUpdate).
 // All of it is shown and paid for exactly as the lamps are (stand at one, hold fire).
 // (the guards and walls themselves are in statue.js). PLACES.on says the masons have opened them
 const PLACES = [],
-  RINGS = [12.2, 19.5, 26.5],
+  RINGS = [13.5, 20.9, 28.3],
   WALL_N = 8,
-  GUARD = { kind: 'statue', cost: { statue: 5, tower: 6 }, name: { statue: 'Mace-bearer', tower: 'Archer' } },
+  GUARD = { kind: 'statue', cost: { statue: 5, tower: 5 }, name: { statue: 'Mace-bearer', tower: 'Archer' } },
   costOf = (l) => (l && l.cost) || LAMP_COST;
 PLACES.rings = new URLSearchParams(location.search).get('pattern') === 'rings';
 {
   const LINE = new THREE.MeshBasicMaterial({ color: 0xf3ead6, transparent: true, opacity: 0.08, depthWrite: false }),
     DOT = new THREE.RingGeometry(0.62, 0.72, 28).rotateX(-Math.PI / 2),
-    // (the ghost of a guard: a plinth, a figure and a head, no more than a shape)
-    shape = (tall) => {
-      const g = new THREE.Group();
-      cyl(g, tall ? 0.6 : 0.8, tall ? 0.7 : 0.9, tall ? 1.7 : 0.45, GHOST, [0, tall ? 0.85 : 0.22, 0]);
-      cyl(g, 0.28, 0.36, 1.25, GHOST, [0, (tall ? 1.7 : 0.45) + 0.62, 0]);
-      sph(g, 0.24, GHOST, [0, (tall ? 1.7 : 0.45) + 1.48, 0]);
-      return g;
-    },
     put = (x, z, kind, cost, yaw, len = 0) => {
       const y = groundY(x, z),
         wall = kind === 'wall',
@@ -4347,10 +4362,8 @@ PLACES.rings = new URLSearchParams(location.search).get('pattern') === 'rings';
         q = { x, y, z, kind, cost, face: yaw, len, built: false, base, ghost };
       // (the ghost of what would stand there: the length of the wall, or the guard of either kind)
       if (wall) add(ghost, new THREE.BoxGeometry(len, 1.4, 0.75), GHOST, [0, 0.7, 0], [0, yaw, 0]);
-      else {
-        q.pick = { statue: shape(false), tower: shape(true) };
-        ghost.add(q.pick.statue, q.pick.tower);
-      }
+      // (a circle has no ghost of its own: the two guards' ghosts are shared, and brought to it. See buildUpdate)
+      else q.pick = true;
       ghost.position.set(x, y, z);
       ghost.visible = base.visible = false;
       scene.add(ghost);
@@ -4425,17 +4438,91 @@ PLACES.rings = new URLSearchParams(location.search).get('pattern') === 'rings';
     dot(n, b, c);
   }
   PLACES.line = LINE;
-  // (R, at a circle: the other kind of guard)
-  addEventListener('keydown', (e) => {
-    if (e.code !== 'KeyR' || e.repeat || !STOCK.at || !STOCK.at.pick) return;
-    GUARD.kind = GUARD.kind === 'statue' ? 'tower' : 'statue';
-  });
 }
 // (the moment the masons are free the pattern is there on the ground)
 function placesOpen() {
   if (PLACES.on || !CAMPS.some((c) => !c.first && c.rescued && c.prisoners[0].look === 'mason')) return;
   PLACES.on = true;
   for (const q of PLACES) q.base.visible = true;
+}
+// No wall may be built that would shut any ground off from the rest: nobody, brother, villager or demon, is ever walled in or
+// walled out, and there is always a way to the fire. wouldLock(w) says whether raising w would do that.
+// The lines of the pattern cut the ground into pieces: the triangles between the rings, the ground inside the inner ring,
+// and everything outside the outer one. Each line lies between two of them (found once, wallCells: a point a little to each
+// side of every line, and two such points are in the same piece if one can be seen from the other across no line; a point
+// with no line beyond it is outside). A wall shuts the way between its two pieces, unless it has been broken. So w may be
+// built only if, with it up, every piece can still be reached from outside through lines that are open
+function wallCells() {
+  const W = PLACES.filter((q) => q.len),
+    ends = W.map((w) => {
+      const ux = (Math.cos(w.face) * w.len) / 2,
+        uz = (-Math.sin(w.face) * w.len) / 2;
+      return [w.x - ux, w.z - uz, w.x + ux, w.z + uz];
+    }),
+    // (does the straight way from a to b cross any line?)
+    cut = (ax, az, bx, bz) =>
+      ends.some(([cx, cz, dx, dz]) => {
+        const o = (px, pz, qx, qz, rx, rz) => Math.sign((qx - px) * (rz - pz) - (qz - pz) * (rx - px));
+        return o(ax, az, bx, bz, cx, cz) !== o(ax, az, bx, bz, dx, dz) && o(cx, cz, dx, dz, ax, az) !== o(cx, cz, dx, dz, bx, bz);
+      }),
+    pts = [],
+    of = [];
+  for (const w of W)
+    for (const sd of [1, -1]) pts.push([w.x + Math.sin(w.face) * 0.9 * sd, w.z + Math.cos(w.face) * 0.9 * sd]);
+  // (piece 0 is outside; the rest are numbered as they are found)
+  const out = pts.map(([x, z]) => !cut(x, z, (x * 80) / Math.hypot(x, z), (z * 80) / Math.hypot(x, z)));
+  let n = 1;
+  pts.forEach(([x, z], i) => {
+    if (out[i]) return (of[i] = 0);
+    for (let j = 0; j < i; j++)
+      if (!out[j] && !cut(x, z, pts[j][0], pts[j][1])) return (of[i] = of[j]);
+    of[i] = n++;
+  });
+  W.forEach((w, i) => ((w.ca = of[2 * i]), (w.cb = of[2 * i + 1])));
+  PLACES.cells = n;
+  PLACES.walls = W;
+}
+function wouldLock(w) {
+  if (!PLACES.cells) wallCells();
+  const seen = new Uint8Array(PLACES.cells),
+    go = [0];
+  seen[0] = 1;
+  let got = 1;
+  while (go.length) {
+    const c = go.pop();
+    for (const q of PLACES.walls) {
+      if (q === w || (q.built && !(q.S && q.S.dead)) || (q.ca !== c && q.cb !== c)) continue;
+      const o = q.ca === c ? q.cb : q.ca;
+      if (!seen[o]) (seen[o] = 1), got++, go.push(o);
+    }
+  }
+  return got < PLACES.cells;
+}
+// how a walker stands to a place that is being built on: d, how far he is from it (from the line of a wall, or the middle
+// of a circle); R, how far off is clear of it; and dx, dz, the way straight off it from where he is (if he is right on it,
+// the way the place faces: out from the fire)
+function offPlace(l, Q) {
+  const ux = Math.cos(l.face),
+    uz = -Math.sin(l.face),
+    t = l.len ? Math.max(-l.len / 2, Math.min(l.len / 2, (Q.x - l.x) * ux + (Q.z - l.z) * uz)) : 0,
+    dx = Q.x - l.x - ux * t,
+    dz = Q.z - l.z - uz * t,
+    d = Math.hypot(dx, dz);
+  return d < 0.01 ? { d, R: l.len ? 1.0 : 1.45, dx: Math.sin(l.face), dz: Math.cos(l.face) } : { d, R: l.len ? 1.0 : 1.45, dx: dx / d, dz: dz / d };
+}
+// (the guard chosen for a plinth that was waiting: it stands there, and the plinth is part of it)
+function guardPick(l, kind) {
+  GUARD.pause = null;
+  LOCK = false;
+  STOCK.pickEl.style.display = 'none';
+  l.kind = kind;
+  l.wait = false;
+  l.built = true;
+  if (l.ped) scene.remove(l.ped);
+  if (l.solid) SOLIDS.splice(SOLIDS.indexOf(l.solid), 1);
+  placeBuilt(l);
+  flash(tmpA.set(l.x, l.y + 0.2, l.z), 0xffd08a, 5);
+  STOCK.at = null;
 }
 // (built: the wall or the guard stands where its mark was, in a burst of stone dust)
 function placeBuilt(q) {
@@ -4492,7 +4579,9 @@ function buildUpdate(dt) {
       }
       return b;
     };
-  STOCK.at = (buildOpen() && !LOCK && !talking() && (LAMPS.find(by) || (PLACES.on && PLACES.line.visible && place()))) || null;
+  // (a place he is in the middle of building stays his while he steps off it, though another may now be nearer)
+  const mine = STOCK.hold && STOCK.at && STOCK.at.kind && !STOCK.at.built && !STOCK.at.wait && off(STOCK.at) < 2.4 ? STOCK.at : null;
+  STOCK.at = (buildOpen() && !LOCK && !talking() && (LAMPS.find(by) || (PLACES.on && PLACES.line.visible && (mine || place())))) || null;
   // When every lamp stands, Rama standing on any of the four signs gets the same sign over his head, and Space held there
   // is his draw. Which sign he began the night from is kept in RITE.sign
   const on = !STOCK.at && nightReady() && SIGNS_AT.find((q) => Math.hypot(P.x - q.x, P.z - q.z) < 1.5);
@@ -4506,34 +4595,136 @@ function buildUpdate(dt) {
   nightUpdate(dt);
   const l = STOCK.at,
     sg = STOCK.sign;
-  // at a circle: the guard is of the kind last chosen, and a line under the sign names it and the key that changes it
-  if (!STOCK.cap) {
-    STOCK.cap = document.createElement('div');
-    STOCK.cap.style.cssText = 'position:absolute;top:58px;left:50%;transform:translateX(-50%);font:600 12px var(--f);letter-spacing:.03em;color:#fff3df;text-shadow:0 1px 3px rgba(0,0,0,.85);pointer-events:none';
-    // (first inside the sign: its last child stays the cost)
-    sg.prepend(STOCK.cap);
+  // (a wall that would shut ground off cannot be built: its ghost is red and its sign shows a cross for a price)
+  STOCK.shut = !!(l && l.len && wouldLock(l));
+  if (STOCK.shut) STOCK.hold = false;
+  // A guard is built in two steps. First the place: at a circle there is one disc, as for a wall, and holding it builds a
+  // bare plinth (both guards cost the same, so nothing is chosen yet; the ghost on the circle slowly shows the one and then
+  // the other). Then the guard: the moment the plinth stands the level stops, and two cards come up in the middle of the
+  // screen, one for each guard, in the dark ground and pale sign of the arrow in the corner: its sign, its name and a line
+  // on what it does. A click on a card stands that guard on the plinth, and the level goes on
+  if (!STOCK.pickEl) {
+    const pk = document.createElement('div'),
+      ICON = {
+        // (a gada: a round ribbed head with a knob, on a short haft)
+        statue:
+          '<svg viewBox="0 0 24 24"><path d="M5 19.4 L 12.4 11.2" stroke="#f0dcb4" stroke-width="2.3" stroke-linecap="round" fill="none"/><circle cx="15.6" cy="7.8" r="5" fill="#f0dcb4"/><circle cx="19.6" cy="3.8" r="1.5" fill="#f0dcb4"/><path d="M12.4 4.9 L 18.6 11 M15.6 2.8 V 12.8" stroke="rgba(22,22,24,.55)" stroke-width="1" fill="none"/></svg>',
+        // (a drawn bow with an arrow on the string)
+        tower:
+          '<svg viewBox="0 0 24 24"><path d="M9 2.6 C 18.6 6, 18.6 18, 9 21.4" stroke="#f0dcb4" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M9 2.6 L 5 12 L 9 21.4" stroke="#f0dcb4" stroke-width="1" stroke-linejoin="round" fill="none"/><path d="M5 12 H 19" stroke="#f0dcb4" stroke-width="1.3" stroke-linecap="round"/><path d="M22.4 12 L 18 9.4 V 14.6 Z" fill="#f0dcb4"/></svg>',
+      };
+    const row = document.createElement('div');
+    // (over the whole screen, which it dims a little: the level is stopped behind it, and nothing under it can be clicked)
+    pk.style.cssText =
+      'position:fixed;inset:0;z-index:30;display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px;user-select:none;color:#fff3df;background:rgba(10,10,12,.3)';
+    pk.innerHTML = '<h2 style="margin:0;font:600 15px var(--f);letter-spacing:.22em;text-transform:uppercase;color:#ffd08a">Who stands guard here?</h2>';
+    row.style.cssText = 'display:flex;gap:16px';
+    pk.append(row);
+    STOCK.opts = [
+      ['statue', 'Stands his ground and strikes whatever comes near.'],
+      ['tower', 'Shoots from his pedestal at whatever comes in reach.'],
+    ].map(([kind, says]) => {
+      const o = document.createElement('div'),
+        rest = 'rgba(22,22,24,.88)';
+      o.style.cssText =
+        `width:190px;box-sizing:border-box;padding:24px 18px 22px;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:11px;cursor:pointer;text-align:center;background:${rest};` +
+        'transition:transform .15s ease-out,background .15s';
+      o.innerHTML =
+        `<span style="width:60px;height:60px;display:block">${ICON[kind]}</span>` +
+        `<b style="font:700 22px/1.1 var(--f)">${GUARD.name[kind]}</b>` +
+        `<em style="font:italic 500 16px/1.3 var(--f);opacity:.8">${says}</em>`;
+      o.kind = kind;
+      // (under the pointer a card lifts and warms a little)
+      o.onmouseenter = () => ((o.style.transform = 'translateY(-4px)'), (o.style.background = 'rgba(46,40,32,.95)'));
+      o.onmouseleave = () => ((o.style.transform = ''), (o.style.background = rest));
+      o.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        if (GUARD.pause) guardPick(GUARD.pause, kind);
+        o.onmouseleave();
+      });
+      row.append(o);
+      return o;
+    });
+    document.body.append(pk);
+    STOCK.pickEl = pk;
   }
   if (l && l.pick) {
     l.kind = GUARD.kind;
     l.cost = GUARD.cost[l.kind];
-    l.pick.statue.visible = l.kind === 'statue';
-    l.pick.tower.visible = l.kind === 'tower';
-    const txt = GUARD.name[l.kind] + ' · R: ' + GUARD.name[l.kind === 'statue' ? 'tower' : 'statue'];
-    if (STOCK.cap.textContent !== txt) STOCK.cap.textContent = txt;
   }
-  STOCK.cap.style.display = l && l.pick ? 'block' : 'none';
+  // The ghost on a circle is the two guards themselves, as they would stand there, in the ghost's pale colour: the
+  // mace-bearer for a couple of seconds, then the archer, then the mace-bearer again, the one simply taking the other's
+  // place. (One of each is made, the first time it is wanted, and stood on whichever circle he is at)
+  if (l && l.pick && !l.wait && !GUARD.ghost) {
+    GUARD.ghost = {};
+    for (const kind of ['statue', 'tower']) {
+      const S = (kind === 'tower' ? makeTower : makeStatue)(0, 0, 0);
+      // (it is only a figure: it guards nothing, and stands in nobody's way)
+      STATUES.splice(STATUES.indexOf(S), 1);
+      SOLIDS.splice(SOLIDS.indexOf(S.solid), 1);
+      S.G.traverse((o) => {
+        if (!o.isMesh) return;
+        o.material = GHOST;
+        o.castShadow = o.receiveShadow = false;
+      });
+      GUARD.ghost[kind] = S.G;
+    }
+  }
+  if (GUARD.ghost) {
+    const show = l && l.pick && !l.wait ? (Math.floor(T / 2.2) % 2 ? 'tower' : 'statue') : '';
+    for (const kind in GUARD.ghost) {
+      const g = GUARD.ghost[kind];
+      g.visible = kind === show;
+      if (g.visible) {
+        g.position.set(l.x, l.y, l.z);
+        g.rotation.y = l.face;
+      }
+    }
+  }
   // (what the sign shows: a lamp's cost, or the moon)
   if (l && sg.rite !== !!l.rite) {
     sg.rite = !!l.rite;
     sg.lastChild.innerHTML = l.rite ? MOON_ICON : COST_HTML;
   }
   if (!l) STOCK.hold = false;
+  // While a wall or a plinth is going up, nobody stands where it will be. A brother who is on the spot when the hold begins
+  // walks off it (see DIRECT, where he is given the order), and the ring does not close until he has; one who is clear of
+  // it cannot walk on. (The place is still his: he is near enough to go on building)
+  if (STOCK.hold && l && l.kind)
+    for (const h of HEROES) {
+      const Q = h.group.position,
+        o = offPlace(l, Q);
+      if (o.d >= o.R) h.clearOf = l;
+      else if (h.clearOf === l) {
+        Q.x += o.dx * (o.R - o.d);
+        Q.z += o.dz * (o.R - o.d);
+      } else STOCK.k = Math.min(STOCK.k, 0.95);
+    }
+  else for (const h of HEROES) h.clearOf = null;
   STOCK.k = STOCK.hold ? Math.min(1, STOCK.k + dt / (l && l.rite ? RITE_T : HOLD_T)) : Math.max(0, STOCK.k - dt * 4);
   if (l && l.rite && STOCK.k >= 1) {
     STOCK.hold = false;
     STOCK.k = 0;
     STOCK.at = null;
     nightStart();
+  } else if (l && l.pick && STOCK.k >= 1) {
+    // the ring has closed at a circle: paid for, and a bare plinth stands there, waiting to be told which guard
+    woodGain(-costOf(l));
+    l.wait = true;
+    l.base.visible = false;
+    l.ped = cyl(scene, 0.8, 0.9, 0.45, toon(0xb3a488, { rim: 0.14 }), [l.x, l.y + 0.225, l.z]);
+    l.ped.castShadow = true;
+    // (and it is in the way, as the guard on it will be)
+    l.solid = { x: l.x, z: l.z, r: 0.95 };
+    SOLIDS.push(l.solid);
+    puff(tmpA.set(l.x, l.y + 0.5, l.z), 0xe6dccb, 24, 2.6, 0.6, 3, 0.4);
+    flash(tmpA.set(l.x, l.y + 0.2, l.z), 0xffd08a, 5);
+    STOCK.hold = false;
+    STOCK.k = 0;
+    // and everything stops until he has said which: see frame, and guardPick
+    GUARD.pause = l;
+    LOCK = true;
+    STOCK.pickEl.style.display = 'flex';
   } else if (l && STOCK.k >= 1) {
     // the ring has closed: the wood is spent and the lamp begins to put itself together
     woodGain(-costOf(l));
@@ -4544,19 +4735,27 @@ function buildUpdate(dt) {
     STOCK.at = null;
     flash(tmpA.set(l.x, l.y + 0.2, l.z), 0xffd08a, 5);
   }
-  sg.style.display = STOCK.at ? 'flex' : 'none';
+  // (one disc for a lamp, a wall or the night; the pair of them at a guard's circle)
+  sg.style.display = STOCK.at && !STOCK.at.wait ? 'flex' : 'none';
+
   // the ghost stands on the platform he is at: breathing a little, firmer as the ring fills, red if he cannot pay
   siteMarks(dt);
   GHOST.opacity = 0.26 + 0.06 * Math.sin(T * 3) + 0.4 * STOCK.k;
-  GHOST.color.set(STOCK.n < costOf(STOCK.at) ? 0xff7a6a : 0xffd9a0);
+  GHOST.color.set(STOCK.shut || STOCK.n < costOf(STOCK.at) ? 0xff7a6a : 0xffd9a0);
   STOCK.ring.setAttribute('stroke-dashoffset', RING_LEN * (1 - STOCK.k));
   if (!STOCK.at) return;
-  tmpA.set(l.x, l.y + 2.0, l.z).project(cam);
+  // A place to build has its sign over the head of the brother being played, always in the same spot above him, so that it
+  // is never in front of him wherever the place lies. The sign for calling the night stays over its symbol
+  if (l.rite) tmpA.set(l.x, l.y + 2.0, l.z);
+  else tmpA.set(P.x, P.y + 2.5, P.z);
+  tmpA.project(cam);
+  if (l.wait) return;
   sg.style.transform = `translate(-50%,-100%) translate(${((tmpA.x + 1) / 2) * innerWidth}px,${((1 - tmpA.y) / 2) * innerHeight}px) scale(${1 + 0.06 * STOCK.k})`;
-  const poor = !l.rite && STOCK.n < costOf(l),
-    num = sg.querySelector('i');
+  const poor = !l.rite && (STOCK.shut || STOCK.n < costOf(l)),
+    num = sg.querySelector('i'),
+    price = STOCK.shut ? '✕' : String(costOf(l));
   // (the price on the sign is this place's own)
-  if (num && !l.rite && num.textContent !== String(costOf(l))) num.textContent = costOf(l);
+  if (num && !l.rite && num.textContent !== price) num.textContent = price;
   if (num) num.style.color = poor ? '#ff8a7a' : '#fff3df';
   sg.style.opacity = poor ? 0.8 : 1;
 }
@@ -5201,6 +5400,12 @@ if (new URLSearchParams(location.search).has('dev')) {
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = tick(now);
+  // While the choice of a guard is up, the level is stopped: no time passes and nothing moves, the picture simply stays
+  if (GUARD.pause) {
+    T -= dt;
+    composer.render();
+    return;
+  }
   // while anyone is speaking the enemies stand frozen, just as the brothers do
   HOLD_FOES = talking();
   heroUpdate(dt);
