@@ -471,43 +471,67 @@ function statuesUpdate(dt) {
 }
 
 // ---------- the wall ----------
-// What the masons raise besides guards: a length of dry stone wall, chest high, three courses of dressed blocks under a row
-// of capstones, the joints of each course set over the middle of the blocks below. It does nothing but stand in the way.
+// What the masons raise besides guards: a length of wall, chest high, in the manner of the hermitage's own stonework.
+// It stands on a plinth course a little wider than itself; its face is two courses of large dressed sandstone blocks, close
+// in shade, with a band of red ochre (geru) painted along under the top; and along the top runs a rounded coping, a roll of
+// paler stone. Each end is a round post, a little taller than the wall, with a ring, a low dome and a bud on it: where
+// several walls meet their posts stand in the same place and read as one, so every corner of a design has its pillar.
+// It does nothing but stand in the way.
 // Whoever walks goes round it (it is a row of SOLIDS, so the pathfinder sees it); a demon who finds no way round, or only a
 // long one, breaks it instead (see wallInWay), and it comes down in a heap. makeWall(x, z, yaw, len): its middle, the way it
 // runs (yaw 0 runs along x), and how long it is
 const WALLS = [],
-  WALL = { hp: 520, h: 1.42, thick: 0.72, far: 4 };
+  WALL = { hp: 520, h: 1.42, thick: 0.6, far: 4, mats: null };
 function makeWall(x, z, yaw = 0, len = 10) {
-  const G = new THREE.Group(),
+  // (one set of stone for every wall)
+  const M =
+      WALL.mats ||
+      (WALL.mats = {
+        st: [toon(0xc6b086, { rim: 0.16 }), toon(0xbba478, { rim: 0.15 }), toon(0x9c8a6c, { rim: 0.12 })],
+        cope: toon(0xe2d6ba, { rim: 0.2 }),
+        geru: toon(0xb4553c, { rim: 0.12 }),
+      }),
+    G = new THREE.Group(),
     top = new THREE.Group(),
-    st = [toon(0xc6b79c, { rim: 0.16 }), toon(0xb3a488, { rim: 0.14 }), toon(0x9d8e74, { rim: 0.12 })],
+    st = M.st,
     ux = Math.cos(yaw),
     uz = -Math.sin(yaw),
-    solids = [];
+    solids = [],
+    // (the wall itself runs between its two posts)
+    run = len - 0.7,
+    shade = (m) => ((m.castShadow = m.receiveShadow = true), m);
   G.position.set(x, groundY(x, z), z);
   G.rotation.y = yaw;
   G.add(top);
-  // the courses: blocks a little over a pace long, no two quite alike in length, shade or how far they stand out
-  for (let c = 0; c < 3; c++) {
-    let at = -len / 2 - (c % 2 ? 0.55 : 0);
-    for (let i = 0; at < len / 2; i++) {
-      const w0 = 1.05 + 0.3 * Math.abs(Math.sin(i * 12.9898 + c * 78.233 + x)),
-        a = Math.max(at, -len / 2),
-        b = Math.min(at + w0, len / 2);
+  // the plinth course
+  shade(add(top, new THREE.BoxGeometry(run, 0.2, WALL.thick + 0.2), st[2], [0, 0.1, 0]));
+  // the face: two courses of large blocks, the joints of the upper set over the middles of the lower, each block a hair
+  // prouder or shyer than its neighbour
+  for (let c = 0; c < 2; c++) {
+    let at = -run / 2 - (c ? 0.9 : 0);
+    for (let i = 0; at < run / 2; i++) {
+      const w0 = 1.7 + 0.35 * Math.abs(Math.sin(i * 12.9898 + c * 78.233 + x)),
+        a = Math.max(at, -run / 2),
+        b = Math.min(at + w0, run / 2);
       at += w0;
       if (b - a < 0.12) continue;
-      const m = add(top, new THREE.BoxGeometry(b - a - 0.03, 0.4, WALL.thick + 0.06 * Math.sin(i * 3.1 + c)), st[(i + c * 2) % 3], [(a + b) / 2, 0.2 + c * 0.41, 0.02 * Math.sin(i * 5.3 + c * 2)]);
-      m.castShadow = m.receiveShadow = true;
+      shade(add(top, new THREE.BoxGeometry(b - a - 0.025, 0.45, WALL.thick + 0.03 * Math.sin(i * 3.1 + c)), st[(i + c) % 2], [(a + b) / 2, 0.425 + c * 0.455, 0]));
     }
   }
-  // the capstones: flatter, a little wider than the wall, each rounded off by being set a hair askew
-  for (let i = 0, at = -len / 2; at < len / 2; i++) {
-    const w0 = 1.5 + 0.35 * Math.abs(Math.sin(i * 7.7 + z)),
-      b = Math.min(at + w0, len / 2),
-      m = add(top, new THREE.BoxGeometry(b - at - 0.04, 0.17, WALL.thick + 0.16), st[i % 2], [(at + b) / 2, 1.23 + 0.085, 0], [0, 0.03 * Math.sin(i * 4.1), 0]);
-    m.castShadow = true;
-    at = b;
+  // the band of red ochre under the top, and the rounded coping along it
+  add(top, new THREE.BoxGeometry(run, 0.17, WALL.thick + 0.035), M.geru, [0, 0.9, 0]);
+  const cope = shade(cyl(top, 0.36, 0.36, run, M.cope, [0, 1.1, 0]));
+  cope.rotation.z = Math.PI / 2;
+  // the two posts: a round shaft on a foot, a ring of ochre, a low dome and a bud
+  for (const e of [-1, 1]) {
+    const px = (e * len) / 2;
+    shade(cyl(top, 0.52, 0.56, 0.2, st[2], [px, 0.1, 0]));
+    shade(cyl(top, 0.42, 0.46, 1.4, st[0], [px, 0.9, 0]));
+    cyl(top, 0.5, 0.5, 0.16, M.geru, [px, 1.6, 0]);
+    shade(cyl(top, 0.54, 0.46, 0.1, M.cope, [px, 1.73, 0]));
+    const dome = shade(sph(top, 0.4, M.cope, [px, 1.78, 0]));
+    dome.scale.y = 0.6;
+    shade(add(top, new THREE.ConeGeometry(0.11, 0.3, 10), M.cope, [px, 2.1, 0]));
   }
   scene.add(G);
   // (in the way of everything that walks: a row of small rounds along it)

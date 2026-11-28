@@ -3776,6 +3776,7 @@ const STOCK = { n: 10, pend: 0, pendS: 0, el: null, sign: null, ring: null, at: 
     // (at a plinth that is waiting for its guard nothing is held: the guard is chosen by a click on its card)
     if (STOCK.at && STOCK.at.wait) return;
     if (on && STOCK.at && !STOCK.at.rite && (STOCK.shut || STOCK.n < costOf(STOCK.at))) {
+      STOCK.denyT = T + 0.9;
       for (const o of [sg, el]) o.animate([{ translate: '0' }, { translate: '-4px' }, { translate: '4px' }, { translate: '0' }], { duration: 220 });
       return;
     }
@@ -4335,8 +4336,8 @@ const SITES = [],
 for (const l of LAMPS) SITES.push({ x: l.x, y: l.y, z: l.z, cost: LAMP_COST, open: () => !l.built, ghost: l.ghost, of: l });
 // Once the masons are free the ground round the hermitage can be built on. What may be built is drawn on it as one pattern,
 // in thin pale lines, like a kolam: dots, and lines joining them.
-//   The lines are the sides of three rings (RINGS), the inner two eight-sided and the outer one sixteen-sided so that no
-//     side is long, and lines between each ring and the next, corner to corner: so the ground between the rings is all triangles. The
+//   The lines are the sides of two eight-sided rings (RINGS, the first two), a zigzag between them corner to corner, and
+//     eight points beyond the outer of the two (RINGS, the third, is how far out they reach): an eight-pointed star, all triangles. The
 //     innermost ring runs inside the lamps, just clear of the four signs, and each lamp stands in a triangle of its own.
 //     Any length can be raised into a wall, so the ground can be shut, opened or wound as he likes. A longer length costs
 //     more. Walkers go round a wall; a demon with no way round, or only a long one, breaks it (see wallInWay, in statue.js)
@@ -4353,6 +4354,8 @@ const PLACES = [],
 PLACES.rings = new URLSearchParams(location.search).get('pattern') === 'rings';
 {
   const LINE = new THREE.MeshBasicMaterial({ color: 0xf3ead6, transparent: true, opacity: 0.08, depthWrite: false }),
+    // (a wall's ghost is a big pale slab, so it has its own, much fainter, shade of the ghost's colour)
+    WGHOST = GHOST.clone(),
     DOT = new THREE.RingGeometry(0.62, 0.72, 28).rotateX(-Math.PI / 2),
     put = (x, z, kind, cost, yaw, len = 0) => {
       const y = groundY(x, z),
@@ -4361,7 +4364,7 @@ PLACES.rings = new URLSearchParams(location.search).get('pattern') === 'rings';
         ghost = new THREE.Group(),
         q = { x, y, z, kind, cost, face: yaw, len, built: false, base, ghost };
       // (the ghost of what would stand there: the length of the wall, or the guard of either kind)
-      if (wall) add(ghost, new THREE.BoxGeometry(len, 1.4, 0.75), GHOST, [0, 0.7, 0], [0, yaw, 0]);
+      if (wall) add(ghost, new THREE.BoxGeometry(len, 1.4, 0.75), WGHOST, [0, 0.7, 0], [0, yaw, 0]);
       // (a circle has no ghost of its own: the two guards' ghosts are shared, and brought to it. See buildUpdate)
       else q.pick = true;
       ghost.position.set(x, y, z);
@@ -4418,26 +4421,19 @@ PLACES.rings = new URLSearchParams(location.search).get('pattern') === 'rings';
       dot(c, at(k - 1, j), at(k - 1, j + 1));
       dot(c, at(k, i + 1), at(k - 1, j + 1));
     }
-  // The outer ring has twice the corners, so that its sides are no longer than the rest. Every other corner of it stands
-  // straight out from a corner of the middle ring, and a short line joins the two; each corner between is joined to the two
-  // middle corners it stands between. So each side of the middle ring has three triangles beyond it
-  const out = (j) => [Math.sin((j * step) / 2) * RINGS[2], Math.cos((j * step) / 2) * RINGS[2]];
+  // Beyond the middle ring there is no third ring, only its points: one out from the middle of each side of the middle
+  // ring, almost at the road, joined to that side's two corners. So the outline of the whole is an eight-pointed star, and
+  // each point is a triangle with a guard's circle in it
   for (let i = 0; i < WALL_N && !PLACES.rings; i++) {
     const m = at(1, i),
       n = at(1, i + 1),
-      a = out(2 * i),
-      b = out(2 * i + 1),
-      c = out(2 * i + 2);
-    seg(a, b);
-    seg(b, c);
-    seg(m, a);
+      b = [Math.sin((i + 0.5) * step) * RINGS[2], Math.cos((i + 0.5) * step) * RINGS[2]];
     seg(m, b);
     seg(n, b);
-    dot(m, a, b);
     dot(m, n, b);
-    dot(n, b, c);
   }
   PLACES.line = LINE;
+  PLACES.ghost = WGHOST;
 }
 // (the moment the masons are free the pattern is there on the ground)
 function placesOpen() {
@@ -4470,7 +4466,11 @@ function wallCells() {
   for (const w of W)
     for (const sd of [1, -1]) pts.push([w.x + Math.sin(w.face) * 0.9 * sd, w.z + Math.cos(w.face) * 0.9 * sd]);
   // (piece 0 is outside; the rest are numbered as they are found)
-  const out = pts.map(([x, z]) => !cut(x, z, (x * 80) / Math.hypot(x, z), (z * 80) / Math.hypot(x, z)));
+  // (looking out a hair to one side of straight, so as never to look exactly through a corner where lines meet)
+  const out = pts.map(([x, z]) => {
+    const k = 80 / Math.hypot(x, z);
+    return !cut(x, z, (x * 0.9997 - z * 0.0245) * k, (z * 0.9997 + x * 0.0245) * k);
+  });
   let n = 1;
   pts.forEach(([x, z], i) => {
     if (out[i]) return (of[i] = 0);
@@ -4736,12 +4736,17 @@ function buildUpdate(dt) {
     flash(tmpA.set(l.x, l.y + 0.2, l.z), 0xffd08a, 5);
   }
   // (one disc for a lamp, a wall or the night; the pair of them at a guard's circle)
-  sg.style.display = STOCK.at && !STOCK.at.wait ? 'flex' : 'none';
+  // The sign with the cost and the ring is there only while he is building: from the moment he holds until the ring has
+  // run back. (Also for a moment when he tries and cannot, so that he sees the price or the cross that stopped him; and
+  // always for calling the night.) Until then the place is shown by its faint ghost alone
+  sg.style.display = STOCK.at && !STOCK.at.wait && (STOCK.at.rite || STOCK.hold || STOCK.k > 0 || T < (STOCK.denyT || 0)) ? 'flex' : 'none';
 
   // the ghost stands on the platform he is at: breathing a little, firmer as the ring fills, red if he cannot pay
   siteMarks(dt);
-  GHOST.opacity = 0.26 + 0.06 * Math.sin(T * 3) + 0.4 * STOCK.k;
+  GHOST.opacity = 0.13 + 0.03 * Math.sin(T * 3) + 0.45 * STOCK.k;
   GHOST.color.set(STOCK.shut || STOCK.n < costOf(STOCK.at) ? 0xff7a6a : 0xffd9a0);
+  PLACES.ghost.color.copy(GHOST.color);
+  PLACES.ghost.opacity = 0.045 + 0.4 * STOCK.k;
   STOCK.ring.setAttribute('stroke-dashoffset', RING_LEN * (1 - STOCK.k));
   if (!STOCK.at) return;
   // A place to build has its sign over the head of the brother being played, always in the same spot above him, so that it
@@ -5317,6 +5322,8 @@ let shown = 0,
       }
       NIGHT.day = 2;
       for (const c of CAMPS) campShow(c);
+      // (and plenty to build with, for trying designs: these two starts are for that)
+      woodGain(300);
     }
     if (skip === 'saved') {
       // both far camps are freed, with nothing fought or said: their guards are gone, their captives stand loose and set
